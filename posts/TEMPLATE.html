@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Título do Seu Post | Cloud by MCN</title>
+    
+    <!-- SEO -->
+    <meta property="og:title" content="Título do Seu Post">
+    <meta property="og:description" content="Descrição breve do seu post para SEO.">
+
+    <!-- CSS & Prism -->
+    <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+</head>
+<body>
+
+    <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+
+    <header class="site-header fade-in">
+        <div class="nav-container">
+            <a href="../index.html" class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 17L12 22L22 17" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                CLOUD BY <span>MCN</span>
+            </a>
+            <nav class="nav-menu">
+                <ul>
+                    <li><a href="../index.html" class="nav-link">Home</a></li>
+                    <li><a href="#" class="nav-link active">Artigos</a></li>
+                </ul>
+            </nav>
+            <div id="theme-toggle" style="cursor: pointer;">☀️</div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        
+        <!-- Breadcrumbs -->
+        <div class="breadcrumbs fade-in">
+            <a href="../index.html">Home</a> <span>/</span> <a href="#">Artigos</a> <span>/</span> [CATEGORIA]
+        </div>
+        
+        <article class="article-grid fade-in">
+            
+            <div class="article-content">
+                <header class="article-header">
+                    <div class="article-meta">
+                        <span class="post-date">XX Mês AAAA</span> • [TAGS_PRINCIPAIS] • <span id="reading-time"></span>
+                    </div>
+                    <h1 class="article-title">Título do Seu Post Aqui</h1>
+                </header>
+
+                <p>
+                    Comece seu artigo aqui. Use parágrafos para o texto principal.
+                </p>
+
+                <h2 id="primeira-secao">Primeira Seção</h2>
+                <p>
+                    Você pode adicionar links, **negritos**, e outros elementos HTML.
+                </p>
+                <ul>
+                    <li>Item 1 da lista</li>
+                    <li>Item 2 da lista</li>
+                </ul>
+
+                <h2 id="blocos-de-codigo">Blocos de Código</h2>
+                <p>
+                    Use a tag `pre` com `code` e a classe `language-` para syntax highlighting.
+                </p>
+
+                <pre><code class="language-bash">echo "Hello, Cloud by MCN!"
+aws s3 ls</code></pre>
+
+                <h2 id="imagens-e-media">Imagens e Mídia</h2>
+                <p>
+                    Para adicionar imagens, coloque o arquivo em `assets/img/` e referencie-o:
+                </p>
+                <img src="../assets/img/nome-da-sua-imagem.jpg" alt="Descrição da imagem" style="max-width: 100%; height: auto; display: block; margin: 20px auto;">
+
+
+                <div style="margin-top: 60px;">
+                    <a href="../index.html" style="font-weight: bold; border-bottom: 1px solid var(--accent);">← Voltar para Home</a>
+                </div>
+            </div>
+
+             <!-- Table of Contents (Sticky) -->
+             <aside class="toc-sidebar">
+                <div class="toc-title">Neste artigo</div>
+                <ul class="toc-list" id="toc-list">
+                    <!-- Gerado via JS -->
+                </ul>
+            </aside>
+
+        </article>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <!-- Inclua apenas os componentes de linguagem que você usará frequentemente: -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="../assets/js/script.js"></script>
+</body>
+</html>

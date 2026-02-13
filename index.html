@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud by MCN | Modern DevOps</title>
+    <meta name="description" content="Blog técnico sobre AWS, Infraestrutura como Código e DevOps.">
+    <meta property="og:type" content="website">
+    <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+    <!-- Elemento Invisível do Google Translate -->
+    <div id="google_translate_element"></div>
+
+    <!-- Header Estático -->
+    <header class="site-header fade-in">
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 17L12 22L22 17" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                CLOUD BY <span>MCN</span>
+            </a>
+            
+            <div class="nav-right">
+                <nav class="nav-menu">
+                    <ul>
+                        <li><a href="index.html" class="nav-link active">Home</a></li>
+                        <li><a href="#" class="nav-link">Artigos</a></li>
+                    </ul>
+                </nav>
+
+                <!-- Seletor de Língua -->
+                <div class="lang-switcher">
+                    <div class="lang-btn" id="lang-pt" title="Português">
+                        <img src="https://flagcdn.com/w40/br.png" alt="PT">
+                    </div>
+                    <div class="lang-btn" id="lang-en" title="English">
+                        <img src="https://flagcdn.com/w40/us.png" alt="EN">
+                    </div>
+                </div>
+
+                <div id="theme-toggle" style="cursor: pointer; font-size: 1.2rem;">☀️</div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        
+        <div class="layout-grid fade-in">
+            
+            <!-- ESQUERDA: Perfil Fixo (Sticky) -->
+            <aside class="profile-sidebar">
+                <div class="profile-card">
+                    <div class="profile-img-container">
+                        <!-- Placeholder até você colocar sua foto real em assets/img/photo.jpg -->
+                        <img src="assets/img/avatar.jpg" alt="MCN" class="profile-img">
+                    </div>
+                    <h2 class="profile-name">MATHEUS N.</h2>
+                    <span class="profile-role">ANALISTA DE INFRA/CLOUD</span>
+<p class="profile-bio">
+Engenheiro de infraestrutura focado em AWS, com experiência em soluções cloud. Pós-graduando em Arquitetura Cloud, com foco em IA, escalabilidade e sistemas distribuídos.
+</p>
+
+                    <div class="social-links">
+                        <a href="https://www.linkedin.com/in/m-cnascimento/" target="_blank" class="social-btn" title="LinkedIn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+                        </a>
+                        <a href="https://www.instagram.com/cloudbymcn/" target="_blank" class="social-btn" title="Instagram">
+                            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" stroke-width="0"><path d="M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.917 3.917 0 0 0-1.417.923A3.927 3.927 0 0 0 .42 2.76C.222 3.269.087 3.85.048 4.703.01 5.555 0 5.827 0 8.001c0 2.172.01 2.444.048 3.297.04.852.174 1.433.372 1.942.205.526.478.95.923 1.417.444.46.867.733 1.417.923.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.444-.01 3.297-.048c.852-.04 1.433-.174 1.942-.372a3.927 3.927 0 0 0 1.417-.923c.46-.445.733-.867.923-1.417.198-.51.333-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.297c-.04-.852-.174-1.433-.372-1.942a3.917 3.917 0 0 0-.923-1.417A3.927 3.927 0 0 0 13.24 0.42c-.51-.198-1.09-.333-1.942-.372C10.445.01 10.173 0 8 0ZM8 1.5c2.165 0 2.444.01 3.297.048.792.039 1.243.173 1.57.308.34.142.595.356.87.63.284.284.498.539.63.87.135.327.269.778.308 1.57.038.853.048 1.132.048 3.297s-.01 2.444-.048 3.297c-.039.792-.173 1.243-.308 1.57a2.087 2.087 0 0 1-.63.87c-.284.284-.539.498-.87.63-.327.135-.778.269-1.57-.308-.853.038-1.132.048-3.297.048s-2.444-.01-3.297-.048c-.792-.039-1.243-.173-1.57-.308a2.087 2.087 0 0 1 .63-.87c.284-.284.539-.498.87-.63.327-.135.778-.269 1.57-.308C5.555 1.51 5.827 1.5 8 1.5Z"/>
+                            <path d="M12.957 2.513a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2ZM8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 1a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/>
+                            </svg>
+                        </a>
+                        <a href="mailto:matheuscamposti@gmail.com" class="social-btn" title="Email">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        </a>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- DIREITA: Conteúdo Principal -->
+            <div class="content-area">
+                
+                <!-- Hero Compacto -->
+                <div class="hero-compact">
+                    <h1>Arquitetura Cloud<br></h1>
+                    <p>Este blog documenta arquiteturas reais, decisões técnicas e implementações completas. Automação, otimização de custos, pipelines de mídia e infraestrutura que funciona.</p>
+                </div>
+
+                <!-- Controles: Busca + Filtros -->
+                <div class="controls-bar">
+                    <div class="search-wrapper">
+                        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" class="search-input" placeholder="Buscar posts...">
+                    </div>
+                    <div class="tags-filter">
+                        <button class="filter-btn active" data-filter="all">Todos</button>
+                        <button class="filter-btn" data-filter="aws">AWS</button>
+                        <button class="filter-btn" data-filter="iac">IaC</button>
+                    </div>
+                </div>
+
+                <!-- Grid de Posts -->
+                <div class="home-grid">
+                    
+                    <article class="post-card" data-tags="aws ec2 vpc sg database">
+                        <div>
+                            <div class="post-meta-info">
+                                <span class="post-date">12 Fev 2026</span>
+                                <div class="card-tags">
+                                    <span class="tag">#AWS</span>
+                                    <span class="tag">#EC2</span>
+                                    <span class="tag">#SG</span>
+                                    <span class="tag">#VPC</span>
+                                </div>
+                            </div>
+                            <a href="posts/artigo-integracao-leverpro-athenas-communitybuilder.html"><h2 class="post-title">Integração segura entre uma API externa → banco de dados na AWS</h2></a>
+                            <p class="post-excerpt">Case real: infraestrutura para uma API em Node.js, exposta por HTTPS com Nginx, Let's Encrypt e allowlist de IPs, consumindo dados de um banco de dados sem expor o banco à internet.</p>
+                        </div>
+                        <a href="posts/artigo-integracao-leverpro-athenas-communitybuilder.html" class="read-more">Ler artigo <span>→</span></a>
+                    </article>
+
+                    <article class="post-card" data-tags="aws cloudfront s3 mediaconvert batch lambda">
+                        <div>
+                            <div class="post-meta-info">
+                                <span class="post-date">04 Fev 2026</span>
+                                <div class="card-tags">
+                                    <span class="tag">#AWS</span>
+                                    <span class="tag">#CloudFront</span>
+                                    <span class="tag">#S3</span>
+                                    <span class="tag">#Lambda</span>
+                                </div>
+                            </div>
+                            <a href="posts/otimizacao-mp4.html"><h2 class="post-title">Arquitetura para Otimização de Vídeos na AWS: Um Case de Produção com Entrega Global sem Alteração de URLs</h2></a>
+                            <p class="post-excerpt">Uma arquitetura com MediaConvert, S3 Batch Operations e AWS Lambda para implementar progressive download em vídeos legados, otimizando a entrega global via CloudFront sem quebrar integrações existentes.</p>
+                        </div>
+                        <a href="posts/otimizacao-mp4.html" class="read-more">Ler artigo <span>→</span></a>
+                    </article>
+
+                </div>
+
+                <!-- Newsletter Footer -->
+                <div style="margin-top: 60px; padding: 40px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); text-align: center;">
+                    <h3 style="font-family: 'Space Grotesk'; margin-bottom: 10px;">Newsletter Semanal</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">Dicas de AWS direto no seu e-mail.</p>
+                    <form onsubmit="event.preventDefault(); alert('Inscrito!')" style="display: flex; gap: 10px; justify-content: center;">
+                        <input type="email" placeholder="seu@email.com" style="padding: 10px; border-radius: 8px; border: 1px solid var(--card-border); background: rgba(0,0,0,0.3); color: #fff;">
+                        <button type="submit" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Assinar</button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <footer style="text-align: center; color: var(--text-secondary); padding: 40px 0; font-size: 0.85rem;">
+        &copy; <span id="current-year"></span> Cloud by MCN.
+    </footer>
+
+    <script src="assets/js/script.js"></script>
+</body>
+</html>

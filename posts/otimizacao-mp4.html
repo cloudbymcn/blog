@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Otimização de entrega global de vídeos na AWS sem alterar URLs (CloudFront + S3 + MediaConvert + Batch + Lambda) | Cloud by MCN</title>
+
+  <!-- SEO -->
+  <meta property="og:title" content="Otimização de entrega global de vídeos na AWS sem alterar URLs" />
+  <meta property="og:description" content="Case real: como otimizei milhares de MP4 (fast start) com MediaConvert + S3 Batch Operations + Lambda, mantendo as mesmas URLs consumidas pelo Salesforce e melhorando a experiência em redes 4G/5G via CloudFront." />
+
+  <!-- CSS & Prism -->
+  <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg" />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+
+  <!-- Post Enhancements (scoped) -->
+  <style>
+    /* Keep it compatible with existing site CSS */
+    .article-content h2 { margin-top: 2.5rem; padding-top: 0.25rem; }
+    .article-content h3 { margin-top: 1.75rem; }
+    .article-content hr { margin: 2.5rem 0; opacity: .35; }
+
+    /* Callouts (upgrade) */
+    .callout {
+      border-left: 4px solid var(--accent, #FF9900);
+      background: rgba(255,153,0,.06);
+      padding: 14px 16px;
+      border-radius: 14px;
+      margin: 18px 0;
+    }
+    .callout strong { display: inline-block; margin-bottom: 4px; }
+
+    /* Code boxes (collapsible + toolbar) */
+    details.codebox {
+      margin: 16px 0 20px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.22);
+    }
+    details.codebox > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      user-select: none;
+      font-weight: 700;
+    }
+    details.codebox > summary::-webkit-details-marker { display: none; }
+    .codebox-title { display:flex; align-items:center; gap:10px; }
+    .codebox-pill {
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.18);
+      opacity: .85;
+      font-weight: 600;
+    }
+    .codebox-tools { display:flex; gap:8px; align-items:center; }
+    .codebtn {
+      font: inherit;
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.06);
+      cursor: pointer;
+    }
+    .codebtn:active { transform: translateY(1px); }
+    .codebtn[disabled] { opacity: .55; cursor: not-allowed; }
+
+    /* Prism blocks inside codebox */
+    details.codebox pre {
+      margin: 0;
+      border-radius: 0;
+    }
+    details.codebox .codewrap {
+      position: relative;
+    }
+    details.codebox .copy-toast {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      background: rgba(0,0,0,.6);
+      border: 1px solid rgba(255,255,255,.16);
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: .18s;
+      pointer-events: none;
+    }
+    details.codebox .copy-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* "Jump links" for sections */
+    .anchor-link {
+      text-decoration: none;
+      opacity: .55;
+      margin-left: 10px;
+      font-weight: 700;
+    }
+    .anchor-link:hover { opacity: 1; }
+
+    /* Inline code look */
+    code:not([class]) {
+      padding: 2px 6px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    /* Small helper toolbar top of article */
+    .post-tools {
+      display:flex;
+      gap:10px;
+      flex-wrap: wrap;
+      margin: 16px 0 24px;
+    }
+    .post-tools button {
+      font: inherit;
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.06);
+    }
+  </style>
+
+</head>
+
+<body>
+  <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+
+  <header class="site-header fade-in">
+    <div class="nav-container">
+      <a href="../index.html" class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 17L12 22L22 17" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 12L12 17L22 12" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        CLOUD BY <span>MCN</span>
+      </a>
+
+      <nav class="nav-menu">
+        <ul>
+          <li><a href="../index.html" class="nav-link">Home</a></li>
+          <li><a href="#" class="nav-link active">Artigos</a></li>
+        </ul>
+      </nav>
+
+      <div id="theme-toggle" style="cursor: pointer;">☀️</div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- Breadcrumbs -->
+    <div class="breadcrumbs fade-in">
+      <a href="../index.html">Home</a> <span>/</span> <a href="#">Artigos</a>
+      <span>/</span> AWS • CloudFront • S3 • MediaConvert
+    </div>
+
+    <article class="article-grid fade-in">
+      <div class="article-content">
+        <header class="article-header">
+                            <div class="post-meta-info">
+                                <span class="post-date">04 Fev 2026</span>
+                                <div class="card-tags">
+                                    <span class="tag">#AWS</span>
+                                    <span class="tag">#AmazonCloudFront</span>
+                                    <span class="tag">#AmazonS3</span>
+                                    <span class="tag">#AWSLambda</span>
+                                    <span class="tag">#MediaConvert</span>
+                                    <span class="tag">#S3BatchOperations</span>
+                                </div>
+                            </div>
+
+          <h1 class="article-title">
+            Otimização da entrega global de vídeos na AWS (sem alterar URLs): CloudFront + S3 + MediaConvert + Batch + Lambda
+          </h1>
+
+          <p class="article-subtitle">
+            Um caso real de produção: vídeos MP4 com início lento em redes móveis, integrações consumindo URLs fixas (Salesforce) e a necessidade de acelerar o “play” sem quebrar nada.
+          </p>
+        </header>
+
+        <p>
+          Este post mostra, com foco em execução e segurança, como eu implementei uma esteira para <strong>otimizar milhares de MP4</strong>
+          armazenados no <strong>Amazon S3</strong> e entregues via <strong>Amazon CloudFront</strong>, garantindo um ponto inegociável:
+          <strong>as URLs não poderiam mudar</strong> — porque já estavam integradas (no meu caso, em páginas e fluxos do <strong>Salesforce</strong>).
+         
+        </p>
+
+        <p>
+          O “sintoma” era simples de explicar e difícil de aceitar no dia a dia: em algumas redes <strong>4G/5G</strong>, o vídeo
+          <strong>demorava mais para começar</strong>. Em ambientes comerciais, isso vira atrito imediato: o usuário clica, espera,
+          e a percepção de qualidade cai — mesmo com o vídeo estando “ok” tecnicamente.
+         
+        </p>
+
+        <hr />
+
+        <h2 id="o-que-voce-vai-conseguir">O que você vai conseguir ao final<a class="anchor-link" href="#o-que-voce-vai-conseguir" aria-label="Link da seção">#</a></h2>
+        <ul>
+          <li><strong>Início mais rápido</strong> do vídeo (melhora perceptível em mobile).</li>
+          <li><strong>Mesmas URLs</strong> (não quebra Salesforce, site, apps ou links já distribuídos).</li>
+          <li><strong>Processo escalável</strong> para milhares de arquivos.</li>
+          <li><strong>Plano de segurança</strong>: backup + possibilidade de rollback.</li>
+        </ul>
+
+
+        <hr />
+
+        <h2 id="tl-dr">Resumo direto (TL;DR)<a class="anchor-link" href="#tl-dr" aria-label="Link da seção">#</a></h2>
+        <ul>
+          <li><strong>Problema:</strong> MP4s legados iniciando lentamente (especialmente em redes móveis).</li>
+          <li><strong>Restrição:</strong> as URLs já consumidas pelo Salesforce não podiam ser alteradas.</li>
+          <li><strong>Ideia central:</strong> gerar um MP4 otimizado para “start rápido” e <strong>substituir o arquivo no mesmo caminho/nome</strong>.</li>
+          <li><strong>Como:</strong> MediaConvert para gerar MP4 com “fast start” + S3 Batch Operations + Lambda para sobrescrever em lote.</li>
+          <li><strong>Segurança:</strong> backup em lote antes, e rollback possível.</li>
+        </ul>
+       
+
+        <hr />
+
+        <h2 id="arquitetura">Arquitetura (visão geral)<a class="anchor-link" href="#arquitetura" aria-label="Link da seção">#</a></h2>
+        <p>
+          A solução tem duas etapas grandes: (1) gerar versões otimizadas e (2) substituir os originais mantendo o mesmo nome.
+          Em alto nível, o fluxo fica assim:
+         
+        </p>
+
+        <div class="callout">
+          <img src="../assets/img/timelie.png" alt="arquitetura" style=
+     "max-width:100%;margin:20px auto;display:block;">
+        </div>
+
+        <details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">bash</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-bash">S3 (images/&lt;bloco&gt;/&lt;video&gt;.mp4)
+  ├─ MediaConvert → gera MP4 otimizado (fast start) em:
+  │   images/&lt;bloco&gt;/_mp4_opt/&lt;video&gt;_opt.mp4
+  ├─ S3 Batch Operations (Copy) → faz backup dos originais
+  └─ S3 Batch Operations (Invoke Lambda) → Lambda copia _mp4_opt para a raiz e mantém o nome (.mp4)</code></pre>
+  </div>
+</details>
+       
+
+        <hr />
+
+        <h2 id="pre-req">Pré-requisitos (checklist rápido)<a class="anchor-link" href="#pre-req" aria-label="Link da seção">#</a></h2>
+        <ul>
+          <li>Bucket S3 com os MP4s (ex.: <code>meubucketfake</code>).</li>
+          <li>CloudFront distribuindo o prefixo onde os MP4s são acessados (ex.: <code>/images/*</code>).</li>
+          <li>Acesso para usar: MediaConvert, S3 Batch Operations, Lambda e IAM.</li>
+          <li>Região utilizada: <strong>us-east-1</strong> (N. Virginia).</li>
+        </ul>
+       
+
+
+        <hr />
+
+        <h2 id="entendendo-o-por-que">Entendendo o “porquê” (sem complicar)<a class="anchor-link" href="#entendendo-o-por-que" aria-label="Link da seção">#</a></h2>
+        <p>
+          Muitos MP4 “antigos” ou gerados por pipelines diferentes começam a tocar mais lentamente porque o player precisa
+          ler informações importantes do arquivo antes de dar play. A otimização “fast start” reorganiza o MP4 para que essas
+          informações fiquem disponíveis logo no início, reduzindo o tempo até o primeiro frame — principalmente quando a rede
+          varia (caso comum em 4G/5G).
+        </p>
+
+        <p>
+          O ponto importante: <strong>não é uma troca de tecnologia</strong> (não é sobre streaming HLS/DASH aqui). É uma melhoria
+          pragmática: <strong>otimizar o mesmo MP4</strong> para tocar melhor no mundo real.
+        </p>
+
+        <hr />
+        <h2 id="etapa-1-mediaconvert">Etapa 1 — Criar 1 job “modelo” no MediaConvert (para validar com confiança)<a class="anchor-link" href="#etapa-1-mediaconvert" aria-label="Link da seção">#</a></h2>
+
+<p>
+  Antes de qualquer automação em massa, o primeiro passo foi validar se a otimização realmente funcionava
+  <strong>em um único vídeo</strong>.
+</p>
+
+<p>
+  Essa etapa existe por um motivo simples:
+  <strong>evitar custo, retrabalho e surpresa ruim depois</strong>.
+  Aqui eu usei o MediaConvert como uma ferramenta de validação técnica,
+  não como ferramenta de execução em escala.
+</p>
+
+<img src="../assets/img/1.png" alt="Descrição do conteúdo da imagem" style=
+     "max-width:100%;margin:20px auto;display:block;">
+
+<h3 id="mediaconvert-criar-job">1.1 Criar um novo job<a class="anchor-link" href="#mediaconvert-criar-job" aria-label="Link da seção">#</a></h3>
+
+<ol>
+  <li>Acesse <strong>AWS Elemental MediaConvert</strong> na região <strong>us-east-1</strong>.</li>
+  <li>Vá em <strong>Jobs</strong> → <strong>Create job</strong>.</li>
+  <li>Se for a primeira vez usando o serviço, aceite a criação/configuração da role padrão sugerida pela AWS.</li>
+</ol>
+
+<h3 id="mediaconvert-input">1.2 Definir o Input (vídeo original)<a class="anchor-link" href="#mediaconvert-input" aria-label="Link da seção">#</a></h3>
+
+<p>
+  O input do job é o vídeo original armazenado no Amazon S3.
+  Como este é apenas um teste, basta escolher <strong>um MP4 representativo</strong>.
+</p>
+
+<ol>
+  <li>No painel esquerdo, clique em <strong>Input 1</strong>.</li>
+  <li>Em <strong>Input file URL</strong>, informe o caminho completo do arquivo no S3:</li>
+</ol>
+
+<details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">bash</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-bash">s3://meubucketfake/images/57816/57816_41.mp4</code></pre>
+  </div>
+</details>
+
+<ol start="3">
+  <li>Mantenha as demais opções no padrão para seguir as características do arquivo original.</li>
+</ol>
+
+
+<h3 id="mediaconvert-output-group">1.3 Criar o Output Group (destino do vídeo otimizado)<a class="anchor-link" href="#mediaconvert-output-group" aria-label="Link da seção">#</a></h3>
+
+<p>
+  Um ponto importante de segurança: o vídeo otimizado <strong>não sobrescreve o original</strong>.
+  Nesta etapa, ele é gerado em uma pasta separada (<code>_mp4_opt</code>).
+</p>
+
+<ol>
+  <li>Em <strong>Output groups</strong>, clique em <strong>Add</strong>.</li>
+  <li>Selecione <strong>File group</strong>.</li>
+  <li>Em <strong>Destination</strong>, informe o caminho da pasta de saída:</li>
+</ol>
+
+<details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">bash</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-bash">s3://meubucketfake/images/57816/_mp4_opt/</code></pre>
+  </div>
+</details>
+
+
+<h3 id="mediaconvert-output">1.4 Configurar o Output (MP4 com início rápido)<a class="anchor-link" href="#mediaconvert-output" aria-label="Link da seção">#</a></h3>
+
+<p>
+  Aqui está o ponto-chave da otimização:
+  configurar o MP4 para iniciar mais rápido, especialmente em redes móveis.
+</p>
+
+<ol>
+  <li>Em <strong>Outputs</strong>, clique em <strong>Add output</strong>.</li>
+  <li>Em <strong>Name modifier</strong>, utilize <code>_opt</code> para identificar a versão otimizada.</li>
+  <li><strong>Container:</strong> MP4.</li>
+  <li>
+    <strong>Moov placement:</strong>
+    selecione <strong>Progressive download</strong>.
+    <br />
+    <em>Esse ajuste move os metadados para o início do arquivo, reduzindo o tempo até o primeiro frame.</em>
+  </li>
+  <li>
+    <strong>Vídeo:</strong> H.264 (compatibilidade ampla).
+    Para controle de qualidade e tamanho, QVBR costuma ser um bom ponto de partida.
+  </li>
+</ol>
+
+<img src="../assets/img/3.png" alt="Descrição do conteúdo da imagem" style=
+     "max-width:100%;margin:20px auto;display:block;">
+
+<p>Em JSON, esse ponto aparece assim:</p>
+
+<details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">json</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-json">"Mp4Settings": {
+  "MoovPlacement": "PROGRESSIVE_DOWNLOAD"
+}</code></pre>
+  </div>
+</details>
+
+<h3 id="mediaconvert-submit">1.5 Executar o job e validar o resultado<a class="anchor-link" href="#mediaconvert-submit" aria-label="Link da seção">#</a></h3>
+
+<ol>
+  <li>Clique em <strong>Create</strong> / <strong>Submit job</strong>.</li>
+  <li>Aguarde o job finalizar.</li>
+  <li>Verifique no S3 se o arquivo foi gerado corretamente:</li>
+</ol>
+
+<details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">bash</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-bash">images/57816/_mp4_opt/57816_41_opt.mp4</code></pre>
+  </div>
+</details>
+
+<ol start="4">
+  <li>Compare tamanho, qualidade visual e tempo de início.</li>
+  <li>Se possível, teste a reprodução via CloudFront em uma rede 4G/5G.</li>
+</ol>
+
+<img src="../assets/img/4.png" alt="Descrição do conteúdo da imagem" style=
+     "max-width:100%;margin:20px auto;display:block;">
+
+<p>
+  Com esse job validado, o padrão técnico está definido.
+  A partir daqui, ele pode ser reutilizado com segurança na automação em lote (Etapa 2).
+</p>
+
+<hr />
+
+<h2 id="etapa-2-automatizar-mediaconvert">Etapa 2 — Automatizar a criação de jobs do MediaConvert (em lote, do jeito certo)<a class="anchor-link" href="#etapa-2-automatizar-mediaconvert" aria-label="Link da seção">#</a></h2>
+
+<p>
+  Depois de validar manualmente um job no MediaConvert (Etapa 1), o próximo desafio era escalar.
+  Fazer isso vídeo por vídeo seria inviável. A solução foi automatizar a criação dos jobs usando
+  <strong>Python no CloudShell</strong>, percorrendo o bucket S3 e disparando jobs apenas para os arquivos necessários.
+</p>
+
+<p>
+  Aqui é importante deixar algo bem claro, porque é um erro comum (e eu mesmo caí nisso no início):
+</p>
+
+<div class="callout">
+  <strong>Atenção:</strong> o CloudShell abre por padrão em modo <strong>bash</strong>.  
+  Código Python <strong>não pode ser colado direto no terminal</strong>.  
+  O script precisa ser salvo em um arquivo <code>.py</code> e executado explicitamente com <code>python3</code>.
+</div>
+
+<h3 id="etapa-2-fluxo-correto">2.1 Fluxo correto no CloudShell<a class="anchor-link" href="#etapa-2-fluxo-correto" aria-label="Link da seção">#</a></h3>
+
+<ol>
+  <li>Abrir o CloudShell na região <strong>us-east-1</strong>.</li>
+  <li>Criar um arquivo Python usando <code>nano</code>.</li>
+  <li>Colar o script completo dentro do arquivo.</li>
+  <li>Salvar o arquivo.</li>
+  <li>Executar usando <code>python3</code>.</li>
+</ol>
+
+<details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">bash</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-bash">nano generate_mp4_opt_cloudshell.py
+# cola o script
+# CTRL + O → Enter
+# CTRL + X
+
+python3 generate_mp4_opt_cloudshell.py</code></pre>
+  </div>
+</details>
+
+        <div class="callout">
+          <img src="../assets/img/cloudshell.png" alt="arquitetura" style=
+     "max-width:100%;margin:20px auto;display:block;">
+        </div>
+
+<hr />
+
+<h3 id="endpoint-mediaconvert">2.2 Endpoint do MediaConvert<a class="anchor-link" href="#endpoint-mediaconvert" aria-label="Link da seção">#</a></h3>
+
+<p>
+  O MediaConvert utiliza um endpoint específico por conta e região.
+  Antes de criar os jobs via API, validei o endpoint correto para <strong>us-east-1</strong>:
+</p>
+
+<details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">bash</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-bash">https://mediaconvert.us-east-1.amazonaws.com</code></pre>
+  </div>
+</details>
+
+
+<hr />
+
+<h3 id="script-mediaconvert">2.3 Script usado para criar os jobs em lote<a class="anchor-link" href="#script-mediaconvert" aria-label="Link da seção">#</a></h3>
+
+<p>
+  O script abaixo percorre o prefixo <code>images/</code>, identifica arquivos <code>.mp4</code> e:
+</p>
+
+<ul>
+  <li>Pula arquivos que já possuem versão otimizada em <code>/_mp4_opt/</code></li>
+  <li>Cria jobs no MediaConvert apenas quando necessário</li>
+  <li>Gera logs claros para acompanhamento e prints</li>
+</ul>
+
+<details class="codebox" open>
+  <summary>
+    <span class="codebox-title">Script completo <span class="codebox-pill">python</span></span><span class="codebox-tools"><button type="button" class="codebtn copy-btn">Copiar</button></span>
+  </summary>
+
+<pre><code class="language-python">
+import boto3
+import os
+import time
+
+# =========================
+# CONFIGURAÇÕES
+# =========================
+REGION = "us-east-1"
+ACCOUNT_ID = "*AQUI VOCE COLOCA SEU ACC ID*"
+
+BUCKET = "meubucketfake"
+BASE_PREFIX = "images/"
+OUTPUT_FOLDER = "_mp4_opt"
+
+DELAY_SECONDS = 0.6  # seguro contra throttling
+
+MEDIACONVERT_ENDPOINT = "https://mediaconvert.us-east-1.amazonaws.com"
+ROLE_ARN = f"arn:aws:iam::{ACCOUNT_ID}:role/service-role/MediaConvert_Default_Role"
+
+# =========================
+# CLIENTS
+# =========================
+s3 = boto3.client("s3", region_name=REGION)
+
+mediaconvert = boto3.client(
+    "mediaconvert",
+    region_name=REGION,
+    endpoint_url=MEDIACONVERT_ENDPOINT
+)
+
+# =========================
+# HELPERS
+# =========================
+def mp4_opt_exists(base_dir):
+    """Verifica se já existe pasta _mp4_opt"""
+    resp = s3.list_objects_v2(
+        Bucket=BUCKET,
+        Prefix=f"{base_dir}/{OUTPUT_FOLDER}/",
+        MaxKeys=1
+    )
+    return "Contents" in resp
+
+
+def create_job(input_key):
+    base_dir = os.path.dirname(input_key).replace("\\", "/")
+    input_s3 = f"s3://{BUCKET}/{input_key}"
+    output_s3 = f"s3://{BUCKET}/{base_dir}/{OUTPUT_FOLDER}/"
+
+    job = {
+        "Role": ROLE_ARN,
+        "Settings": {
+            "Inputs": [
+                {
+                    "FileInput": input_s3,
+                    "VideoSelector": {}
+                }
+            ],
+            "OutputGroups": [
+                {
+                    "Name": "MP4_OPT",
+                    "OutputGroupSettings": {
+                        "Type": "FILE_GROUP_SETTINGS",
+                        "FileGroupSettings": {
+                            "Destination": output_s3
+                        }
+                    },
+                    "Outputs": [
+                        {
+                            "NameModifier": "_opt",
+                            "ContainerSettings": {
+                                "Container": "MP4",
+                                "Mp4Settings": {
+                                    "MoovPlacement": "PROGRESSIVE_DOWNLOAD"
+                                }
+                            },
+                            "VideoDescription": {
+                                "CodecSettings": {
+                                    "Codec": "H_264",
+                                    "H264Settings": {
+                                        "RateControlMode": "QVBR",
+                                        "QvbrSettings": {
+                                            "QvbrQualityLevel": 8
+                                        },
+                                        "MaxBitrate": 15000000,
+                                        "QualityTuningLevel": "SINGLE_PASS_HQ",
+                                        "CodecProfile": "HIGH",
+                                        "CodecLevel": "AUTO",
+                                        "FramerateControl": "INITIALIZE_FROM_SOURCE"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+    response = mediaconvert.create_job(**job)
+    job_id = response["Job"]["Id"]
+    print(f"JOB CRIADO | {input_key} | {job_id}")
+
+
+# =========================
+# MAIN
+# =========================
+def main():
+    paginator = s3.get_paginator("list_objects_v2")
+    criados = 0
+    pulados = 0
+
+    print("=== INÍCIO DA EXECUÇÃO ===")
+
+    for page in paginator.paginate(Bucket=BUCKET, Prefix=BASE_PREFIX):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+
+            # filtros
+            if not key.lower().endswith(".mp4"):
+                continue
+            if f"/{OUTPUT_FOLDER}/" in key:
+                continue
+            if key.lower().endswith("_opt.mp4"):
+                continue
+
+            base_dir = os.path.dirname(key)
+
+            # pular se já existe
+            if mp4_opt_exists(base_dir):
+                print(f"PULADO (já existe): {key}")
+                pulados += 1
+                continue
+
+            create_job(key)
+            criados += 1
+            time.sleep(DELAY_SECONDS)
+
+    print("=== FIM DA EXECUÇÃO ===")
+    print(f"JOBS CRIADOS: {criados}")
+    print(f"JOBS PULADOS: {pulados}")
+
+
+if __name__ == "__main__":
+    main()
+
+</code></pre>
+</details>
+
+
+<hr />
+
+<h3 id="cloudshell-estabilidade">2.4 Observação importante sobre estabilidade<a class="anchor-link" href="#cloudshell-estabilidade" aria-label="Link da seção">#</a></h3>
+
+<p>
+  O CloudShell pode desconectar por inatividade. Se o volume for muito grande, o ideal é:
+</p>
+
+<ul>
+  <li>Usar <code>nohup</code>, ou</li>
+  <li>Executar o script a partir de uma instância Linux</li>
+</ul>
+
+<p>
+  Mesmo assim, o script foi escrito de forma idempotente: se for interrompido e executado novamente,
+  ele <strong>não recria jobs duplicados</strong>.
+</p>
+
+<h3>Resumo da etapa</h3>
+
+<p>
+  <strong>O MediaConvert foi utilizado para criar e validar o job modelo.</strong>
+  <br />
+  <strong>O script foi responsável por executar esse job em escala.</strong>
+</p>
+
+<p>
+  Essa separação de responsabilidades torna o processo:
+  mais seguro, escalável e fácil de manter.
+</p>
+
+        
+        <hr />
+
+        <h2 id="etapa-3-backup">Etapa 3 — Backup total dos MP4 originais (antes de qualquer substituição)<a class="anchor-link" href="#etapa-3-backup" aria-label="Link da seção">#</a></h2>
+        <p>
+          Antes de sobrescrever qualquer arquivo, eu fiz backup via <strong>S3 Batch Operations (Copy)</strong>.
+          Como o bucket não tinha versionamento habilitado, esse backup foi o meu “cinto de segurança”.
+         
+        </p>
+
+        <h3 id="backup-destination">3.1 Definir o destino do backup<a class="anchor-link" href="#backup-destination" aria-label="Link da seção">#</a></h3>
+        <p>
+          A ideia é manter a estrutura inteira de <code>images/</code> dentro de um bucket/prefixo de backup:
+        </p>
+        <details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">bash</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-bash">s3://images_BACKUP/images/</code></pre>
+  </div>
+</details>
+       
+
+        <h3 id="backup-job">3.2 Criar o Batch job (Copy) com calma e rastreabilidade<a class="anchor-link" href="#backup-job" aria-label="Link da seção">#</a></h3>
+        <ol>
+          <li>Acesse <strong>S3</strong> → <strong>Batch Operations</strong> → <strong>Create job</strong>.</li>
+          <li>Em <strong>Manifest</strong>, use uma lista apenas dos MP4 originais (isso deixa o job previsível).</li>
+          <li>Em <strong>Operation</strong>, escolha <strong>Copy</strong>.</li>
+          <li>Em <strong>Destination</strong>, configure <code>s3://images_BACKUP/images/</code>.</li>
+          <li>Revise permissões da role do Batch (ela precisa ler do bucket origem e gravar no destino).</li>
+          <li>Execute e acompanhe a taxa de sucesso.</li>
+        </ol>
+       
+
+        <div class="callout">
+          <img src="../assets/img/batch.png" alt="arquitetura" style=
+     "max-width:100%;margin:20px auto;display:block;">
+        </div>
+
+                <div class="callout">
+          <img src="../assets/img/batch1.png" alt="arquitetura" style=
+     "max-width:100%;margin:20px auto;display:block;">
+        </div>
+
+        <hr />
+
+        <h2 id="etapa-4-overwrite">Etapa 4 — Substituir os originais mantendo o mesmo nome (Batch + Lambda)<a class="anchor-link" href="#etapa-4-overwrite" aria-label="Link da seção">#</a></h2>
+        <p>
+          Aqui está o objetivo final, de forma bem direta: o Salesforce continua acessando
+          <code>images/&lt;bloco&gt;/&lt;video&gt;.mp4</code> e, “por baixo”, esse arquivo passa a ser o otimizado.
+         
+        </p>
+
+        <h3 id="lambda-code">4.1 Lambda: a lógica de sobrescrita (conceito)<a class="anchor-link" href="#lambda-code" aria-label="Link da seção">#</a></h3>
+        <p>
+          A Lambda recebe o evento do Batch (no campo <code>tasks</code>), lê a key do arquivo otimizado e calcula o destino removendo:
+          (a) a pasta <code>/_mp4_opt/</code> e (b) o sufixo <code>_opt</code> do nome.
+         
+        </p>
+
+        <details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">bash</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-bash">images/57816/_mp4_opt/57816_41_opt.mp4
+→ images/57816/57816_41.mp4</code></pre>
+  </div>
+</details>
+       
+
+        <p>
+          Esse passo é crítico porque é onde você garante a promessa do projeto: <strong>mesma URL, arquivo melhor</strong>.
+        </p>
+
+                <div class="callout">
+          <img src="../assets/img/lambda.png" alt="arquitetura" style=
+     "max-width:100%;margin:20px auto;display:block;">
+        </div>
+
+        <details class="codebox">
+  <summary>
+    <span class="codebox-title">Código <span class="codebox-pill">python</span></span>
+    <span class="codebox-tools">
+      <button type="button" class="codebtn copy-btn" data-copy-target="__CODE__">Copiar</button>
+    </span>
+  </summary>
+  <div class="codewrap">
+    <div class="copy-toast" aria-live="polite">Copiado ✅</div>
+<pre><code class="language-python">
+import boto3
+import urllib.parse
+
+s3 = boto3.client("s3")
+
+def lambda_handler(event, context):
+    results = []
+
+    for task in event["tasks"]:
+        try:
+            task_id = task["taskId"]
+
+            bucket_arn = task["s3BucketArn"]
+            bucket = bucket_arn.split(":::")[1]
+
+            source_key = urllib.parse.unquote_plus(task["s3Key"])
+
+            # Segurança: só processa _mp4_opt
+            if "/_mp4_opt/" not in source_key:
+                raise Exception("Arquivo fora da pasta _mp4_opt")
+
+            # Calcula destino final
+            dest_key = source_key.replace("/_mp4_opt/", "/")
+            dest_key = dest_key.replace("_opt.mp4", ".mp4")
+
+            # Copia sobrescrevendo
+            s3.copy_object(
+                Bucket=bucket,
+                CopySource={
+                    "Bucket": bucket,
+                    "Key": source_key
+                },
+                Key=dest_key
+            )
+
+            results.append({
+                "taskId": task_id,
+                "resultCode": "Succeeded",
+                "resultString": f"Substituído por {dest_key}"
+            })
+
+        except Exception as e:
+            results.append({
+                "taskId": task.get("taskId", "unknown"),
+                "resultCode": "PermanentFailure",
+                "resultString": str(e)
+            })
+
+    return {
+        "invocationSchemaVersion": "1.0",
+        "invocationId": event["invocationId"],
+        "treatMissingKeysAs": "PermanentFailure",
+        "results": results
+    }
+
+</code></pre>
+  </div>
+</details>
+
+        <h3 id="batch-invoke">4.2 Batch job: invocando a Lambda em massa<a class="anchor-link" href="#batch-invoke" aria-label="Link da seção">#</a></h3>
+        <ol>
+          <li>S3 → Batch Operations → Create job</li>
+          <li>Manifest: lista apenas dos arquivos <code>_mp4_opt/*_opt.mp4</code></li>
+          <li>Operation: <strong>Invoke AWS Lambda function</strong></li>
+          <li>Function: <code>overwrite_mp4_with_optimized</code></li>
+          <li>Execute primeiro com um lote pequeno (por exemplo, 10 arquivos) para validar o comportamento.</li>
+        </ol>
+       
+
+
+        <h3 id="batch-permissions">4.3 Permissões e erros comuns (o que costuma travar)<a class="anchor-link" href="#batch-permissions" aria-label="Link da seção">#</a></h3>
+        <ul>
+          <li><strong>AccessDenied lambda:InvokeFunction</strong> → a role do Batch precisa permissão para invocar a função.</li>
+          <li><strong>Evento inesperado</strong> → no Batch, o evento costuma vir em <code>tasks</code>, não em <code>Records</code>.</li>
+          <li><strong>Manifest errado</strong> → se você mandar arquivos que não são os otimizados, a Lambda pode calcular destinos incorretos.</li>
+        </ul>
+       
+
+
+        <hr />
+
+        <h2 id="etapa-5-cloudfront">Etapa 5 — CloudFront: cache sob controle (para não “parecer” que não mudou)<a class="anchor-link" href="#etapa-5-cloudfront" aria-label="Link da seção">#</a></h2>
+        <p>
+          Mesmo substituindo o arquivo no S3, o CloudFront pode continuar servindo uma versão em cache por algum tempo.
+          Portanto, é importante revisar as regras de cache do path onde os MP4s são entregues.
+         
+        </p>
+
+        <h3 id="cache-behavior">5.1 Cache Behavior (recomendação prática)<a class="anchor-link" href="#cache-behavior" aria-label="Link da seção">#</a></h3>
+        <ul>
+          <li>Separe paths de mídia vs site quando fizer sentido (fica mais fácil ajustar TTL sem afetar o site todo).</li>
+          <li>Para mídia, normalmente você só precisa de <strong>GET/HEAD</strong>.</li>
+          <li><strong>TTL:</strong> se você substitui conteúdo mantendo o mesmo nome, considere TTL menor nesse path — ou planeje uma invalidação durante a virada.</li>
+        </ul>
+       
+
+
+
+        <h3 id="origin-shield">5.2 Origin Shield<a class="anchor-link" href="#origin-shield" aria-label="Link da seção">#</a></h3>
+        <p>
+          Eu ativei <strong>Origin Shield</strong> (us-east-1) para reduzir cache misses e aliviar o S3 em cenários de muitas requisições repetidas.
+         
+        </p>
+
+
+        <hr />
+
+        <h2 id="testes">Checklist de testes (o que validar antes de considerar “pronto”)<a class="anchor-link" href="#testes" aria-label="Link da seção">#</a></h2>
+        <ul>
+          <li>Abra a <strong>URL antiga</strong> do MP4 (a usada pelo Salesforce) e confirme que toca normalmente.</li>
+          <li>Teste em Wi‑Fi e em 4G/5G (se possível, em mais de uma operadora).</li>
+          <li>Confirme que o arquivo final mantém o nome <code>.mp4</code> (sem quebrar integrações e embeds).</li>
+          <li>Verifique headers de cache do CloudFront (HIT/MISS) para entender se você está vendo versão antiga ou nova.</li>
+          <li>Confira CloudWatch Logs da Lambda para garantir que não houve falhas em massa.</li>
+        </ul>
+       
+
+        <hr />
+
+        <h2 id="rollback">Rollback (como voltar rápido se algo sair do esperado)<a class="anchor-link" href="#rollback" aria-label="Link da seção">#</a></h2>
+        <p>
+          Se você fez o backup, voltar é simples: crie um novo Batch (Copy) invertendo a direção: backup → original.
+          Isso te dá confiança para executar a mudança em produção sem “apostas”.
+         
+        </p>
+
+        <hr />
+
+        <h2 id="conclusao">Conclusão<a class="anchor-link" href="#conclusao" aria-label="Link da seção">#</a></h2>
+        <p>
+          O resultado prático foi o que importava: vídeos iniciando mais rápido (principalmente em mobile), sem alterar URLs,
+          sem exigir mudanças no Salesforce e com um processo que escala para milhares de arquivos com segurança.
+         
+        </p>
+
+        <p>
+          Após isso o passo natural é automatizar para que novos vídeos sejam otimizados automaticamente.
+        </p>
+
+        <div style="margin-top: 60px;">
+          <a href="../index.html" style="font-weight: bold; border-bottom: 1px solid var(--accent);">← Voltar para Home</a>
+        </div>
+      </div>
+
+      <aside class="toc-sidebar">
+        <div class="toc-title">Neste artigo</div>
+        <ul class="toc-list" id="toc-list"></ul>
+      </aside>
+    </article>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script src="../assets/js/script.js"></script>
+
+  <!-- Post Enhancements JS -->
+  <script>
+    (function() {
+      function qs(sel, ctx) { return (ctx || document).querySelector(sel); }
+      function qsa(sel, ctx) { return Array.from((ctx || document).querySelectorAll(sel)); }
+
+      // Expand/collapse all code boxes
+      const expandAll = qs("#expand-all");
+      const collapseAll = qs("#collapse-all");
+      const codeboxes = () => qsa("details.codebox");
+
+      if (expandAll) expandAll.addEventListener("click", () => codeboxes().forEach(d => d.open = true));
+      if (collapseAll) collapseAll.addEventListener("click", () => codeboxes().forEach(d => d.open = false));
+
+      // Copy permalink
+      const copyPermalink = qs("#copy-permalink");
+      if (copyPermalink) copyPermalink.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          copyPermalink.textContent = "Link copiado ✅";
+          setTimeout(() => copyPermalink.textContent = "Copiar link deste post", 1400);
+        } catch(e) {
+          alert("Não consegui copiar automaticamente. Copie manualmente: " + window.location.href);
+        }
+      });
+
+      // Add copy behavior for each codebox
+      qsa("details.codebox").forEach(box => {
+        const btn = qs(".copy-btn", box);
+        const toast = qs(".copy-toast", box);
+        const pre = qs("pre", box);
+        if (!btn || !pre) return;
+
+        btn.addEventListener("click", async (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          try {
+            const text = pre.innerText.replace(/\n+$/,"");
+            await navigator.clipboard.writeText(text);
+            if (toast) {
+              toast.classList.add("show");
+              setTimeout(() => toast.classList.remove("show"), 1100);
+            }
+            btn.textContent = "Copiado";
+            setTimeout(() => btn.textContent = "Copiar", 1100);
+          } catch(e) {
+            alert("Falhou ao copiar. Selecione e copie manualmente.");
+          }
+        });
+      });
+    })();
+  </script>
+
+</body>
+</html>

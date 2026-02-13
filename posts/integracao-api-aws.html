@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Case: Integração segura Athenas (Firebird) → consultorPRO via API REST na AWS | Cloud by MCN</title>
+
+  <!-- SEO -->
+  <meta property="og:title" content="Case: Integração segura Athenas (Firebird) → consultorPRO via API REST na AWS | Cloud by MCN" />
+  <meta property="og:description" content="Case real (anonimizado): como preparei uma infra segura na AWS para expor uma API HTTPS (Nginx + Let's Encrypt + allowlist de IPs) consumindo dados do Athenas (Firebird) sem expor o banco à internet." />
+
+  <!-- CSS & Prism -->
+  <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg" />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+
+  <!-- Post Enhancements (scoped) -->
+  <style>
+    /* Keep it compatible with existing site CSS */
+    .article-content h2 { margin-top: 2.5rem; padding-top: 0.25rem; border-top: 1px solid var(--card-border); }
+    .article-content h3 { margin-top: 1.75rem; }
+    .article-content hr { margin: 2.5rem 0; opacity: .35; }
+    .callout {
+      border-left: 4px solid var(--accent, #FF9900);
+      background: rgba(255,153,0,.06);
+      padding: 14px 16px;
+      border-radius: 14px;
+      margin: 18px 0;
+    }
+    .callout strong { display: inline-block; margin-bottom: 4px; }
+    code:not([class]) {
+      padding: 2px 6px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+    pre {
+      margin: 16px 0 20px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      background: rgba(0,0,0,.22);
+      padding: 1em;
+    }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 18px; padding: 16px 18px; margin: 14px 0; }
+    .grid2 { display:grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 860px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+    details { border: 1px solid var(--card-border); border-radius: 16px; background: rgba(127,127,127,.06); margin: 14px 0; overflow:hidden; }
+    summary { cursor:pointer; padding: 12px 14px; font-weight: 750; color: var(--text-primary); user-select:none; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    summary::-webkit-details-marker { display:none; }
+    .tag { font-size:12px; padding: 3px 8px; border-radius:999px; border:1px solid var(--card-border); color: var(--text-secondary); font-weight: 650; }
+    .print { border: 2px dashed var(--card-border); border-radius: 16px; padding: 14px; background: rgba(127,127,127,.05); }
+    .print .t { font-weight: 850; margin-bottom: 6px; }
+    .print .d { color: var(--text-secondary); font-size: 14px; line-height:1.5; }
+    .toc { padding: 14px 16px; border: 1px solid var(--card-border); border-radius: 18px; background: rgba(127,127,127,.06); }
+    .toc a { color: var(--text-primary); text-decoration:none; }
+    .toc a:hover { text-decoration:underline; }
+    .warn { color: #ffbf00; font-weight: 800; }
+    .bad { color: #ff6b6b; font-weight: 800; }
+    footer { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--card-border); color: var(--text-secondary); font-size: 13px; }
+    .kicker { font-weight: 700; letter-spacing: .02em; color: var(--accent); text-transform: uppercase; font-size: 12px; }
+    .subtitle { margin: 0; color: var(--text-secondary); font-size: 16px; line-height: 1.6; max-width: 86ch; }
+    .meta { margin-top: 14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; color: var(--text-secondary); font-size: 13px; }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding: 6px 10px; border-radius: 999px; background: rgba(255,153,0,.12); border: 1px solid rgba(255,153,0,.25); color: var(--text-primary); font-weight: 650; }
+    .pill code { background: transparent; padding: 0; }
+  </style>
+
+</head>
+
+<body>
+  <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+
+  <header class="site-header fade-in">
+    <div class="nav-container">
+      <a href="../index.html" class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 17L12 22L22 17" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M2 12L12 17L22 12" stroke="#FF9900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        CLOUD BY <span>MCN</span>
+      </a>
+
+      <nav class="nav-menu">
+        <ul>
+          <li><a href="../index.html" class="nav-link">Home</a></li>
+          <li><a href="#" class="nav-link active">Artigos</a></li>
+        </ul>
+      </nav>
+
+      <div id="theme-toggle" style="cursor: pointer;">☀️</div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- Breadcrumbs -->
+    <div class="breadcrumbs fade-in">
+      <a href="../index.html">Home</a> <span>/</span> <a href="#">Artigos</a>
+      <span>/</span> AWS • Case • EC2 • Nginx
+    </div>
+
+    <article class="article-grid fade-in">
+      <div class="article-content">
+          <div class="wrap">
+    <header>
+      <div class="kicker">Projeto / Case de Infra</div>
+      <h1>Integração segura via API REST → Banco de dados na AWS</h1>
+      <p class="subtitle">
+        Case real (com dados anonimizados): infraestrutura pronta para receber uma API em Node.js,
+        exposta por HTTPS + encriptação, DNS via Cloudflare e allowlist de IPs — com acesso interno ao banco de dados sem o expor à internet.
+      </p>
+      <div class="meta">
+        <span>Data: 12/02/2026</span>
+        <span class="pill">Stack: <code>EC2</code> · <code>SG</code> · <code>VPC</code> · <code>ELASTIC IP</code></span>
+      </div>
+    </header>
+
+ 
+    <h2 id="objetivo">Objetivo</h2>
+    <div class="card callout">
+      Preparar o nosso ambiente em nuvem para receber uma API de um terceiro para fazer consultas no nosso banco de dados, isso de modo seguro e funcional. Optamos por escolher esse modelo pois teriamos controle de todo ambiente.
+    </div>
+
+    <h2 id="arquitetura">Arquitetura final (visão geral)</h2>
+    <p>
+      A ideia é separar “o que é público” (API) do “que é crítico” (banco). A API fica na internet, mas com acesso estritamente controlado.
+      O banco fica dentro da VPC e só aceita conexão da VM da API.
+    </p>
+
+<img src="../assets/img/estruturaleverpro.jpeg" alt="Descrição do conteúdo da imagem" style=
+     "max-width:100%;margin:20px auto;display:block;">
+
+
+    
+    <h2 id="threatmodel">Threat model (o que eu estava tentando evitar)</h2>
+       <ul>
+      <li><span class="bad">Exposição</span>: abrir a porta do banco para o mundo = convite para ataque e vazamento.</li>
+      <li><span class="bad">Varredura e exploração da API</span>: deixar 443 público = bots/scan 24/7.</li>
+      <li><span class="bad">Acesso administrativo indevido</span>: SSH público e sem restrição = brute force e tentativa de acesso.</li>
+      <li><span class="warn">Configuração errada de DNS/SSL</span>: certificado em domínio errado ou proxy ativado no Cloudflare = quebra de emissão/renovação.</li>
+    </ul>
+
+    <div class="card callout">
+      <b>Postura final de segurança</b>
+      <ul>
+        <li><b>SSH (22)</b> liberado apenas para meu IP</li>
+        <li><b>HTTPS (443)</b> liberado apenas para IPs fixos da empresa que irá acessar</li>
+        <li><b>Banco (3050)</b> liberado apenas para a EC2 da API (Security Group como source)</li>
+        <li><b>Banco nunca público</b></li>
+      </ul>
+    </div>
+
+    <h2 id="passos">Passo a passo</h2>
+    <p>
+      Abaixo está a sequência correta para você repetir sem retrabalho. O artigo vai até o ponto em que a infraestrutura está pronta,
+      <b>antes</b> de instalar a API da Empresa fictícia ConsultorPRO.
+    </p>
+
+    <h3>0) Convenções e dados anonimizados</h3>
+    <ul>
+      <li>Domínio fictício: <code>consultorPRO.exemplo.com</code></li>
+      <li>IP público fictício da EC2: <code>203.0.113.10</code></li>
+      <li>IPs consultorPRO fictícios a serem liberados na minha instância: <code>198.51.100.10/32</code>, <code>198.51.100.11/32</code>, <code>198.51.100.12/32</code></li>
+      <li>Porta do banco: <code>1234</code></li>
+    </ul>
+
+    <h3>1) Criar a EC2 Ubuntu (servidor da API)</h3>
+    <ol>
+      <li>AWS Console → EC2 → <b>Launch instance</b></li>
+      <li>Nome: <code>api-consultorPRO-proxy</code></li>
+      <li>AMI: <b>Ubuntu Server 24.04 LTS</b></li>
+      <li>Instance type: <code>t3.micro</code> (ajuste conforme carga)</li>
+      <li>Network: <b>mesma VPC</b> do servidor do banco</li>
+      <li>Subnet: <b>pública</b> (para receber HTTPS)</li>
+      <li>Auto-assign public IP: <b>Enabled</b></li>
+    </ol>
+
+
+    <h3>2) Criar a Key Pair (.pem) para acesso SSH</h3>
+    <p>
+      Para acessar com segurança, criei uma chave dedicada. Em ambiente corporativo, evite compartilhar a chave “padrão” com terceiros.
+      Se a ConsultorPRO precisar acesso, o ideal é criar um usuário e chave exclusivos (ou você executar os comandos).
+    </p>
+    <ol>
+      <li>Na criação da instância: <b>Create new key pair</b></li>
+      <li>Tipo: <b>RSA</b></li>
+      <li>Formato: <b>.pem</b></li>
+      <li>Salvar em local seguro</li>
+    </ol>
+
+
+    <h3>3) Security Group inicial (bootstrap)</h3>
+    <p>No início, eu preciso instalar pacotes, validar HTTP e emitir SSL. Então criei um SG temporário.</p>
+    <pre><code>Inbound (temporário):
+- SSH 22  → meu IP (/32)
+- HTTP 80 → 0.0.0.0/0 (validação Let's Encrypt)
+- HTTPS 443 → 0.0.0.0/0 (testes iniciais)</code></pre>
+
+    <div class="card callout">
+      <b>Por que HTTP 80 fica aberto no começo?</b>
+      O Let's Encrypt (HTTP-01) precisa validar o host em 80. Depois, você mantém 80 só para redirect ou fecha, dependendo do desenho.
+    </div>
+
+    <div class="print">
+      <div class="t">[PRINT-04] Security Group inicial (bootstrap)</div>
+      <div class="d">Print do SG mostrando SSH/80/443 (fase temporária).</div>
+    </div>
+
+    <h3>4) Elastic IP (IP fixo)</h3>
+    <ol>
+      <li>EC2 → <b>Elastic IPs</b> → Allocate Elastic IP</li>
+      <li>Selecionar o Elastic IP → Actions → <b>Associate</b> → escolher a EC2</li>
+    </ol>
+      <li><span class="bad">Caso não tenha IPs elásticos sobrando pode usar o privado mas saiba que se reiniciar a instância o  IP irá mudar e você tem que se atentar a isso. </span></li>
+
+
+
+    <h3>5) DNS no Cloudflare (subdomínio → IP)</h3>
+    <pre><code>Type: A
+Name: ConsultorPRO
+Content: 203.0.113.10
+Proxy: DNS only (cinza)</code></pre>
+
+<img src="../assets/img/cloud.png" alt="Descrição do conteúdo da imagem" style=
+     "max-width:100%;margin:20px auto;display:block;">
+
+    <h3>6) Validar DNS</h3>
+    <pre><code>nslookup consultorPRO.exemplo.com</code></pre>
+<li>É necessário ver o IP sendo resolvido.</li>
+
+
+    <h3>7) Acessar EC2 via SSH e atualizar</h3>
+    <li>Você tem 2 opções a primeira é gerar a chave .ppk a partir da chave .pem e a outra é o modo abaixo. Ambos via PuTTY.</li>
+    <pre><code>ssh -i api-access-key.pem ubuntu@consultorPRO.exemplo.com
+sudo apt update
+sudo apt upgrade -y</code></pre>
+
+<img src="../assets/img/linux.png" alt="Descrição do conteúdo da imagem" style=
+     "max-width:100%;margin:20px auto;display:block;">
+
+    <h3>8) Instalar Nginx</h3>
+    <pre><code>sudo apt install nginx -y
+sudo systemctl enable nginx
+sudo systemctl start nginx
+sudo systemctl status nginx --no-pager</code></pre>
+
+
+    <h3>9) Emitir SSL (Let's Encrypt)</h3>
+    <pre><code>sudo systemctl stop nginx
+sudo apt install certbot -y
+sudo certbot certonly --standalone -d consultorPRO.exemplo.com
+sudo ls -la /etc/letsencrypt/live/consultorPRO.exemplo.com/
+sudo systemctl start nginx</code></pre>
+
+
+    <h3>10) Configurar Nginx com HTTPS + endpoints preparados</h3>
+    <details open>
+      <summary>Nginx config (sites-available) <span class="tag">nginx</span></summary>
+      <pre><code>server {
+  listen 80;
+  server_name consultorPRO.exemplo.com;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl http2;
+  server_name consultorPRO.exemplo.com;
+
+  ssl_certificate     /etc/letsencrypt/live/consultorPRO.exemplo.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/consultorPRO.exemplo.com/privkey.pem;
+
+  location /status { proxy_pass http://127.0.0.1:3000/status; }
+  location /q      { proxy_pass http://127.0.0.1:3000/q; }
+
+  location / {
+    return 200 "OK - HTTPS ativo. Aguardando deploy da API.\n";
+    add_header Content-Type text/plain;
+  }
+}</code></pre>
+    </details>
+
+    <pre><code>sudo ln -s /etc/nginx/sites-available/consultorPRO /etc/nginx/sites-enabled/consultorPRO
+sudo nginx -t
+sudo systemctl restart nginx</code></pre>
+
+
+    <h3>11) Descobrir porta do banco</h3>
+    <pre><code>netstat -ano | findstr LISTENING</code></pre>
+
+  
+    <h3>12) Liberar PORTA no SG da instância do BANCO só para o SG da EC2 da API</h3>
+    <pre><code>Type: Custom TCP
+Port: 3050
+Source: Security Group da EC2 API (sg-api-consultorPRO-proxy)</code></pre>
+
+<img src="../assets/img/porta.png" alt="Descrição do conteúdo da imagem" style=
+     "max-width:100%;margin:20px auto;display:block;">
+
+    <h3>13) Fechar o SG da API (estado final): Liberar os IPs da empresa ConsultorPRO na instância linux</h3>
+    <li>Você vai remover todos os ips que estavam liberados e deixam somente o SSH pra você e os IPs requisitados pela empresa.</li>
+    <pre><code>SSH 22   → meu IP (/32)
+HTTPS 443 → IPs fixos consultorPRO (/32)</code></pre>
+
+
+
+    <h2 id="validacoes">Validações e testes antes do deploy da API</h2>
+    <div class="card">
+      <b>DNS</b>
+      <pre><code>nslookup consultorPRO.exemplo.com</code></pre>
+    </div>
+    <div class="card">
+      <b>HTTPS</b>
+      <pre><code>Abrir: https://consultorPRO.exemplo.com</code></pre>
+    </div>
+    <div class="card">
+      <b>Conectividade EC2 → Banco de Dados</b>
+      <pre><code>nc -zv 10.0.2.25 PORTA</code></pre>
+    </div>
+<h2 id="decisoes">Decisões de design (por que fiz assim)</h2>
+    <div class="grid2">
+      <div class="card">
+        <b>Por que EC2 Linux para a API?</b>
+        <p>
+          Porque eu preciso de um ponto controlado para expor HTTPS e aplicar política de rede (allowlist) sem tocar direto no servidor do Athenas.
+          Linux + Nginx = simples, barato, previsível e fácil de auditar.
+        </p>
+      </div>
+      <div class="card">
+        <b>Por que Nginx na frente?</b>
+        <p>
+          Nginx me dá TLS confiável, logs, reverse proxy e flexibilidade para publicar apenas os endpoints necessários (<code>/status</code> e <code>/q</code>),
+          mantendo a aplicação atrás de uma porta interna.
+        </p>
+      </div>
+      <div class="card">
+        <b>Por que Let's Encrypt?</b>
+        <p>
+          Resolve SSL de forma prática e padronizada. Em produção, o mais importante é ser válido e renovável sem manual.
+        </p>
+      </div>
+      <div class="card">
+        <b>Por que allowlist por IP?</b>
+        <p>
+          É o requisito. E é uma defesa direta contra varredura/ataque: mesmo que o domínio seja público, ninguém fora da lista chega na API.
+        </p>
+      </div>
+      <div class="card">
+        <b>Por que liberar o banco só para o SG da API?</b>
+        <p>
+          Isso elimina exposição acidental. A porta <code>3050</code> do Firebird fica aberta apenas para o “identificador” da VM da API (Security Group),
+          não para a internet e nem para sub-redes inteiras.
+        </p>
+      </div>
+      <div class="card">
+        <b>Por que abrir “pro mundo” no começo e depois fechar?</b>
+        <p>
+          Durante bootstrap (instalar Nginx/Certbot, validar DNS/HTTP-01, testar TLS), é comum abrir temporariamente.
+          Mas a regra é: <span class="warn">abrir só o mínimo, por pouco tempo, e fechar imediatamente</span>.
+          O estado final tem que ser restrito.
+        </p>
+      </div>
+    </div>
+
+    <h2 id="handoff">O que eu preciso da consultorPRO agora</h2>
+    <ul>
+      <li>Pacote da API (ou Docker) e instruções</li>
+      <li>Porta interna que a API usa (para ajustar proxy)</li>
+      <li>Parâmetros/segredos (string de conexão, user read-only, etc.)</li>
+    </ul>
+
+    <div class="card callout">
+      Melhor cenário: você executa os comandos enviados. Se for necessário acesso, crie usuário/chave dedicados (não compartilhe sua key principal).
+    </div>
+
+    <h2 id="lições">Lições aprendidas</h2>
+    <ul>
+      <li>Ping não prova HTTPS. DNS + 443 + certificado provam.</li>
+      <li>Proxy Cloudflare pode afetar emissão/renovação (planeje).</li>
+      <li>SG como source exige mesma VPC.</li>
+      <li>Bootstrap aberto é temporário e tem que virar “estado final restrito”.</li>
+    </ul>
+
+    <h2 id="checklist">Checklist final para produção</h2>
+    <div class="grid2">
+      <div class="card">
+        <b>Rede & DNS</b>
+        <ul>
+          <li>Domínio resolve para Elastic IP correto</li>
+          <li>DNS only durante SSL (se usando HTTP-01)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <b>Segurança</b>
+        <ul>
+          <li>443 só para IPs consultorPRO</li>
+          <li>22 só para seu IP</li>
+          <li>3050 só para SG da EC2 API</li>
+        </ul>
+      </div>
+      <div class="card">
+        <b>HTTPS</b>
+        <ul>
+          <li>Certificado válido</li>
+          <li><code>nginx -t</code> sem erro</li>
+        </ul>
+      </div>
+      <div class="card">
+        <b>Pronto para deploy</b>
+        <ul>
+          <li>Nginx preparado para <code>/status</code> e <code>/q</code></li>
+          <li>Conectividade com banco testada</li>
+        </ul>
+      </div>
+    </div>
+
+    <footer>
+      <div><b>Autor:</b> Cloud by MCN — Matheus Campos</div>
+      <div>Observação: todos os IPs/nomes/domínios neste artigo foram anonimizados.</div>
+    </footer>
+  </div>
+      </div>
+
+      <aside class="toc-sidebar">
+        <div class="toc-title">Neste artigo</div>
+        <ul class="toc-list" id="toc-list"></ul>
+      </aside>
+    </article>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script src="../assets/js/script.js"></script>
+
+</body>
+</html>
