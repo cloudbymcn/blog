@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DungeonAI: RPG com IA Generativa na AWS usando Bedrock, Strands Agents e DynamoDB | Cloud by MCN</title>
+<meta name="description" content="Constru&iacute; um jogo text adventure onde a IA narra a hist&oacute;ria, gera imagens das cenas, e gerencia HP, invent&aacute;rio e XP &mdash; tudo serverless na AWS.">
+<meta property="og:title" content="DungeonAI: RPG com IA Generativa na AWS usando Bedrock, Strands Agents e DynamoDB">
+<meta property="og:description" content="Constru&iacute; um jogo text adventure onde a IA narra a hist&oacute;ria, gera imagens das cenas, e gerencia HP, invent&aacute;rio e XP &mdash; tudo serverless na AWS.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body class="post-page">
+
+<nav id="nav" class="scrolled">
+  <div class="nav-in">
+    <a href="../index.html" class="logo">
+      <img class="logo-img" src="../assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-r">
+      <div class="nav-links" id="navLinks">
+        <a href="../index.html#projetos">Projetos</a>
+        <a href="../index.html#sobre">Sobre</a>
+        <a href="../index.html#contato">Contato</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="post-main">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a><span>/</span>
+    <a href="../index.html#projetos">Projetos</a><span>/</span>
+    <span class="current">AWS &middot; Bedrock &middot; AI/ML &middot; Strands Agents &middot; DynamoDB</span>
+  </div>
+
+  <article class="post-article">
+    <header class="post-header">
+      <div class="post-meta-bar">
+        <span class="post-date-tag">31 Mar 2026</span>
+        <span class="post-reading" id="readTime"></span>
+      </div>
+      <h1>DungeonAI: RPG com IA Generativa na AWS usando Bedrock, Strands Agents e DynamoDB</h1>
+      <p class="post-subtitle">Constru&iacute; um jogo text adventure onde a IA narra a hist&oacute;ria, gera imagens das cenas, e gerencia HP, invent&aacute;rio e XP &mdash; tudo serverless na AWS.</p>
+    </header>
+
+    <div class="post-content">
+
+      <!-- ================================================================== -->
+      <!-- INTRO -->
+      <!-- ================================================================== -->
+
+      <p>
+        Eu sempre quis construir algo que misturasse IA generativa com jogos. N&atilde;o um chatbot gen&eacute;rico, mas uma experi&ecirc;ncia onde a IA fosse o <strong>Dungeon Master</strong> &mdash; narrando hist&oacute;rias, gerando imagens das cenas, controlando combate, progress&atilde;o e economia do jogo.
+      </p>
+      <p>
+        O resultado &eacute; o <strong>DungeonAI</strong>: um RPG text adventure onde o jogador escolhe a&ccedil;&otilde;es (ou digita livremente), e a IA responde com narrativa em portugu&ecirc;s, uma imagem gerada da cena, e atualiza&ccedil;&otilde;es de estado &mdash; HP, ouro, XP, invent&aacute;rio, localiza&ccedil;&atilde;o. Tudo persiste no DynamoDB, as imagens ficam no S3, e a orquestra&ccedil;&atilde;o usa <strong>Strands Agents</strong>, o framework open-source da AWS para agentes de IA.
+      </p>
+      <p>
+        Neste post eu documento a arquitetura completa, cada arquivo de c&oacute;digo, e o passo a passo para rodar na sua conta AWS. O c&oacute;digo est&aacute; no GitHub: <a href="https://github.com/cloudbymcn/dungeonai" target="_blank">github.com/cloudbymcn/dungeonai</a>.
+      </p>
+
+      <div class="callout info">
+        <strong>O que &eacute; Amazon Bedrock?</strong>
+        Bedrock &eacute; o servi&ccedil;o da AWS que d&aacute; acesso a modelos de IA (como Claude da Anthropic e Titan da Amazon) via API, sem precisar gerenciar infraestrutura de GPU. Voc&ecirc; chama o modelo, paga por token/imagem, e pronto.
+      </div>
+
+      <div class="callout info">
+        <strong>O que &eacute; Strands Agents?</strong>
+        &Eacute; um framework open-source da AWS para construir agentes de IA. Ele permite definir ferramentas (tools) com um simples decorador <code>@tool</code>, conectar a modelos do Bedrock, e orquestrar fluxos complexos. Pense em &ldquo;LangChain, mas mais simples e integrado com AWS&rdquo;.
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- ARQUITETURA -->
+      <!-- ================================================================== -->
+
+      <h2>Arquitetura</h2>
+
+      <p>O fluxo geral do DungeonAI &eacute; este:</p>
+
+      <pre><code>Jogador &rarr; Streamlit &rarr; Strands Agent &rarr; Amazon Bedrock
+                                                  |
+                          Claude 3.5 Haiku / Titan Image V2 / DynamoDB
+                                                  |
+                                               S3 Bucket</code></pre>
+
+      <p>A cada turno, o ciclo completo funciona assim:</p>
+
+      <ol>
+        <li><strong>Jogador</strong> escolhe uma a&ccedil;&atilde;o ou digita livremente no Streamlit</li>
+        <li><strong>Strands Agent</strong> carrega o estado atual do DynamoDB (HP, invent&aacute;rio, localiza&ccedil;&atilde;o, hist&oacute;rico)</li>
+        <li><strong>Claude 3.5 Haiku</strong> recebe o contexto + a&ccedil;&atilde;o e gera: narrativa, prompt de imagem, mudan&ccedil;as de estado e op&ccedil;&otilde;es para o pr&oacute;ximo turno</li>
+        <li><strong>Titan Image Generator V2</strong> gera a imagem da cena a partir do prompt</li>
+        <li>Imagem &eacute; salva no <strong>S3</strong>, estado atualizado no <strong>DynamoDB</strong></li>
+        <li>Frontend renderiza narrativa + imagem + status atualizado</li>
+      </ol>
+
+      <div class="card">
+        <div class="card-title">Por que essa arquitetura?</div>
+        <p>Cada servi&ccedil;o tem uma responsabilidade clara: Bedrock fornece os modelos, DynamoDB persiste estado entre sess&otilde;es, S3 armazena as imagens geradas, e Strands Agents orquestra tudo com tools tipadas. N&atilde;o tem servidor para gerenciar &mdash; &eacute; tudo pay-per-use.</p>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- SERVI&Ccedil;OS AWS -->
+      <!-- ================================================================== -->
+
+      <h2>Servi&ccedil;os AWS Utilizados</h2>
+
+      <p>Para quem n&atilde;o &eacute; familiar com AWS, aqui vai o papel de cada servi&ccedil;o e o custo estimado por sess&atilde;o de jogo (~30 turnos):</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Servi&ccedil;o</th>
+            <th>O que faz neste projeto</th>
+            <th>Custo/sess&atilde;o</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Amazon Bedrock (Claude 3.5 Haiku)</strong></td>
+            <td>Gera a narrativa, decide combate, cria prompts de imagem, atualiza estado do jogo. Pense em &ldquo;o c&eacute;rebro do Dungeon Master&rdquo;.</td>
+            <td>~$0.02</td>
+          </tr>
+          <tr>
+            <td><strong>Amazon Bedrock (Titan Image Generator V2)</strong></td>
+            <td>Gera imagens das cenas a partir de prompts em ingl&ecirc;s. Cada turno gera uma imagem. Pense em &ldquo;o ilustrador da aventura&rdquo;.</td>
+            <td>~$0.40&ndash;0.80</td>
+          </tr>
+          <tr>
+            <td><strong>DynamoDB</strong></td>
+            <td>Armazena o estado do jogo (HP, ouro, XP, invent&aacute;rio, localiza&ccedil;&atilde;o, hist&oacute;rico de turnos). Persist&ecirc;ncia entre sess&otilde;es. Pense em &ldquo;a ficha do personagem na nuvem&rdquo;.</td>
+            <td>&lt;$0.01</td>
+          </tr>
+          <tr>
+            <td><strong>S3</strong></td>
+            <td>Armazena as imagens geradas por Titan. Cada imagem ~150KB. Pense em &ldquo;o &aacute;lbum de fotos da aventura&rdquo;.</td>
+            <td>&lt;$0.01</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="tip">
+        <strong>Custo total por sess&atilde;o:</strong> entre $0.43 e $0.83. O maior custo &eacute; a gera&ccedil;&atilde;o de imagens com Titan. Se quiser economizar, d&aacute; para gerar imagem a cada 3&ndash;5 turnos em vez de todo turno.
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- ESTRUTURA DO PROJETO -->
+      <!-- ================================================================== -->
+
+      <h2>Estrutura do Projeto</h2>
+
+      <pre><code>dungeonai/
+├── .env.example
+├── .gitignore
+├── requirements.txt
+├── agent/
+│   ├── dungeon_master.py          # orquestrador principal
+│   ├── prompts/
+│   │   └── system_prompt.txt      # personalidade do DM
+│   └── tools/
+│       ├── narrate_story.py       # chama Claude Haiku
+│       ├── generate_scene.py      # chama Titan Image
+│       └── update_state.py        # lê/grava DynamoDB
+└── frontend/
+    └── app.py                     # Streamlit dark fantasy theme</code></pre>
+
+      <!-- ================================================================== -->
+      <!-- PASSO A PASSO -->
+      <!-- ================================================================== -->
+
+      <h2>Passo a Passo</h2>
+
+      <!-- STEP 1 -->
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Configurar modelos no Amazon Bedrock</h3>
+          <p>
+            No console da AWS, eu fui em <strong>Amazon Bedrock &rarr; Model Catalog</strong> (regi&atilde;o <code>us-east-1</code>) e habilitei dois modelos:
+          </p>
+          <ul>
+            <li><strong>Claude 3.5 Haiku</strong> (Anthropic) &mdash; para gera&ccedil;&atilde;o de texto/narrativa</li>
+            <li><strong>Titan Image Generator V2</strong> (Amazon) &mdash; para gera&ccedil;&atilde;o de imagens</li>
+          </ul>
+          <p>Ambos ficam dispon&iacute;veis em segundos. N&atilde;o precisa provisionar nada &mdash; s&oacute; habilitar o acesso.</p>
+          <div class="tip">
+            <strong>Dica:</strong> se os modelos n&atilde;o aparecerem, verifique se voc&ecirc; est&aacute; na regi&atilde;o <code>us-east-1</code>. Nem todos os modelos est&atilde;o dispon&iacute;veis em todas as regi&otilde;es.
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Criar tabela no DynamoDB</h3>
+          <p>
+            Eu criei uma tabela chamada <code>dungeonai-game-sessions</code> com partition key <code>session_id</code> (String) e modo <strong>On-Demand</strong> (paga por request, sem provisionar capacidade).
+          </p>
+          <ul>
+            <li>AWS Console &rarr; DynamoDB &rarr; <strong>Create table</strong></li>
+            <li>Table name: <code>dungeonai-game-sessions</code></li>
+            <li>Partition key: <code>session_id</code> (String)</li>
+            <li>Capacity mode: <strong>On-demand</strong></li>
+          </ul>
+          <div class="callout info">
+            <strong>O que &eacute; DynamoDB?</strong> &Eacute; o banco NoSQL serverless da AWS. Voc&ecirc; cria uma tabela, grava e l&ecirc; dados via API, e paga por request. N&atilde;o precisa gerenciar servidor, disco ou replica&ccedil;&atilde;o.
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Criar bucket no S3</h3>
+          <p>
+            Criei um bucket chamado <code>dungeonai-scenes</code> para armazenar as imagens geradas pelo Titan. Mantive o <strong>Block Public Access</strong> ativado &mdash; as imagens s&atilde;o acessadas via SDK, n&atilde;o via URL p&uacute;blica.
+          </p>
+          <ul>
+            <li>AWS Console &rarr; S3 &rarr; <strong>Create bucket</strong></li>
+            <li>Bucket name: <code>dungeonai-scenes</code> (deve ser &uacute;nico globalmente &mdash; ajuste o nome)</li>
+            <li>Region: <code>us-east-1</code></li>
+            <li>Block Public Access: <strong>ativado</strong></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>Configurar credenciais AWS</h3>
+          <p>
+            No terminal, eu rodei <code>aws configure</code> para definir as credenciais do meu usu&aacute;rio IAM. Depois criei uma policy com as permiss&otilde;es necess&aacute;rias:
+          </p>
+          <details>
+            <summary><strong>dungeonai-policy.json</strong> (clique para expandir)</summary>
+<pre><code class="language-json">{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BedrockAccess",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:Converse"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0",
+        "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-image-generator-v2:0"
+      ]
+    },
+    {
+      "Sid": "DynamoDBAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:123456789012:table/dungeonai-game-sessions"
+    },
+    {
+      "Sid": "S3Access",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::dungeonai-scenes/*"
+    }
+  ]
+}</code></pre>
+          </details>
+          <div class="warning">
+            <strong>Nunca commite credenciais!</strong> Use <code>aws configure</code> ou vari&aacute;veis de ambiente. O <code>.env</code> est&aacute; no <code>.gitignore</code>.
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 5 -->
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Criar projeto e instalar depend&ecirc;ncias</h3>
+          <p>
+            Eu criei a estrutura de pastas e os arquivos de configura&ccedil;&atilde;o:
+          </p>
+          <details>
+            <summary><strong>requirements.txt</strong> (clique para expandir)</summary>
+<pre><code class="language-bash">strands-agents[bedrock]
+boto3>=1.35.0
+streamlit>=1.40.0
+python-dotenv>=1.0.0
+Pillow>=10.0.0</code></pre>
+          </details>
+
+          <details>
+            <summary><strong>.env.example</strong> (clique para expandir)</summary>
+<pre><code class="language-bash">AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+DYNAMODB_TABLE=dungeonai-game-sessions
+S3_BUCKET=dungeonai-scenes
+BEDROCK_TEXT_MODEL=us.anthropic.claude-3-5-haiku-20241022-v1:0
+BEDROCK_IMAGE_MODEL=amazon.titan-image-generator-v2:0</code></pre>
+          </details>
+
+          <details>
+            <summary><strong>.gitignore</strong> (clique para expandir)</summary>
+<pre><code class="language-bash">.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.streamlit/</code></pre>
+          </details>
+
+          <p>Para instalar:</p>
+<pre><code class="language-bash">python -m venv .venv
+source .venv/bin/activate   # no Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+# edite .env com suas credenciais reais</code></pre>
+        </div>
+      </div>
+
+      <!-- STEP 6 -->
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <h3>Criar o System Prompt</h3>
+          <p>
+            Este &eacute; o arquivo mais importante do projeto. Ele define a personalidade do Dungeon Master, as regras de combate, o mundo do jogo, e o formato de sa&iacute;da JSON que o Claude deve seguir. Eu iterei bastante nesse prompt at&eacute; chegar num resultado consistente.
+          </p>
+          <details>
+            <summary><strong>agent/prompts/system_prompt.txt</strong> (clique para expandir)</summary>
+<pre><code>You are the Dungeon Master of "Caverns of Eldrath", a dark fantasy text adventure RPG.
+You narrate in Brazilian Portuguese (pt-BR), with vivid and immersive descriptions.
+
+═══ NARRATIVE RULES ═══
+- Always narrate in 2nd person ("Voce entra na caverna...")
+- Keep narratives between 3-6 paragraphs
+- Include sensory details: sounds, smells, light, temperature
+- Reference the player's current state (HP, inventory, location) naturally
+- End each turn with 2-4 action options for the player
+- If the player types a free action, interpret it creatively within the story
+
+═══ TONE AND PERSONALITY ═══
+- Dark fantasy with moments of humor
+- Mysterious and atmospheric, but never frustrating
+- Reward creative actions with bonus XP or hidden items
+- Be fair in combat — the player should feel challenged but not cheated
+- Use dramatic pauses and cliffhangers between scenes
+
+═══ COMBAT SYSTEM (d20) ═══
+- Attack rolls: random 1-20. Hit if roll + player_level >= enemy_ac
+- Critical hit on natural 20: double damage
+- Critical fail on natural 1: player takes self-damage (1-3 HP)
+- Player base damage: 3-8 + weapon_bonus
+- Enemy damage varies by creature type
+- Player can flee combat (50% chance, costs 1-3 HP on failure)
+- Healing potions restore 15-25 HP
+
+═══ PROGRESSION AND ECONOMY ═══
+- XP per combat victory: 10-30 (based on enemy difficulty)
+- XP per puzzle solved: 15-25
+- XP per exploration milestone: 5-10
+- Level up at: 100, 250, 500, 800, 1200 XP
+- Level up grants: +10 max HP, +1 base damage
+- Gold drops: 5-20 per enemy, 10-50 in treasure chests
+- Shop prices: Healing Potion (30g), Torch (10g), Rope (15g),
+  Dagger+1 (80g), Shield (60g), Magic Scroll (100g)
+
+═══ GAME WORLD: CAVERNS OF ELDRATH ═══
+Locations:
+1. Entrance Hall — dimly lit, cobblestone floor, merchant NPC
+2. Fungal Caverns — bioluminescent mushrooms, poisonous spores
+3. Underground River — dark water, stepping stones, water creatures
+4. Dwarven Ruins — ancient forges, traps, valuable loot
+5. Shadow Depths — near-total darkness, powerful enemies
+6. Dragon's Sanctum — final area, boss fight
+
+Creatures:
+- Cave Rats (HP:8, AC:8, DMG:1-3, XP:10) — Entrance Hall
+- Mushroom Golem (HP:25, AC:12, DMG:4-8, XP:20) — Fungal Caverns
+- River Serpent (HP:30, AC:13, DMG:5-10, XP:25) — Underground River
+- Dwarven Automaton (HP:40, AC:15, DMG:6-12, XP:30) — Dwarven Ruins
+- Shadow Wraith (HP:50, AC:16, DMG:8-15, XP:40) — Shadow Depths
+
+NPCs:
+- Thorin the Merchant (Entrance Hall): buys/sells items, gives hints
+- Elara the Ghost (Dwarven Ruins): gives quest to find dwarven artifact
+
+═══ IMAGE PROMPT RULES ═══
+- Always generate an image prompt in ENGLISH
+- Style: dark fantasy digital painting, atmospheric lighting
+- Include: the scene described, the environment, any creatures present
+- Do NOT include text, UI elements, or player character in the image
+- Keep prompts under 200 characters for best Titan results
+- Format: "Dark fantasy scene: [description], atmospheric lighting, detailed"
+
+═══ OUTPUT FORMAT ═══
+You MUST respond with valid JSON in this exact structure:
+
+{
+  "narrative": "A narrativa em portugues...",
+  "image_prompt": "Dark fantasy scene: description in English...",
+  "state_changes": {
+    "hp_change": 0,
+    "gold_change": 0,
+    "xp_change": 0,
+    "add_items": [],
+    "remove_items": [],
+    "new_location": null
+  },
+  "options": [
+    "Opcao 1 em portugues",
+    "Opcao 2 em portugues",
+    "Opcao 3 em portugues"
+  ],
+  "combat_log": null
+}
+
+If combat occurs, combat_log should be:
+{
+  "enemy_name": "Name",
+  "enemy_hp": 0,
+  "roll": 0,
+  "hit": true/false,
+  "damage_dealt": 0,
+  "damage_taken": 0,
+  "combat_over": true/false,
+  "victory": true/false
+}
+
+CRITICAL: Always respond with ONLY the JSON. No markdown, no extra text.</code></pre>
+          </details>
+
+          <div class="card">
+            <div class="card-title">Por que o prompt &eacute; t&atilde;o detalhado?</div>
+            <p>O Claude Haiku &eacute; r&aacute;pido e barato, mas precisa de instru&ccedil;&otilde;es claras para manter consist&ecirc;ncia entre turnos. Sem as regras expl&iacute;citas de combate (d20), ele inventava mec&acirc;nicas diferentes a cada turno. Sem o formato JSON estrito, ele misturava narrativa com dados de estado. Cada se&ccedil;&atilde;o desse prompt foi iterada at&eacute; o comportamento ficar previs&iacute;vel.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 7 -->
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-content">
+          <h3>Criar as Agent Tools</h3>
+          <p>
+            O Strands Agents usa o decorador <code>@tool</code> para transformar fun&ccedil;&otilde;es Python em ferramentas que o agente pode chamar. Eu criei tr&ecirc;s tools:
+          </p>
+
+          <details>
+            <summary><strong>agent/tools/narrate_story.py</strong> (clique para expandir)</summary>
+<pre><code class="language-python">"""Tool para gerar narrativa usando Claude 3.5 Haiku via Bedrock."""
+
+import json
+import os
+import boto3
+from strands import tool
+from dotenv import load_dotenv
+
+load_dotenv()
+
+bedrock = boto3.client("bedrock-runtime", region_name=os.getenv("AWS_REGION", "us-east-1"))
+MODEL_ID = os.getenv("BEDROCK_TEXT_MODEL", "us.anthropic.claude-3-5-haiku-20241022-v1:0")
+
+
+@tool
+def narrate_story(
+    system_prompt: str,
+    player_action: str,
+    game_state: dict
+) -> dict:
+    """
+    Generates the next turn narrative, image prompt, state changes,
+    and player options using Claude 3.5 Haiku.
+
+    Args:
+        system_prompt: The DM system prompt with all game rules.
+        player_action: What the player chose to do this turn.
+        game_state: Current game state (hp, gold, xp, inventory, location, history).
+
+    Returns:
+        dict with keys: narrative, image_prompt, state_changes, options, combat_log.
+    """
+    # Build context message with current state
+    context = (
+        f"Estado atual do jogador:\n"
+        f"- HP: {game_state.get('hp', 100)}/{game_state.get('max_hp', 100)}\n"
+        f"- Gold: {game_state.get('gold', 0)}\n"
+        f"- XP: {game_state.get('xp', 0)} (Level {game_state.get('level', 1)})\n"
+        f"- Inventario: {', '.join(game_state.get('inventory', [])) or 'vazio'}\n"
+        f"- Localizacao: {game_state.get('location', 'Entrance Hall')}\n"
+        f"- Turno: {game_state.get('turn', 1)}\n\n"
+        f"Historico recente:\n"
+    )
+
+    # Include last 3 turns of history for context
+    history = game_state.get("history", [])
+    for entry in history[-3:]:
+        context += f"- Jogador: {entry.get('action', '?')}\n"
+        context += f"  Resultado: {entry.get('summary', '?')}\n"
+
+    context += f"\nAcao do jogador agora: {player_action}"
+
+    # Call Bedrock Converse API
+    response = bedrock.converse(
+        modelId=MODEL_ID,
+        system=[{"text": system_prompt}],
+        messages=[
+            {
+                "role": "user",
+                "content": [{"text": context}]
+            }
+        ],
+        inferenceConfig={
+            "maxTokens": 2048,
+            "temperature": 0.8,
+            "topP": 0.9
+        }
+    )
+
+    # Extract response text
+    raw_text = response["output"]["message"]["content"][0]["text"]
+
+    # Parse JSON — with fallback for malformed responses
+    try:
+        # Try direct JSON parse
+        result = json.loads(raw_text)
+    except json.JSONDecodeError:
+        # Try extracting JSON from markdown code block
+        try:
+            json_start = raw_text.index("{")
+            json_end = raw_text.rindex("}") + 1
+            result = json.loads(raw_text[json_start:json_end])
+        except (ValueError, json.JSONDecodeError):
+            # Fallback: return raw text as narrative
+            result = {
+                "narrative": raw_text,
+                "image_prompt": "Dark fantasy scene: mysterious cavern with torchlight, atmospheric lighting, detailed",
+                "state_changes": {
+                    "hp_change": 0,
+                    "gold_change": 0,
+                    "xp_change": 0,
+                    "add_items": [],
+                    "remove_items": [],
+                    "new_location": None
+                },
+                "options": [
+                    "Explorar a area",
+                    "Verificar o inventario",
+                    "Descansar"
+                ],
+                "combat_log": None
+            }
+
+    return result</code></pre>
+          </details>
+
+          <details>
+            <summary><strong>agent/tools/generate_scene.py</strong> (clique para expandir)</summary>
+<pre><code class="language-python">"""Tool para gerar imagens de cena usando Titan Image Generator V2 via Bedrock."""
+
+import json
+import os
+import base64
+import uuid
+from datetime import datetime
+import boto3
+from strands import tool
+from dotenv import load_dotenv
+
+load_dotenv()
+
+bedrock = boto3.client("bedrock-runtime", region_name=os.getenv("AWS_REGION", "us-east-1"))
+s3 = boto3.client("s3", region_name=os.getenv("AWS_REGION", "us-east-1"))
+
+MODEL_ID = os.getenv("BEDROCK_IMAGE_MODEL", "amazon.titan-image-generator-v2:0")
+BUCKET = os.getenv("S3_BUCKET", "dungeonai-scenes")
+
+
+@tool
+def generate_scene(
+    image_prompt: str,
+    session_id: str,
+    turn_number: int
+) -> dict:
+    """
+    Generates a scene image using Titan Image Generator V2 and saves to S3.
+
+    Args:
+        image_prompt: English description of the scene to generate.
+        session_id: The game session ID for organizing images.
+        turn_number: Current turn number for the filename.
+
+    Returns:
+        dict with keys: image_base64, s3_key, success.
+    """
+    try:
+        # Call Titan Image Generator V2
+        body = json.dumps({
+            "textToImageParams": {
+                "text": image_prompt
+            },
+            "imageGenerationConfig": {
+                "numberOfImages": 1,
+                "height": 512,
+                "width": 512,
+                "cfgScale": 8.0,
+                "seed": int(uuid.uuid4().int % 2147483647)
+            }
+        })
+
+        response = bedrock.invoke_model(
+            modelId=MODEL_ID,
+            contentType="application/json",
+            accept="application/json",
+            body=body
+        )
+
+        result = json.loads(response["body"].read())
+        image_base64 = result["images"][0]
+
+        # Save to S3
+        s3_key = f"sessions/{session_id}/turn_{turn_number:04d}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
+        image_bytes = base64.b64decode(image_base64)
+
+        s3.put_object(
+            Bucket=BUCKET,
+            Key=s3_key,
+            Body=image_bytes,
+            ContentType="image/png",
+            Metadata={
+                "session_id": session_id,
+                "turn": str(turn_number),
+                "prompt": image_prompt[:256]
+            }
+        )
+
+        return {
+            "image_base64": image_base64,
+            "s3_key": s3_key,
+            "success": True
+        }
+
+    except Exception as e:
+        print(f"[generate_scene] Error: {e}")
+        return {
+            "image_base64": None,
+            "s3_key": None,
+            "success": False
+        }</code></pre>
+          </details>
+
+          <details>
+            <summary><strong>agent/tools/update_state.py</strong> (clique para expandir)</summary>
+<pre><code class="language-python">"""Tool para gerenciar estado do jogo no DynamoDB."""
+
+import os
+import json
+from datetime import datetime
+from decimal import Decimal
+import boto3
+from strands import tool
+from dotenv import load_dotenv
+
+load_dotenv()
+
+dynamodb = boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "us-east-1"))
+table = dynamodb.Table(os.getenv("DYNAMODB_TABLE", "dungeonai-game-sessions"))
+
+# XP thresholds for leveling up
+LEVEL_THRESHOLDS = [0, 100, 250, 500, 800, 1200]
+
+
+def _decimal_default(obj):
+    """JSON serializer for Decimal objects from DynamoDB."""
+    if isinstance(obj, Decimal):
+        return int(obj) if obj == int(obj) else float(obj)
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+
+def _to_decimal(data):
+    """Convert floats/ints to Decimal for DynamoDB compatibility."""
+    if isinstance(data, dict):
+        return {k: _to_decimal(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_to_decimal(i) for i in data]
+    elif isinstance(data, float):
+        return Decimal(str(data))
+    elif isinstance(data, int):
+        return Decimal(str(data))
+    return data
+
+
+@tool
+def get_game_state(session_id: str) -> dict:
+    """
+    Loads the current game state from DynamoDB.
+
+    Args:
+        session_id: The unique session identifier.
+
+    Returns:
+        dict with the full game state, or a fresh state if session is new.
+    """
+    response = table.get_item(Key={"session_id": session_id})
+
+    if "Item" in response:
+        # Convert Decimal back to native types
+        item = json.loads(json.dumps(response["Item"], default=_decimal_default))
+        return item
+
+    # New session — return default state
+    return {
+        "session_id": session_id,
+        "hp": 100,
+        "max_hp": 100,
+        "gold": 20,
+        "xp": 0,
+        "level": 1,
+        "inventory": ["Torch", "Healing Potion"],
+        "location": "Entrance Hall",
+        "turn": 0,
+        "history": [],
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+        "alive": True
+    }
+
+
+@tool
+def save_game_state(
+    session_id: str,
+    current_state: dict,
+    state_changes: dict,
+    player_action: str,
+    narrative_summary: str
+) -> dict:
+    """
+    Applies state changes and saves the updated game state to DynamoDB.
+
+    Args:
+        session_id: The unique session identifier.
+        current_state: The current game state before changes.
+        state_changes: Changes to apply (hp_change, gold_change, xp_change, etc).
+        player_action: What the player did this turn (for history).
+        narrative_summary: Short summary of what happened (for history).
+
+    Returns:
+        dict with the updated game state.
+    """
+    state = current_state.copy()
+
+    # Apply HP change
+    hp_change = state_changes.get("hp_change", 0)
+    state["hp"] = max(0, min(state["max_hp"], state["hp"] + hp_change))
+
+    # Apply gold change
+    gold_change = state_changes.get("gold_change", 0)
+    state["gold"] = max(0, state["gold"] + gold_change)
+
+    # Apply XP change and check level up
+    xp_change = state_changes.get("xp_change", 0)
+    state["xp"] = state["xp"] + xp_change
+    new_level = _calculate_level(state["xp"])
+
+    if new_level > state["level"]:
+        levels_gained = new_level - state["level"]
+        state["level"] = new_level
+        state["max_hp"] = state["max_hp"] + (10 * levels_gained)
+        state["hp"] = state["max_hp"]  # Full heal on level up
+
+    # Apply inventory changes
+    add_items = state_changes.get("add_items", [])
+    remove_items = state_changes.get("remove_items", [])
+
+    for item in add_items:
+        if item not in state["inventory"]:
+            state["inventory"].append(item)
+
+    for item in remove_items:
+        if item in state["inventory"]:
+            state["inventory"].remove(item)
+
+    # Apply location change
+    new_location = state_changes.get("new_location")
+    if new_location:
+        state["location"] = new_location
+
+    # Update turn counter
+    state["turn"] = state.get("turn", 0) + 1
+
+    # Add to history (keep last 20 turns)
+    history_entry = {
+        "turn": state["turn"],
+        "action": player_action,
+        "summary": narrative_summary[:200],
+        "hp_after": state["hp"],
+        "location": state["location"],
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    state["history"] = state.get("history", [])[-19:] + [history_entry]
+
+    # Check death
+    if state["hp"] <= 0:
+        state["alive"] = False
+
+    # Update timestamp
+    state["updated_at"] = datetime.utcnow().isoformat()
+
+    # Save to DynamoDB
+    state["session_id"] = session_id
+    table.put_item(Item=_to_decimal(state))
+
+    return state
+
+
+def _calculate_level(xp: int) -> int:
+    """Calculate player level based on XP thresholds."""
+    level = 1
+    for i, threshold in enumerate(LEVEL_THRESHOLDS):
+        if xp >= threshold:
+            level = i + 1
+    return min(level, len(LEVEL_THRESHOLDS))</code></pre>
+          </details>
+
+          <div class="tip">
+            <strong>Por que <code>Decimal</code>?</strong> O DynamoDB n&atilde;o aceita <code>float</code> do Python. Todos os n&uacute;meros precisam ser convertidos para <code>Decimal</code> antes de gravar e reconvertidos ao ler. Esse detalhe causa muitos bugs se voc&ecirc; n&atilde;o tratar.
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 8 -->
+      <div class="step">
+        <div class="step-num">8</div>
+        <div class="step-content">
+          <h3>Criar o Orquestrador</h3>
+          <p>
+            O <code>dungeon_master.py</code> &eacute; o c&eacute;rebro do projeto. Ele cria o agente Strands com o modelo Bedrock, carrega o system prompt, e coordena o fluxo de cada turno chamando as tools na ordem certa.
+          </p>
+          <details>
+            <summary><strong>agent/dungeon_master.py</strong> (clique para expandir)</summary>
+<pre><code class="language-python">"""Orquestrador do DungeonAI — coordena tools e fluxo de cada turno."""
+
+import os
+import uuid
+from pathlib import Path
+from strands import Agent
+from strands.models.bedrock import BedrockModel
+from dotenv import load_dotenv
+
+from agent.tools.narrate_story import narrate_story
+from agent.tools.generate_scene import generate_scene
+from agent.tools.update_state import get_game_state, save_game_state
+
+load_dotenv()
+
+# Load system prompt
+PROMPT_PATH = Path(__file__).parent / "prompts" / "system_prompt.txt"
+SYSTEM_PROMPT = PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def create_agent() -> Agent:
+    """Create and configure the Strands Agent with Bedrock model and tools."""
+    model = BedrockModel(
+        model_id=os.getenv("BEDROCK_TEXT_MODEL", "us.anthropic.claude-3-5-haiku-20241022-v1:0"),
+        region_name=os.getenv("AWS_REGION", "us-east-1")
+    )
+
+    agent = Agent(
+        model=model,
+        tools=[narrate_story, generate_scene, get_game_state, save_game_state]
+    )
+
+    return agent
+
+
+def new_session() -> str:
+    """Generate a new unique session ID."""
+    return str(uuid.uuid4())
+
+
+def play_turn(session_id: str, player_action: str) -> dict:
+    """
+    Execute one complete game turn.
+
+    Flow:
+    1. Load state from DynamoDB
+    2. Generate narrative + state changes with Claude Haiku
+    3. Generate scene image with Titan
+    4. Save updated state to DynamoDB
+    5. Return everything to frontend
+
+    Args:
+        session_id: The game session ID.
+        player_action: What the player chose to do.
+
+    Returns:
+        dict with: narrative, image_base64, options, game_state, combat_log.
+    """
+    # Step 1: Load current state
+    game_state = get_game_state(session_id=session_id)
+
+    # Check if player is dead
+    if not game_state.get("alive", True):
+        return {
+            "narrative": "Voce tombou nas Cavernas de Eldrath. Sua jornada terminou aqui.",
+            "image_base64": None,
+            "options": ["Iniciar nova aventura"],
+            "game_state": game_state,
+            "combat_log": None,
+            "game_over": True
+        }
+
+    # Step 2: Generate narrative with Claude Haiku
+    turn_result = narrate_story(
+        system_prompt=SYSTEM_PROMPT,
+        player_action=player_action,
+        game_state=game_state
+    )
+
+    # Step 3: Generate scene image with Titan
+    image_result = generate_scene(
+        image_prompt=turn_result.get("image_prompt", "Dark fantasy cavern scene"),
+        session_id=session_id,
+        turn_number=game_state.get("turn", 0) + 1
+    )
+
+    # Step 4: Save updated state to DynamoDB
+    updated_state = save_game_state(
+        session_id=session_id,
+        current_state=game_state,
+        state_changes=turn_result.get("state_changes", {}),
+        player_action=player_action,
+        narrative_summary=turn_result.get("narrative", "")[:200]
+    )
+
+    # Step 5: Return everything to frontend
+    return {
+        "narrative": turn_result.get("narrative", ""),
+        "image_base64": image_result.get("image_base64"),
+        "options": turn_result.get("options", ["Explorar", "Descansar", "Verificar inventario"]),
+        "game_state": updated_state,
+        "combat_log": turn_result.get("combat_log"),
+        "game_over": not updated_state.get("alive", True)
+    }</code></pre>
+          </details>
+
+          <div class="card">
+            <div class="card-title">Por que Strands Agents e n&atilde;o LangChain?</div>
+            <p>Strands &eacute; o framework open-source da pr&oacute;pria AWS. A integra&ccedil;&atilde;o com Bedrock &eacute; nativa (sem adapters), o decorador <code>@tool</code> &eacute; mais simples que o tooling do LangChain, e o overhead &eacute; menor. Para um projeto 100% AWS, faz mais sentido.</p>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Por que Claude 3.5 Haiku?</div>
+            <p>Tr&ecirc;s motivos: (1) &eacute; r&aacute;pido &mdash; responde em ~1s, essencial para um jogo interativo; (2) &eacute; barato &mdash; ~$0.0008/turno; (3) segue instru&ccedil;&otilde;es de formato JSON de forma confi&aacute;vel, o que nem todo modelo pequeno faz bem. E o portugu&ecirc;s &eacute; excelente.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 9 -->
+      <div class="step">
+        <div class="step-num">9</div>
+        <div class="step-content">
+          <h3>Criar o Frontend</h3>
+          <p>
+            O frontend usa Streamlit com um tema dark fantasy customizado. Aqui eu mostro as partes principais &mdash; o CSS completo tem ~350 linhas e est&aacute; no reposit&oacute;rio.
+          </p>
+          <details>
+            <summary><strong>frontend/app.py</strong> (clique para expandir)</summary>
+<pre><code class="language-python">"""DungeonAI — Frontend Streamlit com tema dark fantasy."""
+
+import base64
+import streamlit as st
+from agent.dungeon_master import play_turn, new_session
+
+# ── Page config ──────────────────────────────────────────
+st.set_page_config(
+    page_title="DungeonAI - Caverns of Eldrath",
+    page_icon="🗡️",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+# ── Dark fantasy CSS (abbreviated — full version in repo) ──
+st.markdown("""
+&lt;style&gt;
+    .stApp { background-color: #0a0a0f; color: #c4b59a; }
+    .narrative-box {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border: 1px solid #c4975a33;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        font-size: 1.05rem;
+        line-height: 1.8;
+        color: #d4c4a8;
+    }
+    .status-bar {
+        display: flex; gap: 1rem; padding: 0.75rem;
+        background: #12121f; border-radius: 8px;
+        border: 1px solid #c4975a22;
+        margin-bottom: 1rem;
+    }
+    .stat { text-align: center; flex: 1; }
+    .stat-value { font-size: 1.3rem; font-weight: bold; color: #c4975a; }
+    .stat-label { font-size: 0.7rem; color: #888; text-transform: uppercase; }
+    /* ... ~350 lines total — see repo for full CSS ... */
+&lt;/style&gt;
+""", unsafe_allow_html=True)
+
+
+# ── Session state init ───────────────────────────────────
+if "session_id" not in st.session_state:
+    st.session_state.session_id = new_session()
+    st.session_state.game_started = False
+    st.session_state.turns = []
+    st.session_state.pending_action = None
+
+# ── Title ────────────────────────────────────────────────
+st.markdown("&lt;h1 style='text-align:center;color:#c4975a'&gt;⚔️ DungeonAI&lt;/h1&gt;", unsafe_allow_html=True)
+st.markdown("&lt;p style='text-align:center;color:#888'&gt;Caverns of Eldrath&lt;/p&gt;", unsafe_allow_html=True)
+
+
+def queue_action(action: str):
+    """Queue a player action to be processed on next rerun."""
+    st.session_state.pending_action = action
+
+
+def process_pending_action():
+    """Process the queued action with a loading spinner."""
+    if st.session_state.pending_action is None:
+        return
+
+    action = st.session_state.pending_action
+    st.session_state.pending_action = None
+
+    with st.spinner("O Dungeon Master esta narrando..."):
+        result = play_turn(st.session_state.session_id, action)
+
+    st.session_state.turns.append(result)
+    st.session_state.game_state = result["game_state"]
+
+
+# ── Start / Continue ─────────────────────────────────────
+if not st.session_state.game_started:
+    if st.button("Iniciar Aventura", use_container_width=True):
+        queue_action("Iniciar uma nova aventura nas Cavernas de Eldrath")
+        st.session_state.game_started = True
+        st.rerun()
+else:
+    process_pending_action()
+
+    # Render turns
+    for turn in st.session_state.turns:
+        # Status bar
+        gs = turn.get("game_state", {})
+        st.markdown(f"""
+        &lt;div class="status-bar"&gt;
+            &lt;div class="stat"&gt;&lt;div class="stat-value"&gt;{gs.get('hp',0)}/{gs.get('max_hp',100)}&lt;/div&gt;&lt;div class="stat-label"&gt;HP&lt;/div&gt;&lt;/div&gt;
+            &lt;div class="stat"&gt;&lt;div class="stat-value"&gt;{gs.get('gold',0)}&lt;/div&gt;&lt;div class="stat-label"&gt;Gold&lt;/div&gt;&lt;/div&gt;
+            &lt;div class="stat"&gt;&lt;div class="stat-value"&gt;{gs.get('xp',0)}&lt;/div&gt;&lt;div class="stat-label"&gt;XP&lt;/div&gt;&lt;/div&gt;
+            &lt;div class="stat"&gt;&lt;div class="stat-value"&gt;Lv{gs.get('level',1)}&lt;/div&gt;&lt;div class="stat-label"&gt;Level&lt;/div&gt;&lt;/div&gt;
+        &lt;/div&gt;
+        """, unsafe_allow_html=True)
+
+        # Scene image
+        if turn.get("image_base64"):
+            image_bytes = base64.b64decode(turn["image_base64"])
+            st.image(image_bytes, use_container_width=True)
+
+        # Narrative
+        st.markdown(f'&lt;div class="narrative-box"&gt;{turn["narrative"]}&lt;/div&gt;', unsafe_allow_html=True)
+
+    # Action buttons (last turn options)
+    if st.session_state.turns:
+        last = st.session_state.turns[-1]
+        if last.get("game_over"):
+            if st.button("Nova Aventura"):
+                st.session_state.session_id = new_session()
+                st.session_state.game_started = False
+                st.session_state.turns = []
+                st.rerun()
+        else:
+            options = last.get("options", [])
+            cols = st.columns(len(options)) if options else []
+            for i, opt in enumerate(options):
+                with cols[i]:
+                    if st.button(opt, key=f"opt_{len(st.session_state.turns)}_{i}"):
+                        queue_action(opt)
+                        st.rerun()
+
+            # Free text input
+            free_action = st.text_input(
+                "Ou digite sua propria acao:",
+                key=f"free_{len(st.session_state.turns)}"
+            )
+            if free_action:
+                queue_action(free_action)
+                st.rerun()</code></pre>
+          </details>
+
+          <div class="tip">
+            <strong>Dica:</strong> o padr&atilde;o <code>queue_action</code> + <code>process_pending_action</code> &eacute; necess&aacute;rio porque o Streamlit re-executa o script inteiro a cada intera&ccedil;&atilde;o. Se voc&ecirc; chamar <code>play_turn</code> direto no callback do bot&atilde;o, o spinner n&atilde;o aparece corretamente.
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 10 -->
+      <div class="step">
+        <div class="step-num">10</div>
+        <div class="step-content">
+          <h3>Rodar o jogo</h3>
+          <p>Com tudo configurado, basta rodar:</p>
+<pre><code class="language-bash">python -m streamlit run frontend/app.py</code></pre>
+          <p>O Streamlit abre no navegador em <code>http://localhost:8501</code>. Clique em <strong>Iniciar Aventura</strong> e boa sorte nas Cavernas de Eldrath.</p>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- COMO FUNCIONA POR DENTRO -->
+      <!-- ================================================================== -->
+
+      <h2>Como Funciona por Dentro</h2>
+
+      <h3>Ciclo de um turno</h3>
+
+      <p>Cada turno segue exatamente 6 passos:</p>
+
+      <ol>
+        <li><strong>Jogador envia a&ccedil;&atilde;o</strong> &mdash; clica em uma op&ccedil;&atilde;o ou digita texto livre</li>
+        <li><strong>Load state</strong> &mdash; <code>get_game_state</code> busca HP, ouro, XP, invent&aacute;rio, localiza&ccedil;&atilde;o e hist&oacute;rico do DynamoDB</li>
+        <li><strong>Claude gera tudo</strong> &mdash; <code>narrate_story</code> envia o estado + a&ccedil;&atilde;o para o Claude Haiku, que retorna JSON com narrativa, prompt de imagem, mudan&ccedil;as de estado e op&ccedil;&otilde;es</li>
+        <li><strong>Titan gera imagem</strong> &mdash; <code>generate_scene</code> usa o prompt em ingl&ecirc;s para gerar uma imagem 512x512</li>
+        <li><strong>Persist&ecirc;ncia</strong> &mdash; imagem salva no S3, estado atualizado no DynamoDB via <code>save_game_state</code></li>
+        <li><strong>Retorno</strong> &mdash; frontend recebe narrativa + imagem + status + op&ccedil;&otilde;es e renderiza tudo</li>
+      </ol>
+
+      <h3>Por que Strands Agents?</h3>
+
+      <p>
+        Strands &eacute; o framework open-source da AWS para agentes de IA. O que eu mais gostei:
+      </p>
+
+      <ul>
+        <li><strong>Decorador <code>@tool</code></strong> &mdash; transforma qualquer fun&ccedil;&atilde;o Python em uma ferramenta que o agente pode chamar, com tipagem autom&aacute;tica dos par&acirc;metros</li>
+        <li><strong>Integra&ccedil;&atilde;o nativa com Bedrock</strong> &mdash; <code>BedrockModel</code> funciona direto, sem adapters ou wrappers</li>
+        <li><strong>Overhead m&iacute;nimo</strong> &mdash; n&atilde;o precisa de chains, prompts templates ou parsers extras. O agente chama as tools e pronto</li>
+      </ul>
+
+      <h3>Por que Claude 3.5 Haiku?</h3>
+
+      <p>
+        Eu testei v&aacute;rios modelos e o Haiku foi o melhor custo-benef&iacute;cio para este caso:
+      </p>
+
+      <ul>
+        <li><strong>Velocidade</strong> &mdash; responde em ~1 segundo, essencial para um jogo interativo</li>
+        <li><strong>Custo</strong> &mdash; ~$0.0008 por turno (input + output tokens)</li>
+        <li><strong>Portugu&ecirc;s</strong> &mdash; narrativas fluidas e naturais em pt-BR</li>
+        <li><strong>JSON confi&aacute;vel</strong> &mdash; segue o formato de sa&iacute;da com consist&ecirc;ncia. Raramente quebra o JSON</li>
+      </ul>
+
+      <!-- ================================================================== -->
+      <!-- TROUBLESHOOTING -->
+      <!-- ================================================================== -->
+
+      <h2>Troubleshooting</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Erro</th>
+            <th>Causa</th>
+            <th>Solu&ccedil;&atilde;o</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>AccessDeniedException</code> no Bedrock</td>
+            <td>Modelo n&atilde;o habilitado ou IAM sem permiss&atilde;o</td>
+            <td>Habilite o modelo no Bedrock Console e verifique a policy IAM</td>
+          </tr>
+          <tr>
+            <td><code>ValidationException: malformed input</code></td>
+            <td>Payload inv&aacute;lido para Titan Image</td>
+            <td>Verifique se <code>height</code> e <code>width</code> s&atilde;o m&uacute;ltiplos de 64 e o prompt n&atilde;o est&aacute; vazio</td>
+          </tr>
+          <tr>
+            <td><code>TypeError: Float types are not supported</code></td>
+            <td>DynamoDB n&atilde;o aceita <code>float</code></td>
+            <td>Use a fun&ccedil;&atilde;o <code>_to_decimal()</code> antes de chamar <code>put_item()</code></td>
+          </tr>
+          <tr>
+            <td>JSON parse error no retorno do Claude</td>
+            <td>Modelo retornou texto fora do formato JSON</td>
+            <td>O fallback em <code>narrate_story.py</code> j&aacute; trata isso. Se persistir, aumente a especificidade do system prompt</td>
+          </tr>
+          <tr>
+            <td><code>NoCredentialError</code></td>
+            <td>AWS credentials n&atilde;o configuradas</td>
+            <td>Rode <code>aws configure</code> ou verifique o arquivo <code>.env</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ================================================================== -->
+      <!-- PR&Oacute;XIMOS PASSOS -->
+      <!-- ================================================================== -->
+
+      <h2>Pr&oacute;ximos Passos</h2>
+
+      <p>O DungeonAI hoje roda local. Esses s&atilde;o os pr&oacute;ximos passos que eu pretendo implementar:</p>
+
+      <ul>
+        <li><strong>Deploy serverless</strong> &mdash; migrar o backend para Lambda + API Gateway, com o frontend em Amplify ou CloudFront + S3</li>
+        <li><strong>Multiplayer</strong> &mdash; WebSockets via API Gateway para m&uacute;ltiplos jogadores na mesma caverna</li>
+        <li><strong>Save/Load com Cognito</strong> &mdash; autentica&ccedil;&atilde;o para cada jogador salvar e retomar sess&otilde;es</li>
+        <li><strong>Mais conte&uacute;do</strong> &mdash; novos biomas, NPCs com quest lines, sistema de crafting</li>
+        <li><strong>Upgrade de modelo para boss fights</strong> &mdash; usar Claude Sonnet em vez de Haiku para batalhas de boss, onde a narrativa precisa ser mais elaborada</li>
+      </ul>
+
+      <hr>
+
+      <p>
+        O c&oacute;digo completo est&aacute; no <a href="https://github.com/cloudbymcn/dungeonai" target="_blank">github.com/cloudbymcn/dungeonai</a>. Se tiver d&uacute;vidas ou sugest&otilde;es, abre uma issue no repo.
+      </p>
+
+    </div>
+
+    <footer class="post-footer">
+      <div class="post-author">
+        <div class="post-author-avatar">MCN</div>
+        <div>
+          <div class="post-author-name">Matheus N.</div>
+          <div class="post-author-role">Engenheiro de Infraestrutura Cloud</div>
+        </div>
+      </div>
+      <div class="post-share">
+        <span>Compartilhar:</span>
+        <a href="#" class="share-btn" title="LinkedIn">in</a>
+        <a href="#" class="share-btn" title="Twitter">X</a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer style="padding:2rem;text-align:center;color:var(--ink3);font-size:.8rem;border-top:1px solid var(--border)">
+  &copy; 2026 Cloud by MCN
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script>
+const text = document.querySelector('.post-content').innerText;
+const words = text.split(/\s+/).length;
+const minutes = Math.ceil(words / 200);
+const el = document.getElementById('readTime');
+if (el) el.textContent = minutes + ' min de leitura';
+</script>
+</body>
+</html>
