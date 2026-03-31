@@ -110,12 +110,12 @@
     </div>
 
     <div class="proj-grid" id="projGrid">
-      <article class="pj rv rv-up stagger tilt-card" data-cat="cloudops" data-date="2026-03-31">
+      <article class="pj rv rv-up stagger tilt-card" data-cat="devops" data-date="2026-03-31">
         <div class="card-glow"></div>
         <div class="card-border-glow"></div>
-        <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">31 Mar 2026</span></div>
-        <h3><a href="posts/ptax-lambda-migration.html">ETL Legado para Lambda: Cotação do Dólar a R$ 3/mês</a></h3>
-        <p>Pipeline Pentaho + Jenkins substituído por Lambda + EventBridge + Terraform. De R$ 200/mês para R$ 3, com alertas reais e zero servidor.</p>
+        <div class="pj-head"><span class="pj-cat">DevOps</span><span class="pj-date">31 Mar 2026</span></div>
+        <h3><a href="posts/ptax-lambda-migration.html">De R$ 200 para R$ 3/mês: Matei um Servidor Inteiro com uma Lambda</a></h3>
+        <p>Aposentei um Jenkins + Pentaho que custava R$ 200/mês e troquei por Lambda + Terraform com CI/CD automático. O servidor nem percebeu que morreu.</p>
         <div class="pj-stack"><span>Lambda</span><span>EventBridge</span><span>Secrets Manager</span><span>Terraform</span><span>CloudWatch</span><span>SNS</span></div>
         <div class="pj-cta"><a href="posts/ptax-lambda-migration.html" data-i18n="read_case">Ler case study →</a></div>
       </article>
@@ -124,8 +124,8 @@
         <div class="card-glow"></div>
         <div class="card-border-glow"></div>
         <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">31 Mar 2026</span></div>
-        <h3><a href="posts/sharepoint-lambda-firebird.html">De Jenkins + Pentaho para Lambda Serverless</a></h3>
-        <p>Como substituí um pipeline ETL on-premise de 20 steps por duas Lambdas e um trigger em tempo real, eliminando servidor físico e reduzindo latência de 10 minutos para segundos.</p>
+        <h3><a href="posts/sharepoint-lambda-firebird.html">20 Steps no Pentaho Viraram 2 Lambdas e um Trigger</a></h3>
+        <p>Pipeline ETL on-premise com 20 steps e 10 minutos de atraso substituído por duas Lambdas com disparo em tempo real. O servidor Jenkins virou peça de museu.</p>
         <div class="pj-stack"><span>Lambda</span><span>API Gateway</span><span>EventBridge</span><span>Secrets Manager</span><span>Power Automate</span><span>CloudWatch</span></div>
         <div class="pj-cta"><a href="posts/sharepoint-lambda-firebird.html" data-i18n="read_case">Ler case study →</a></div>
       </article>
@@ -134,8 +134,8 @@
         <div class="card-glow"></div>
         <div class="card-border-glow"></div>
         <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">30 Mar 2026</span></div>
-        <h3><a href="posts/salesforce-cdc-eventbridge-firebird.html">Sincronização em Tempo Real entre Salesforce e Sistema Legado</a></h3>
-        <p>Como substituí um pipeline batch de 24h de atraso por uma integração event-driven serverless que atualiza dados em ~3 segundos, sem servidor.</p>
+        <h3><a href="posts/salesforce-cdc-eventbridge-firebird.html">De 24 Horas para 3 Segundos: Salesforce em Tempo Real</a></h3>
+        <p>Pipeline batch diário com 24h de atraso virou integração event-driven que sincroniza em 3 segundos. Custo: R$ 8/mês. Servidores: zero.</p>
         <div class="pj-stack"><span>EventBridge</span><span>Lambda</span><span>Salesforce CDC</span><span>SQS</span><span>Secrets Manager</span><span>CloudWatch</span></div>
         <div class="pj-cta"><a href="posts/salesforce-cdc-eventbridge-firebird.html" data-i18n="read_case">Ler case study →</a></div>
       </article>
@@ -144,8 +144,8 @@
         <div class="card-glow"></div>
         <div class="card-border-glow"></div>
         <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">13 Mar 2026</span></div>
-        <h3><a href="posts/gestao-midia-aws-serverless.html">Galeria de Fotos e Vídeos na Nuvem para Empresas</a></h3>
-        <p>Sistema web onde funcionários fazem upload de arquivos direto para a nuvem, com login seguro e entrega rápida via CDN global. Tudo automático, sem servidor.</p>
+        <h3><a href="posts/gestao-midia-aws-serverless.html">Upload de 15s para 2s: Galeria Serverless que Funciona no Celular</a></h3>
+        <p>Construí uma galeria web completa onde o upload vai direto pro S3, sem passar por servidor. Login com Cognito, entrega por CDN, deploy com um comando.</p>
         <div class="pj-stack"><span>S3</span><span>Lambda</span><span>API Gateway</span><span>Cognito</span><span>CloudFront</span><span>SAM</span></div>
         <div class="pj-cta"><a href="posts/gestao-midia-aws-serverless.html" data-i18n="read_case">Ler case study →</a></div>
       </article>
@@ -154,8 +154,8 @@
         <div class="card-glow"></div>
         <div class="card-border-glow"></div>
         <div class="pj-head"><span class="pj-cat">DevOps</span><span class="pj-date">12 Fev 2026</span></div>
-        <h3><a href="posts/integracao-api-aws.html">Conectando um Sistema Externo ao Banco de Dados na Nuvem</a></h3>
-        <p>Como integrar uma API de fora com um banco de dados isolado na AWS, com conexão criptografada e regras de acesso restrito por IP.</p>
+        <h3><a href="posts/integracao-api-aws.html">API Exposta com Banco Blindado: Zero Portas Abertas pro Mundo</a></h3>
+        <p>Liberei acesso externo a uma API sem expor o banco de dados. HTTPS com Let's Encrypt, allowlist por IP, banco isolado em VPC privada.</p>
         <div class="pj-stack"><span>EC2</span><span>VPC</span><span>Security Groups</span><span>Nginx</span><span>Let's Encrypt</span><span>Node.js</span></div>
         <div class="pj-cta"><a href="posts/integracao-api-aws.html" data-i18n="read_case">Ler case study →</a></div>
       </article>
@@ -164,8 +164,8 @@
         <div class="card-glow"></div>
         <div class="card-border-glow"></div>
         <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">04 Fev 2026</span></div>
-        <h3><a href="posts/otimizacao-mp4.html">Otimização de Milhares de Vídeos para Carregamento Instantâneo</a></h3>
-        <p>Processamento automático em lote de milhares de vídeos MP4 para carregar instantaneamente no navegador, sem alterar nenhum link existente.</p>
+        <h3><a href="posts/otimizacao-mp4.html">Milhares de Vídeos Otimizados sem Quebrar Nenhum Link</a></h3>
+        <p>Processei milhares de MP4 em lote para carregar instantaneamente no navegador. Nenhuma URL do Salesforce foi alterada. Custo: centavos.</p>
         <div class="pj-stack"><span>MediaConvert</span><span>S3 Batch</span><span>Lambda</span><span>CloudFront</span><span>S3</span></div>
         <div class="pj-cta"><a href="posts/otimizacao-mp4.html" data-i18n="read_case">Ler case study →</a></div>
       </article>
