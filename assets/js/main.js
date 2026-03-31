@@ -157,11 +157,13 @@ window.addEventListener('scroll', () => {
     a.classList.toggle('active', a.dataset.section === current);
   });
 
-  // Nav dark mode when over dark sections
-  const nlEl = document.querySelector('.nl');
+  // Nav dark mode when over dark sections (contato + footer)
+  const contatoEl = document.getElementById('contato');
   const footerEl = document.querySelector('footer');
   const navBot = nav.offsetHeight + nav.offsetTop;
-  const inDark = (nlEl && y + navBot >= nlEl.offsetTop && y < (footerEl ? footerEl.offsetTop + footerEl.offsetHeight : Infinity));
+  const darkStart = contatoEl ? contatoEl.offsetTop : Infinity;
+  const darkEnd = footerEl ? footerEl.offsetTop + footerEl.offsetHeight : Infinity;
+  const inDark = (y + navBot >= darkStart && y + navBot < darkEnd);
   nav.classList.toggle('nav-dark', inDark);
 
   // Parallax (2)
@@ -255,6 +257,7 @@ document.querySelectorAll('.f-btn').forEach(btn => {
     btn.classList.add('on');
 
     const cards = document.querySelectorAll('.pj');
+    const emptyState = document.getElementById('projEmpty');
     let visibleIndex = 0;
 
     cards.forEach(card => {
@@ -263,7 +266,6 @@ document.querySelectorAll('.f-btn').forEach(btn => {
         card.classList.add('hiding');
         setTimeout(() => card.classList.add('hidden'), 350);
       } else {
-        // Stagger the reveal of visible cards
         const delay = visibleIndex * 80;
         visibleIndex++;
         card.classList.remove('hidden');
@@ -271,12 +273,16 @@ document.querySelectorAll('.f-btn').forEach(btn => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             card.classList.remove('hiding');
-            // Clear delay after animation
             setTimeout(() => { card.style.transitionDelay = '0ms'; }, 500);
           });
         });
       }
     });
+
+    // Show empty state if no visible cards
+    if (emptyState) {
+      emptyState.style.display = visibleIndex === 0 ? 'block' : 'none';
+    }
   });
 });
 
@@ -316,6 +322,20 @@ document.addEventListener('click', e => {
     document.body.style.overflow = '';
   }
 });
+
+// ═══ CONTACT FORM → MAILTO ═══
+const contactForm = document.getElementById('contactForm');
+if (contactForm) {
+  contactForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const name = document.getElementById('cfName').value.trim();
+    const email = document.getElementById('cfEmail').value.trim();
+    const subject = document.getElementById('cfSubject').value;
+    const msg = document.getElementById('cfMsg').value.trim();
+    const body = `Nome: ${name}\nEmail: ${email}\n\n${msg}`;
+    window.location.href = `mailto:matheuscamposti@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  });
+}
 
 // ═══ VIEW TRANSITIONS (1) ═══
 if (document.startViewTransition) {
@@ -369,7 +389,9 @@ const i18n = {
     ft_desc: 'Arquiteturas AWS reais. Decisões técnicas documentadas para a comunidade.',
     ft_nav: 'Navegação', ft_tech: 'Tecnologias',
     ft_nl_desc: '1 arquitetura real por semana.',
-    ft_rights: 'Todos os direitos reservados.'
+    ft_rights: 'Todos os direitos reservados.',
+    ft_cert_title: 'Certificações',
+    proj_empty: 'Nenhum projeto nesta categoria ainda. Em breve!'
   },
   en: {
     nav_proj: 'Projects', nav_about: 'About', nav_contact: 'Contact',
@@ -406,7 +428,9 @@ const i18n = {
     ft_desc: 'Real AWS architectures. Technical decisions documented for the community.',
     ft_nav: 'Navigation', ft_tech: 'Technologies',
     ft_nl_desc: '1 real architecture per week.',
-    ft_rights: 'All rights reserved.'
+    ft_rights: 'All rights reserved.',
+    ft_cert_title: 'Certifications',
+    proj_empty: 'No projects in this category yet. Coming soon!'
   }
 };
 

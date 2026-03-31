@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://cloudbymcn.com/sitemap.xml

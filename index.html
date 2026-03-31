@@ -9,6 +9,8 @@
 <meta property="og:description" content="Arquiteturas AWS reais. Case studies de produção com decisões técnicas e trade-offs.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://cloudbymcn.com">
+<meta property="og:image" content="https://cloudbymcn.com/assets/img/og-cover.png">
+<meta name="theme-color" content="#0f1c2e">
 <title>Cloud by MCN — beyond the cloud</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -61,7 +63,7 @@
   </div>
 </nav>
 
-<!-- HERO — Asymmetric layout -->
+<!-- HERO -->
 <section class="hero" id="hero">
   <div class="sky" id="sky">
     <video class="sky-video" id="skyVideo" autoplay muted loop playsinline>
@@ -137,6 +139,9 @@
         <div class="pj-stack"><span>MediaConvert</span><span>S3 Batch</span><span>Lambda</span><span>CloudFront</span><span>S3</span></div>
         <div class="pj-cta"><a href="posts/otimizacao-mp4.html" data-i18n="read_case">Ler case study →</a></div>
       </article>
+      <div class="proj-empty" id="projEmpty" style="display:none">
+        <p data-i18n="proj_empty">Nenhum projeto nesta categoria ainda. Em breve!</p>
+      </div>
     </div>
   </div>
 </section>
@@ -185,16 +190,7 @@
   </div>
 </section>
 
-<!-- NEWSLETTER -->
-<div class="nl">
-  <div class="nl-grid"></div>
-  <div class="nl-glow"></div>
-  <h2 class="rv rv-scale" data-i18n="nl_title">Receba 1 arquitetura real por semana.</h2>
-  <p class="rv rv-scale" data-i18n="nl_desc">Sem spam. Só decisões técnicas, diagramas e lições de produção.</p>
-  <div class="nl-form rv rv-up"><input type="email" placeholder="seu@email.com"><button class="btn-p mag" data-i18n="nl_btn">Assinar →</button></div>
-</div>
-
-<!-- CONTATO — Enhanced horizontal cards -->
+<!-- CONTATO -->
 <section id="contato">
   <div class="sec-in">
     <div class="sec-label rv rv-up">// contato</div>
@@ -230,14 +226,14 @@
           </a>
         </div>
       </div>
-      <div class="ct-form rv rv-right">
+      <form class="ct-form rv rv-right" id="contactForm">
         <h3 data-i18n="contact_form_title">Envie uma mensagem</h3>
-        <div class="fg"><label data-i18n="form_name">Nome</label><input type="text" placeholder="Seu nome"></div>
-        <div class="fg"><label data-i18n="form_email">Email</label><input type="email" placeholder="seu@email.com"></div>
-        <div class="fg"><label data-i18n="form_subject">Assunto</label><select><option data-i18n="form_opt1">Palestra / workshop</option><option data-i18n="form_opt2">Colaboração técnica</option><option data-i18n="form_opt3">Consultoria AWS</option><option data-i18n="form_opt4">Outro</option></select></div>
-        <div class="fg"><label data-i18n="form_msg">Mensagem</label><textarea placeholder="Descreva sua proposta..."></textarea></div>
-        <button class="ct-submit mag" data-i18n="form_send">Enviar mensagem →</button>
-      </div>
+        <div class="fg"><label data-i18n="form_name">Nome</label><input type="text" id="cfName" placeholder="Seu nome" required></div>
+        <div class="fg"><label data-i18n="form_email">Email</label><input type="email" id="cfEmail" placeholder="seu@email.com" required></div>
+        <div class="fg"><label data-i18n="form_subject">Assunto</label><select id="cfSubject"><option data-i18n="form_opt1">Palestra / workshop</option><option data-i18n="form_opt2">Colaboração técnica</option><option data-i18n="form_opt3">Consultoria AWS</option><option data-i18n="form_opt4">Outro</option></select></div>
+        <div class="fg"><label data-i18n="form_msg">Mensagem</label><textarea id="cfMsg" placeholder="Descreva sua proposta..." required></textarea></div>
+        <button type="submit" class="ct-submit mag" data-i18n="form_send">Enviar mensagem →</button>
+      </form>
     </div>
   </div>
 </section>
@@ -268,9 +264,10 @@
       <span>CI/CD</span>
     </div>
     <div class="ft-col">
-      <h4>Newsletter</h4>
-      <p class="ft-nl-desc" data-i18n="ft_nl_desc">1 arquitetura real por semana.</p>
-      <div class="ft-nl-form"><input type="email" placeholder="seu@email.com"><button>→</button></div>
+      <h4 data-i18n="ft_cert_title">Certificações</h4>
+      <span>AWS Solutions Architect</span>
+      <span>AWS Cloud Practitioner</span>
+      <span>AWS AI Practitioner</span>
     </div>
   </div>
   <div class="ft-bottom">
