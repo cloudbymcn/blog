@@ -1,62 +1,86 @@
-# Cloud by MCN — Projeto do Blog
+# Cloud by MCN
 
-## Estrutura
+Portfolio and technical blog showcasing real-world AWS architectures, case studies, and production decisions.
+
+**Live:** [cloudbymcn.com](https://cloudbymcn.com)
+
+## Tech Stack
+
+- **HTML5 / CSS3 / Vanilla JS** - Zero frameworks, zero build tools
+- **Google Fonts** - Inter, Space Grotesk, DM Serif Display, JetBrains Mono
+- **Prism.js** - Syntax highlighting on post pages
+
+## Project Structure
 
 ```
-cloudbymcn/
-├── index.html                 ← Página principal (hero + projetos + sobre + contato)
+.
+├── index.html              # Single-page app (hero, projects, about, contact)
 ├── assets/
 │   ├── css/
-│   │   ├── style.css          ← Estilos globais (todas as páginas)
-│   │   └── post.css           ← Estilos específicos de artigos
-│   ├── img/
-│   │   ├── hero-bg.webp       ← (ADICIONAR: imagem gerada no Nano Banana)
-│   │   ├── favicon.svg
-│   │   └── ...                ← Prints dos artigos
+│   │   ├── style.css       # Global styles, variables, animations, responsive
+│   │   └── post.css        # Blog post page styles
+│   ├── img/                # Images, certs, video background
 │   └── js/
-│       └── main.js            ← Scroll, filtros, animações, nav mobile
-└── posts/
-    ├── TEMPLATE.html           ← Template para novos posts (copiar e editar)
-    ├── gestao-midia-aws-serverless.html
-    ├── integracao-api-aws.html
-    └── otimizacao-mp4.html
+│       └── main.js         # Animations, scroll, filters, i18n, nav
+├── posts/
+│   ├── TEMPLATE.html       # Copy this to create new posts
+│   ├── gestao-midia-aws-serverless.html
+│   ├── integracao-api-aws.html
+│   └── otimizacao-mp4.html
+├── .gitignore
+└── README.md
 ```
 
-## Como rodar local
+## Features
 
-1. Abra a pasta no VS Code
-2. Instale a extensão **Live Server**
-3. Clique direito no `index.html` → "Open with Live Server"
+- Bilingual support (PT/EN) via custom i18n system
+- CSS-driven animations: split-text hero, word-by-word reveal, scroll-triggered reveals
+- 3D tilt cards with glow effect (desktop)
+- Project filtering and sorting
+- SVG cloud draw loading screen
+- Scroll progress bar, circular back-to-top button
+- Fully responsive (mobile-first breakpoints at 900px, 680px, 380px)
+- Respects `prefers-reduced-motion`
 
-## Como adicionar um novo projeto
+## Running Locally
 
-1. Abra `index.html`
-2. Procure `<!-- COMO ADICIONAR UM NOVO PROJETO -->`
-3. Copie um bloco `<article class="pj">` existente
-4. Cole dentro do `<div class="proj-grid">`
-5. Edite: `data-cat`, `data-date`, título, descrição, tags, métricas
+1. Open in VS Code
+2. Install the **Live Server** extension
+3. Right-click `index.html` > **Open with Live Server**
 
-## Como adicionar um novo post
+Or use any static server:
 
-1. Copie `posts/TEMPLATE.html`
-2. Renomeie (ex: `posts/meu-novo-post.html`)
-3. Edite o `<title>`, `<h1>`, conteúdo
-4. Adicione um card de projeto no `index.html` apontando para o post
+```bash
+npx serve .
+# or
+python -m http.server 8000
+```
 
-## Como adicionar nova categoria de projeto
+## Adding a New Post
 
-1. No `assets/css/style.css`, adicione:
+1. Copy `posts/TEMPLATE.html` and rename it
+2. Edit the `<title>`, meta tags, and content
+3. Add a project card in `index.html` inside `.proj-grid`
+
+## Adding a New Project Category
+
+1. In `style.css`, add a color variable:
    ```css
    .pj[data-cat="aiml"]{--pj-c:#ec4899}
    ```
-2. No `index.html`, adicione um botão de filtro:
+2. In `index.html`, add a filter button:
    ```html
-   <button class="f-btn" data-filter="aiml">Cloud AI/ML</button>
+   <button class="f-btn" data-filter="aiml">AI/ML</button>
    ```
 
-## Deploy
+## Deployment
 
-Opções recomendadas:
-- **S3 + CloudFront** (vira case study)
-- **Netlify** (drag & drop da pasta)
-- **Vercel** (conecta ao GitHub)
+Recommended options:
+- **S3 + CloudFront** (doubles as a case study)
+- **Netlify** (drag & drop or connect GitHub)
+- **Vercel** (connect GitHub repo)
+- **GitHub Pages** (free, from this repo)
+
+## License
+
+All rights reserved. Content and design by Matheus N.
