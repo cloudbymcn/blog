@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Como eliminei 24 horas de latência com Salesforce CDC, EventBridge e Lambda | Cloud by MCN</title>
+<meta name="description" content="Substituí um pipeline batch diário por uma integração event-driven serverless entre Salesforce e Firebird — de 24 horas para ~3 segundos.">
+<meta property="og:title" content="Como eliminei 24 horas de latência com Salesforce CDC, EventBridge e Lambda">
+<meta property="og:description" content="Substituí um pipeline batch diário por uma integração event-driven serverless entre Salesforce e Firebird — de 24 horas para ~3 segundos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body class="post-page">
+
+<nav id="nav" class="scrolled">
+  <div class="nav-in">
+    <a href="../index.html" class="logo">
+      <img class="logo-img" src="../assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-r">
+      <div class="nav-links" id="navLinks">
+        <a href="../index.html#projetos">Projetos</a>
+        <a href="../index.html#sobre">Sobre</a>
+        <a href="../index.html#contato">Contato</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="post-main">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a><span>/</span>
+    <a href="../index.html#projetos">Projetos</a><span>/</span>
+    <span class="current">AWS &middot; EventBridge &middot; Lambda &middot; Salesforce &middot; Serverless</span>
+  </div>
+
+  <article class="post-article">
+    <header class="post-header">
+      <div class="post-meta-bar">
+        <span class="post-date-tag">30 Mar 2026</span>
+        <span class="post-reading" id="readTime"></span>
+      </div>
+      <h1>Como eliminei 24 horas de lat&ecirc;ncia com Salesforce CDC, EventBridge e Lambda</h1>
+      <p class="post-subtitle">Substitu&iacute; um pipeline batch di&aacute;rio por uma integra&ccedil;&atilde;o event-driven serverless entre Salesforce e Firebird &mdash; de 24 horas para ~3 segundos.</p>
+    </header>
+
+    <div class="post-content">
+
+      <p>
+        Em uma empresa de beneficiamento de m&aacute;rmore e granito, o Salesforce &eacute; o sistema comercial &mdash; vendedores registram reservas, aprovam pedidos e atualizam status de embalagens. Mas o sistema que controla estoque f&iacute;sico, corte e log&iacute;stica &eacute; um ERP legado rodando sobre Firebird. Durante anos, a sincroniza&ccedil;&atilde;o entre os dois dependia de um job Jenkins que rodava &agrave;s 23h35, executando um arquivo Pentaho KTR que fazia full scan via SOQL. Resultado: 24 horas de atraso m&iacute;nimo entre uma mudan&ccedil;a no Salesforce e sua reflex&atilde;o no ch&atilde;o de f&aacute;brica.
+      </p>
+      <p>
+        Este post documenta como substitu&iacute; esse pipeline batch por uma arquitetura event-driven serverless usando Salesforce Change Data Capture, Amazon EventBridge e AWS Lambda &mdash; reduzindo a lat&ecirc;ncia de 24 horas para aproximadamente 3 segundos, com custo mensal inferior a R$8.
+      </p>
+
+      <!-- ================================================================== -->
+      <h2 id="prerequisitos">0. Pr&eacute;-requisitos#</h2>
+
+      <p>Antes de come&ccedil;ar, voc&ecirc; vai precisar de:</p>
+      <ul>
+        <li><strong>Salesforce Enterprise Edition</strong> (ou superior) &mdash; CDC n&atilde;o est&aacute; dispon&iacute;vel em edi&ccedil;&otilde;es menores.</li>
+        <li><strong>Conta AWS</strong> com acesso administrativo (ou permiss&otilde;es para criar Lambda, EventBridge, Secrets Manager, SQS, IAM).</li>
+        <li><strong>AWS CLI v2</strong> configurada e autenticada.</li>
+        <li><strong>VPC com subnet privada e NAT Gateway</strong> &mdash; a Lambda precisa acessar o Firebird (rede privada) e a API do Salesforce (internet).</li>
+        <li><strong>Connected App no Salesforce</strong> com OAuth 2.0 habilitado (Client Credentials Flow ou Username-Password Flow).</li>
+      </ul>
+
+      <div class="tip">
+        <strong>Dica:</strong> Se voc&ecirc; ainda n&atilde;o tem NAT Gateway configurado, considere criar um apenas na subnet da Lambda. NAT Gateway custa ~$32/m&ecirc;s fixo &mdash; mas sem ele, a Lambda em VPC n&atilde;o acessa a internet (e portanto n&atilde;o consulta a API do Salesforce).
+      </div>
+
+      <!-- ================================================================== -->
+      <h2 id="o-problema">1. O problema: 24 horas de atraso#</h2>
+
+      <p>
+        A empresa beneficia blocos de m&aacute;rmore e granito &mdash; serra, polui, embala e despacha. O time comercial usa Salesforce para registrar vendas e atualizar status de embalagens (<code>Embalagem__c</code>). O time de log&iacute;stica e produ&ccedil;&atilde;o usa um ERP legado que roda sobre <strong>Firebird</strong>, consultando tabelas como <code>TABCAVALETE</code> (cavaletes/pallets) e <code>TABBLOCOCHAPAS</code> (chapas individuais).
+      </p>
+      <p>
+        A sincroniza&ccedil;&atilde;o entre os dois mundos era feita assim:
+      </p>
+
+      <pre><code class="language-bash">
+# Arquitetura anterior (batch)
+#
+#  ┌────────────┐    23h35 cron    ┌─────────┐    Pentaho KTR     ┌──────────┐
+#  │ Salesforce │ ──── 24h ──────► │ Jenkins │ ─── full SOQL ───► │ Firebird │
+#  │  (Cloud)   │    de espera     │  (EC2)  │    scan + write    │  (EC2)   │
+#  └────────────┘                  └─────────┘                    └──────────┘
+#
+#  Latência: ~24 horas | Custo: instância EC2 dedicada 24/7
+      </code></pre>
+
+      <p>O cen&aacute;rio t&iacute;pico de dor:</p>
+      <ol>
+        <li>Vendedor reserva um bloco de granito no Salesforce &agrave;s <strong>8h da manh&atilde;</strong>.</li>
+        <li>O job Jenkins s&oacute; roda &agrave;s <strong>23h35</strong>.</li>
+        <li>Log&iacute;stica s&oacute; v&ecirc; a reserva na manh&atilde; seguinte &mdash; <strong>quase 24 horas depois</strong>.</li>
+        <li>Enquanto isso, outro vendedor pode vender o mesmo bloco. Ou a log&iacute;stica movimenta o bloco sem saber que ele j&aacute; foi reservado.</li>
+      </ol>
+
+      <p><strong>Fragilidades do pipeline batch:</strong></p>
+      <ul>
+        <li><strong>Lat&ecirc;ncia de 24h:</strong> qualquer mudan&ccedil;a no Salesforce s&oacute; refletia no ERP no dia seguinte.</li>
+        <li><strong>Full scan:</strong> o Pentaho KTR fazia <code>SELECT</code> de todos os registros, mesmo que s&oacute; 3 tivessem mudado. Desperd&iacute;cio de API calls e tempo.</li>
+        <li><strong>Single point of failure:</strong> se o Jenkins ca&iacute;sse (e ca&iacute;a), nenhuma sincroniza&ccedil;&atilde;o acontecia.</li>
+        <li><strong>Zero observabilidade:</strong> sem logs estruturados, sem alertas, sem m&eacute;tricas. &ldquo;Funcionou?&rdquo; era respondido verificando o Firebird manualmente.</li>
+      </ul>
+
+      <div class="warning">
+        <strong>Impacto real:</strong> blocos j&aacute; vendidos sendo movimentados no p&aacute;tio, reservas duplicadas, retrabalho de log&iacute;stica. Problema operacional com impacto financeiro direto.
+      </div>
+
+      <!-- ================================================================== -->
+      <h2 id="solucao">2. A solu&ccedil;&atilde;o: arquitetura event-driven#</h2>
+
+      <p>A ideia central: em vez de perguntar ao Salesforce &ldquo;o que mudou?&rdquo; uma vez por dia, deixar o pr&oacute;prio Salesforce <strong>avisar em tempo real</strong> quando algo muda.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Servi&ccedil;o</th>
+            <th>Papel</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Salesforce CDC</strong></td>
+            <td>Publica eventos automaticamente quando dados mudam (insert, update, delete)</td>
+          </tr>
+          <tr>
+            <td><strong>Amazon EventBridge</strong></td>
+            <td>Recebe eventos do Salesforce via integra&ccedil;&atilde;o de parceiro e os roteia para o target</td>
+          </tr>
+          <tr>
+            <td><strong>AWS Lambda</strong></td>
+            <td>Processa o evento, consulta o Salesforce para dados completos e atualiza o Firebird</td>
+          </tr>
+          <tr>
+            <td><strong>Secrets Manager</strong></td>
+            <td>Armazena credenciais do Firebird e do Salesforce (OAuth) de forma segura</td>
+          </tr>
+          <tr>
+            <td><strong>SQS (DLQ)</strong></td>
+            <td>Captura eventos que falharam ap&oacute;s retries para reprocessamento</td>
+          </tr>
+          <tr>
+            <td><strong>CloudWatch + SNS</strong></td>
+            <td>Monitoramento, logs estruturados e alertas em caso de falha</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <pre><code class="language-bash">
+# Arquitetura nova (event-driven serverless)
+#
+#  ┌────────────┐  CDC event  ┌──────────────┐  rule   ┌────────┐  SQL  ┌──────────┐
+#  │ Salesforce │ ──────────► │ EventBridge  │ ──────► │ Lambda │ ────► │ Firebird │
+#  │  (Cloud)   │   ~1s       │ (Partner Bus)│         │ (VPC)  │      │  (EC2)   │
+#  └────────────┘             └──────────────┘         └───┬────┘      └──────────┘
+#                                                          │
+#                                                          ├──► Secrets Manager
+#                                                          ├──► CloudWatch Logs
+#                                                          └──► SQS DLQ (fallback)
+#
+#  Latência: ~3 segundos | Custo: ~R$8/mês | Servidores: 0
+      </code></pre>
+
+      <div class="callout">
+        <strong>N&uacute;meros:</strong> ~3 segundos de lat&ecirc;ncia end-to-end, ~R$8/m&ecirc;s de custo total, 0 servidores para gerenciar, 100% serverless.
+      </div>
+
+      <!-- ================================================================== -->
+      <h2 id="conceitos">3. Entendendo os conceitos#</h2>
+
+      <h3>Change Data Capture (CDC)</h3>
+      <p>
+        CDC &eacute; um padr&atilde;o de integra&ccedil;&atilde;o onde o sistema de origem publica um evento toda vez que um registro &eacute; criado, atualizado ou deletado. No Salesforce, voc&ecirc; habilita CDC para objetos espec&iacute;ficos (ex: <code>Embalagem__c</code>) e o platform event &eacute; publicado automaticamente no canal <code>/data/Embalagem__ChangeEvent</code>. Sem polling, sem cron &mdash; o dado vem at&eacute; voc&ecirc;.
+      </p>
+
+      <h3>Amazon EventBridge</h3>
+      <p>
+        EventBridge &eacute; um barramento de eventos serverless da AWS. Ele recebe eventos de v&aacute;rias fontes (AWS, SaaS, custom apps) e roteia para targets com base em regras. O Salesforce &eacute; um <strong>parceiro oficial</strong> do EventBridge &mdash; isso significa que existe uma integra&ccedil;&atilde;o nativa: o Salesforce publica diretamente no barramento, sem necessidade de webhook, API Gateway ou middleware.
+      </p>
+
+      <h3>AWS Lambda (em VPC)</h3>
+      <p>
+        Lambda executa c&oacute;digo sem servidor. Neste caso, a Lambda precisa rodar <strong>dentro da VPC</strong> porque o Firebird est&aacute; em uma EC2 na rede privada. Ao colocar a Lambda na VPC, ela ganha acesso &agrave; rede interna, mas perde acesso &agrave; internet &mdash; por isso o NAT Gateway &eacute; necess&aacute;rio (a Lambda tamb&eacute;m precisa consultar a API do Salesforce para buscar dados completos do registro).
+      </p>
+
+      <h3>Firebird</h3>
+      <p>
+        Firebird &eacute; um banco de dados relacional open-source, muito usado em ERPs brasileiros (especialmente os baseados em Delphi). Neste caso, ele roda em uma inst&acirc;ncia EC2 e armazena as tabelas <code>TABCAVALETE</code> (cavaletes/pallets) e <code>TABBLOCOCHAPAS</code> (chapas cortadas). A conex&atilde;o &eacute; feita via <code>firebirdsql</code> (driver Python puro, sem depend&ecirc;ncias bin&aacute;rias).
+      </p>
+
+      <!-- ================================================================== -->
+      <h2 id="implementacao">4. Implementa&ccedil;&atilde;o passo a passo#</h2>
+
+      <p>S&atilde;o 11 etapas. Cada uma inclui os comandos CLI completos ou as configura&ccedil;&otilde;es necess&aacute;rias. Vamos l&aacute;.</p>
+
+      <!-- Etapa 1 -->
+      <h3 id="etapa-1">Etapa 1 &mdash; Criar Secrets no Secrets Manager</h3>
+
+      <p>Armazenamos as credenciais do Firebird e do Salesforce de forma segura. A Lambda vai busc&aacute;-las em runtime.</p>
+
+      <pre><code class="language-bash"># Secret do Firebird
+aws secretsmanager create-secret \
+  --name "firebird/prod/credentials" \
+  --description "Credenciais do Firebird (ERP)" \
+  --secret-string '{
+    "host": "10.0.1.50",
+    "port": "3050",
+    "database": "/dados/ERP.FDB",
+    "user": "SYSDBA",
+    "password": "SUA_SENHA_FIREBIRD"
+  }'
+
+# Secret do Salesforce
+aws secretsmanager create-secret \
+  --name "salesforce/prod/credentials" \
+  --description "Credenciais OAuth do Salesforce Connected App" \
+  --secret-string '{
+    "domain": "sua-instancia.my.salesforce.com",
+    "consumer_key": "SEU_CONSUMER_KEY",
+    "consumer_secret": "SEU_CONSUMER_SECRET",
+    "username": "integracao@suaempresa.com",
+    "password": "SUA_SENHA_SF",
+    "security_token": "SEU_TOKEN"
+  }'</code></pre>
+
+      <div class="tip">
+        <strong>Dica:</strong> Use nomes de secret com path (<code>firebird/prod/...</code>) para organizar por ambiente. Facilita policies IAM com wildcard (<code>firebird/prod/*</code>).
+      </div>
+
+      <!-- Etapa 2 -->
+      <h3 id="etapa-2">Etapa 2 &mdash; Criar DLQ (SQS)</h3>
+
+      <p>Uma fila SQS para capturar eventos que falharam ap&oacute;s todas as tentativas. Reten&ccedil;&atilde;o de 14 dias para reprocessamento manual.</p>
+
+      <pre><code class="language-bash">aws sqs create-queue \
+  --queue-name "salesforce-cdc-dlq" \
+  --attributes '{
+    "MessageRetentionPeriod": "1209600",
+    "VisibilityTimeout": "300"
+  }'
+
+# Anote o QueueUrl e o ARN retornados — vamos usar nas próximas etapas</code></pre>
+
+      <!-- Etapa 3 -->
+      <h3 id="etapa-3">Etapa 3 &mdash; Criar Security Group para a Lambda</h3>
+
+      <p>A Lambda vai rodar dentro da VPC. Ela precisa de um Security Group que permita sa&iacute;da para o Firebird (porta 3050) e para a internet (via NAT).</p>
+
+      <pre><code class="language-bash"># Criar o Security Group
+aws ec2 create-security-group \
+  --group-name "sg-lambda-salesforce-cdc" \
+  --description "SG para Lambda CDC - acesso ao Firebird e internet via NAT" \
+  --vpc-id "vpc-XXXXXXXX"
+
+# Permitir tráfego de entrada na porta 3050 (Firebird) dentro da VPC
+aws ec2 authorize-security-group-ingress \
+  --group-id "sg-XXXXXXXX" \
+  --protocol tcp \
+  --port 3050 \
+  --cidr "10.0.0.0/16"</code></pre>
+
+      <div class="callout">
+        <strong>Nota:</strong> O Security Group do Firebird (na EC2) tamb&eacute;m precisa permitir conex&otilde;es na porta 3050 vindo do SG da Lambda. N&atilde;o esque&ccedil;a de liberar no lado do Firebird tamb&eacute;m.
+      </div>
+
+      <!-- Etapa 4 -->
+      <h3 id="etapa-4">Etapa 4 &mdash; Criar IAM Role para a Lambda</h3>
+
+      <p>A Role precisa de permiss&otilde;es para: ler secrets, enviar para DLQ, escrever logs e criar ENIs na VPC.</p>
+
+      <p><strong>Trust Policy (quem pode assumir a role):</strong></p>
+      <pre><code class="language-json">{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}</code></pre>
+
+      <p><strong>Inline Policy (o que a role pode fazer):</strong></p>
+      <pre><code class="language-json">{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SecretsAccess",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue"
+      ],
+      "Resource": [
+        "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:firebird/prod/*",
+        "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:salesforce/prod/*"
+      ]
+    },
+    {
+      "Sid": "DLQAccess",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:SendMessage"
+      ],
+      "Resource": "arn:aws:sqs:us-east-1:ACCOUNT_ID:salesforce-cdc-dlq"
+    },
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:ACCOUNT_ID:*"
+    },
+    {
+      "Sid": "VPCNetworkInterfaces",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateNetworkInterface",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DeleteNetworkInterface"
+      ],
+      "Resource": "*"
+    }
+  ]
+}</code></pre>
+
+      <pre><code class="language-bash"># Criar a role
+aws iam create-role \
+  --role-name "lambda-salesforce-cdc-role" \
+  --assume-role-policy-document file://trust-policy.json
+
+# Anexar a policy inline
+aws iam put-role-policy \
+  --role-name "lambda-salesforce-cdc-role" \
+  --policy-name "salesforce-cdc-permissions" \
+  --policy-document file://inline-policy.json</code></pre>
+
+      <!-- Etapa 5 -->
+      <h3 id="etapa-5">Etapa 5 &mdash; Habilitar CDC no Salesforce</h3>
+
+      <p>Aqui come&ccedil;a a parte Salesforce. Precisamos dizer quais objetos devem publicar eventos de mudan&ccedil;a.</p>
+
+      <div class="print">
+        <div class="t">Salesforce Setup &rarr; Change Data Capture</div>
+        <div class="d">Acesse Setup &rarr; Integrations &rarr; Change Data Capture. Mova o objeto <code>Embalagem__c</code> da coluna &ldquo;Available Entities&rdquo; para &ldquo;Selected Entities&rdquo; e salve.</div>
+      </div>
+
+      <ol>
+        <li>No Salesforce, v&aacute; em <strong>Setup</strong>.</li>
+        <li>Pesquise por <strong>&ldquo;Change Data Capture&rdquo;</strong> na busca r&aacute;pida.</li>
+        <li>Em <strong>Integrations &rarr; Change Data Capture</strong>, localize o objeto <code>Embalagem__c</code>.</li>
+        <li>Mova-o para a coluna <strong>&ldquo;Selected Entities&rdquo;</strong>.</li>
+        <li>Clique em <strong>Save</strong>.</li>
+      </ol>
+
+      <p>A partir deste momento, qualquer cria&ccedil;&atilde;o, atualiza&ccedil;&atilde;o ou exclus&atilde;o em <code>Embalagem__c</code> gera um evento no canal <code>/data/Embalagem__ChangeEvent</code>.</p>
+
+      <!-- Etapa 6 -->
+      <h3 id="etapa-6">Etapa 6 &mdash; Criar Named Credential (formato legacy)</h3>
+
+      <div class="warning">
+        <strong>Aten&ccedil;&atilde;o cr&iacute;tica:</strong> Voc&ecirc; <strong>DEVE</strong> usar o formato legacy de Named Credential. O formato novo (com External Credential) <strong>n&atilde;o aparece</strong> na lista de Named Credentials dispon&iacute;veis ao configurar o Event Relay. Este &eacute; um dos maiores pontos de confus&atilde;o da integra&ccedil;&atilde;o.
+      </div>
+
+      <div class="print">
+        <div class="t">Salesforce Setup &rarr; Named Credentials (Legacy)</div>
+        <div class="d">Crie uma Named Credential no formato legacy com as configura&ccedil;&otilde;es abaixo. A URL <strong>n&atilde;o &eacute; HTTPS</strong> &mdash; &eacute; o ARN do Event Bus.</div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Label</td>
+            <td><code>AWS_EventBridge</code></td>
+          </tr>
+          <tr>
+            <td>Name</td>
+            <td><code>AWS_EventBridge</code></td>
+          </tr>
+          <tr>
+            <td>URL</td>
+            <td><code>arn:aws:events:US-EAST-1:ACCOUNT_ID:event-bus/aws.partner/salesforce.com/XXXXXXXX/salesforce-cdc</code></td>
+          </tr>
+          <tr>
+            <td>Identity Type</td>
+            <td>Named Principal</td>
+          </tr>
+          <tr>
+            <td>Authentication Protocol</td>
+            <td>Password Authentication</td>
+          </tr>
+          <tr>
+            <td>Username</td>
+            <td>Access Key ID do usu&aacute;rio IAM (Etapa 7)</td>
+          </tr>
+          <tr>
+            <td>Password</td>
+            <td>Secret Access Key do usu&aacute;rio IAM (Etapa 7)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="warning">
+        <strong>Dois erros comuns que v&atilde;o te travar:</strong><br>
+        1. A URL &eacute; o <strong>ARN do Event Bus</strong>, n&atilde;o uma URL HTTPS. Parece estranho colocar um ARN em um campo &ldquo;URL&rdquo;, mas &eacute; assim que funciona.<br>
+        2. A regi&atilde;o no ARN deve estar em <strong>MAI&Uacute;SCULAS</strong>: <code>US-EAST-1</code>, n&atilde;o <code>us-east-1</code>. Se estiver em min&uacute;sculas, o Event Relay falha silenciosamente.
+      </div>
+
+      <!-- Etapa 7 -->
+      <h3 id="etapa-7">Etapa 7 &mdash; Criar usu&aacute;rio IAM para Event Relay</h3>
+
+      <p>O Salesforce precisa de credenciais AWS para publicar eventos no EventBridge. Criamos um usu&aacute;rio IAM dedicado com permiss&otilde;es m&iacute;nimas.</p>
+
+      <p><strong>Policy JSON:</strong></p>
+      <pre><code class="language-json">{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EventBridgePartnerAccess",
+      "Effect": "Allow",
+      "Action": [
+        "events:PutPartnerEvents",
+        "events:CreatePartnerEventSource",
+        "events:ActivatePartnerEventSource"
+      ],
+      "Resource": "*"
+    }
+  ]
+}</code></pre>
+
+      <pre><code class="language-bash"># Criar o usuário
+aws iam create-user --user-name "salesforce-eventbridge-relay"
+
+# Anexar a policy
+aws iam put-user-policy \
+  --user-name "salesforce-eventbridge-relay" \
+  --policy-name "eventbridge-partner-access" \
+  --policy-document file://eventbridge-relay-policy.json
+
+# Gerar Access Key
+aws iam create-access-key --user-name "salesforce-eventbridge-relay"
+
+# ANOTE o AccessKeyId e SecretAccessKey — use na Named Credential (Etapa 6)</code></pre>
+
+      <div class="tip">
+        <strong>Dica:</strong> Sim, a Etapa 7 gera as credenciais usadas na Etapa 6. Na pr&aacute;tica, voc&ecirc; faz a Etapa 7 primeiro e depois preenche a Named Credential. A ordem aqui &eacute; conceitual.
+      </div>
+
+      <!-- Etapa 8 -->
+      <h3 id="etapa-8">Etapa 8 &mdash; Criar Event Relay e ativar</h3>
+
+      <div class="print">
+        <div class="t">Salesforce Setup &rarr; Event Relays</div>
+        <div class="d">Crie um Event Relay apontando para a Named Credential criada na Etapa 6 e selecione os canais CDC.</div>
+      </div>
+
+      <ol>
+        <li>No Salesforce, v&aacute; em <strong>Setup &rarr; Event Relays</strong>.</li>
+        <li>Clique em <strong>New Event Relay</strong>.</li>
+        <li>Selecione a Named Credential <strong><code>AWS_EventBridge</code></strong> (formato legacy &mdash; se n&atilde;o aparecer, revise a Etapa 6).</li>
+        <li>Na configura&ccedil;&atilde;o do relay, adicione o canal <strong><code>/data/Embalagem__ChangeEvent</code></strong>.</li>
+        <li>Salve e <strong>ative o relay manualmente</strong> &mdash; ele n&atilde;o ativa sozinho.</li>
+      </ol>
+
+      <div class="warning">
+        <strong>Aten&ccedil;&atilde;o:</strong> Ap&oacute;s criar o Event Relay, ele fica com status &ldquo;Parado&rdquo;. Voc&ecirc; precisa clicar em <strong>&ldquo;Run&rdquo;</strong> ou <strong>&ldquo;Ativar&rdquo;</strong> para iniciar o envio de eventos. Se esquecer, nada acontece &mdash; e n&atilde;o h&aacute; erro vis&iacute;vel.
+      </div>
+
+      <!-- Etapa 9 -->
+      <h3 id="etapa-9">Etapa 9 &mdash; Associar Partner Event Source no AWS</h3>
+
+      <p>Quando o Event Relay &eacute; ativado no Salesforce, ele cria automaticamente um <strong>Partner Event Source</strong> no EventBridge da AWS. Voc&ecirc; precisa associ&aacute;-lo a um Event Bus.</p>
+
+      <div class="print">
+        <div class="t">AWS Console &rarr; EventBridge &rarr; Partner Event Sources</div>
+        <div class="d">Em EventBridge &rarr; Partner event sources, localize o source do Salesforce (ex: <code>aws.partner/salesforce.com/XXXXXXXX/salesforce-cdc</code>). Clique em &ldquo;Associate with event bus&rdquo;.</div>
+      </div>
+
+      <ol>
+        <li>Acesse o <strong>Console AWS &rarr; Amazon EventBridge &rarr; Partner event sources</strong>.</li>
+        <li>Localize o source criado pelo Salesforce. Ele ter&aacute; um nome como:<br>
+          <code>aws.partner/salesforce.com/00DXXXXXXXXXXXXXXX/salesforce-cdc</code></li>
+        <li>Clique em <strong>&ldquo;Associate with event bus&rdquo;</strong>.</li>
+        <li>O status deve mudar de <strong>&ldquo;Pending&rdquo;</strong> para <strong>&ldquo;Active&rdquo;</strong>.</li>
+      </ol>
+
+      <p>Agora voc&ecirc; tem um Event Bus dedicado ao Salesforce. Eventos CDC come&ccedil;am a fluir.</p>
+
+      <!-- Etapa 10 -->
+      <h3 id="etapa-10">Etapa 10 &mdash; Criar regra no EventBridge</h3>
+
+      <p>A regra define <strong>quais eventos</strong> devem acionar a Lambda e configura a DLQ como fallback.</p>
+
+      <pre><code class="language-bash"># Criar a regra
+aws events put-rule \
+  --name "salesforce-cdc-to-lambda" \
+  --event-bus-name "aws.partner/salesforce.com/XXXXXXXX/salesforce-cdc" \
+  --event-pattern '{
+    "source": ["aws.partner/salesforce.com/XXXXXXXX/salesforce-cdc"]
+  }' \
+  --state "ENABLED" \
+  --description "Roteia eventos CDC do Salesforce para Lambda de sincronização"
+
+# Adicionar Lambda como target com DLQ
+aws events put-targets \
+  --rule "salesforce-cdc-to-lambda" \
+  --event-bus-name "aws.partner/salesforce.com/XXXXXXXX/salesforce-cdc" \
+  --targets '[
+    {
+      "Id": "lambda-sync-firebird",
+      "Arn": "arn:aws:lambda:us-east-1:ACCOUNT_ID:function:salesforce-cdc-sync",
+      "DeadLetterConfig": {
+        "Arn": "arn:aws:sqs:us-east-1:ACCOUNT_ID:salesforce-cdc-dlq"
+      },
+      "RetryPolicy": {
+        "MaximumRetryAttempts": 3,
+        "MaximumEventAgeInSeconds": 3600
+      }
+    }
+  ]'</code></pre>
+
+      <div class="tip">
+        <strong>Dica:</strong> O <code>event-pattern</code> aqui captura <strong>todos</strong> os eventos do Salesforce nesse bus. A filtragem por objeto (<code>Embalagem__c</code>) &eacute; feita no c&oacute;digo da Lambda (veja Etapa 11). Motivo: o payload do CDC varia entre objetos e filtros no EventBridge para campos aninhados em <code>detail.payload</code> s&atilde;o fr&aacute;geis.
+      </div>
+
+      <!-- Etapa 11 -->
+      <h3 id="etapa-11">Etapa 11 &mdash; Criar Lambda e fazer deploy</h3>
+
+      <p>Finalmente, o c&oacute;digo que processa os eventos e atualiza o Firebird.</p>
+
+      <pre><code class="language-bash"># Criar a função Lambda
+aws lambda create-function \
+  --function-name "salesforce-cdc-sync" \
+  --runtime "python3.12" \
+  --role "arn:aws:iam::ACCOUNT_ID:role/lambda-salesforce-cdc-role" \
+  --handler "handler.lambda_handler" \
+  --timeout 60 \
+  --memory-size 256 \
+  --vpc-config '{
+    "SubnetIds": ["subnet-XXXXXXXX"],
+    "SecurityGroupIds": ["sg-XXXXXXXX"]
+  }' \
+  --environment '{
+    "Variables": {
+      "FIREBIRD_SECRET_NAME": "firebird/prod/credentials",
+      "SALESFORCE_SECRET_NAME": "salesforce/prod/credentials",
+      "DLQ_URL": "https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/salesforce-cdc-dlq"
+    }
+  }' \
+  --zip-file fileb://deployment-package.zip
+
+# Permitir que o EventBridge invoque a Lambda
+aws lambda add-permission \
+  --function-name "salesforce-cdc-sync" \
+  --statement-id "eventbridge-invoke" \
+  --action "lambda:InvokeFunction" \
+  --principal "events.amazonaws.com" \
+  --source-arn "arn:aws:events:us-east-1:ACCOUNT_ID:rule/aws.partner/salesforce.com/XXXXXXXX/salesforce-cdc/salesforce-cdc-to-lambda"</code></pre>
+
+      <p><strong>handler.py completo:</strong></p>
+
+      <pre><code class="language-python">"""
+Lambda: Salesforce CDC → Firebird sync
+Recebe eventos CDC do Salesforce via EventBridge e atualiza
+TABCAVALETE e TABBLOCOCHAPAS no Firebird.
+"""
+
+import json
+import os
+import logging
+import boto3
+import firebirdsql
+from simple_salesforce import Salesforce
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# ---------------------------------------------------------------------------
+# Mapeamento de status Salesforce → Firebird
+# ---------------------------------------------------------------------------
+STATUS_MAP = {
+    "Disponível":    "D",
+    "Reservado":     "R",
+    "Vendido":       "V",
+    "Faturado":      "F",
+    "Embarcado":     "E",
+    "Cancelado":     "C",
+    "Direcionado":   "R",   # caso especial — tratado em resolve_status()
+}
+
+# ---------------------------------------------------------------------------
+# Cache de secrets (reutilizado entre invocações do mesmo container)
+# ---------------------------------------------------------------------------
+_secrets_cache = {}
+
+sqs = boto3.client("sqs")
+
+
+def get_secret(secret_name: str) -> dict:
+    """Busca secret no Secrets Manager com cache em memória."""
+    if secret_name in _secrets_cache:
+        return _secrets_cache[secret_name]
+
+    client = boto3.client("secretsmanager")
+    response = client.get_secret_value(SecretId=secret_name)
+    secret = json.loads(response["SecretString"])
+    _secrets_cache[secret_name] = secret
+    logger.info(f"Secret '{secret_name}' carregado com sucesso")
+    return secret
+
+
+def get_salesforce_record(sf: Salesforce, record_id: str) -> dict:
+    """
+    Consulta o registro completo no Salesforce via SOQL.
+    O evento CDC traz apenas os campos alterados — precisamos do registro
+    inteiro para garantir consistência na atualização do Firebird.
+    """
+    query = f"""
+        SELECT Id, Name, Status__c, Cavalete__c, Bloco__c,
+               NumeroPeca__c, Tipo__c, Observacao__c
+        FROM Embalagem__c
+        WHERE Id = '{record_id}'
+    """
+    result = sf.query(query)
+
+    if result["totalSize"] == 0:
+        raise ValueError(f"Registro {record_id} não encontrado no Salesforce")
+
+    return result["records"][0]
+
+
+def resolve_status(record: dict) -> str:
+    """
+    Resolve o status para gravação no Firebird.
+
+    Caso especial: 'Direcionado' no Salesforce significa que o material
+    foi pré-alocado para um cliente, mas ainda não foi vendido formalmente.
+    No Firebird, isso é tratado como 'R' (Reservado), porém com o campo
+    OBSERVACAO preenchido com 'DIRECIONADO - [cliente]'.
+    """
+    status_sf = record.get("Status__c", "")
+    status_fb = STATUS_MAP.get(status_sf)
+
+    if status_fb is None:
+        logger.warning(f"Status desconhecido: '{status_sf}'. Usando 'D' (Disponível).")
+        return "D"
+
+    return status_fb
+
+
+def update_cavalete(cursor, record: dict, status_fb: str):
+    """
+    Atualiza a tabela TABCAVALETE no Firebird.
+    TABCAVALETE armazena dados do cavalete/pallet como unidade.
+    """
+    cavalete = record.get("Cavalete__c")
+    if not cavalete:
+        logger.info("Sem Cavalete__c no registro — pulando TABCAVALETE")
+        return
+
+    sql = """
+        UPDATE TABCAVALETE
+        SET STATUS = ?,
+            OBSERVACAO = ?,
+            DTALTERACAO = CURRENT_TIMESTAMP
+        WHERE CODCAVALETE = ?
+    """
+
+    obs = record.get("Observacao__c", "") or ""
+    if record.get("Status__c") == "Direcionado":
+        obs = f"DIRECIONADO - {obs}".strip(" -")
+
+    cursor.execute(sql, (status_fb, obs, cavalete))
+    logger.info(f"TABCAVALETE atualizado: CODCAVALETE={cavalete}, STATUS={status_fb}")
+
+
+def update_chapa(cursor, record: dict, status_fb: str):
+    """
+    Atualiza a tabela TABBLOCOCHAPAS no Firebird.
+    TABBLOCOCHAPAS armazena dados de cada chapa individual cortada de um bloco.
+    """
+    bloco = record.get("Bloco__c")
+    numero_peca = record.get("NumeroPeca__c")
+
+    if not bloco or not numero_peca:
+        logger.info("Sem Bloco__c ou NumeroPeca__c — pulando TABBLOCOCHAPAS")
+        return
+
+    sql = """
+        UPDATE TABBLOCOCHAPAS
+        SET STATUS = ?,
+            OBSERVACAO = ?,
+            DTALTERACAO = CURRENT_TIMESTAMP
+        WHERE CODBLOCO = ?
+          AND NUMEROPECA = ?
+    """
+
+    obs = record.get("Observacao__c", "") or ""
+    if record.get("Status__c") == "Direcionado":
+        obs = f"DIRECIONADO - {obs}".strip(" -")
+
+    cursor.execute(sql, (status_fb, obs, bloco, int(numero_peca)))
+    logger.info(
+        f"TABBLOCOCHAPAS atualizado: CODBLOCO={bloco}, "
+        f"NUMEROPECA={numero_peca}, STATUS={status_fb}"
+    )
+
+
+def lambda_handler(event, context):
+    """
+    Entry point — recebe evento do EventBridge (Salesforce CDC).
+
+    Estrutura do evento:
+      event["detail"]["payload"]["ChangeEventHeader"]["entityName"]
+      event["detail"]["payload"]["ChangeEventHeader"]["recordIds"]
+      event["detail"]["payload"]["ChangeEventHeader"]["changeType"]
+    """
+    logger.info(f"Evento recebido: {json.dumps(event, default=str)}")
+
+    try:
+        # ----- Extrair header do CDC -----
+        payload = event.get("detail", {}).get("payload", {})
+        header = payload.get("ChangeEventHeader", {})
+
+        entity_name = header.get("entityName", "")
+        change_type = header.get("changeType", "")
+        record_ids = header.get("recordIds", [])
+
+        # Filtrar: só processamos Embalagem__c
+        if entity_name != "Embalagem__c":
+            logger.info(f"Ignorando evento de '{entity_name}' — não é Embalagem__c")
+            return {"statusCode": 200, "body": "Ignored — wrong entity"}
+
+        # Filtrar: só processamos UPDATE e CREATE
+        if change_type not in ("UPDATE", "CREATE"):
+            logger.info(f"Ignorando changeType '{change_type}'")
+            return {"statusCode": 200, "body": f"Ignored — {change_type}"}
+
+        if not record_ids:
+            logger.warning("Evento sem recordIds — nada a processar")
+            return {"statusCode": 200, "body": "No record IDs"}
+
+        # ----- Conectar ao Salesforce -----
+        sf_creds = get_secret(os.environ["SALESFORCE_SECRET_NAME"])
+        sf = Salesforce(
+            username=sf_creds["username"],
+            password=sf_creds["password"],
+            security_token=sf_creds["security_token"],
+            consumer_key=sf_creds["consumer_key"],
+            consumer_secret=sf_creds["consumer_secret"],
+            domain=sf_creds["domain"].replace(".my.salesforce.com", ""),
+        )
+
+        # ----- Conectar ao Firebird -----
+        fb_creds = get_secret(os.environ["FIREBIRD_SECRET_NAME"])
+        conn = firebirdsql.connect(
+            host=fb_creds["host"],
+            port=int(fb_creds["port"]),
+            database=fb_creds["database"],
+            user=fb_creds["user"],
+            password=fb_creds["password"],
+            charset="UTF8",
+        )
+        cursor = conn.cursor()
+
+        # ----- Processar cada recordId -----
+        processed = 0
+        for record_id in record_ids:
+            logger.info(f"Processando recordId: {record_id}")
+
+            # Buscar registro completo no Salesforce
+            record = get_salesforce_record(sf, record_id)
+            status_fb = resolve_status(record)
+
+            # Atualizar Firebird
+            update_cavalete(cursor, record, status_fb)
+            update_chapa(cursor, record, status_fb)
+
+            processed += 1
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        logger.info(f"Concluído: {processed} registro(s) processado(s)")
+        return {
+            "statusCode": 200,
+            "body": f"Processed {processed} record(s)"
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao processar evento: {str(e)}", exc_info=True)
+
+        # Enviar evento para DLQ para reprocessamento
+        try:
+            sqs.send_message(
+                QueueUrl=os.environ["DLQ_URL"],
+                MessageBody=json.dumps({
+                    "error": str(e),
+                    "event": event
+                }, default=str),
+            )
+            logger.info("Evento enviado para DLQ")
+        except Exception as dlq_err:
+            logger.error(f"Falha ao enviar para DLQ: {str(dlq_err)}")
+
+        raise</code></pre>
+
+      <p><strong>Deploy:</strong></p>
+
+      <pre><code class="language-bash"># Criar diretório de build
+mkdir -p build &amp;&amp; cp handler.py build/
+
+# Instalar dependências (separar pip install para evitar PyO3 ImportModuleError)
+pip install simple-salesforce -t build/
+pip install firebirdsql -t build/
+
+# Empacotar
+cd build &amp;&amp; zip -r ../deployment-package.zip . &amp;&amp; cd ..
+
+# Fazer deploy
+aws lambda update-function-code \
+  --function-name "salesforce-cdc-sync" \
+  --zip-file fileb://deployment-package.zip</code></pre>
+
+      <div class="warning">
+        <strong>PyO3 ImportModuleError:</strong> Se voc&ecirc; instalar todas as depend&ecirc;ncias com um &uacute;nico <code>pip install</code>, pode ocorrer um conflito de vers&otilde;es do <code>cryptography</code> que causa <code>ImportModuleError</code> do PyO3 no runtime da Lambda. Instalar <code>simple-salesforce</code> e <code>firebirdsql</code> em comandos <code>pip</code> separados resolve o problema.
+      </div>
+
+      <!-- ================================================================== -->
+      <h2 id="observabilidade">5. Observabilidade#</h2>
+
+      <p>Sem observabilidade, voc&ecirc; s&oacute; descobre que algo quebrou quando a log&iacute;stica reclama. Vamos configurar alertas proativos.</p>
+
+      <h3>CloudWatch Logs</h3>
+      <p>A Lambda j&aacute; envia logs para o CloudWatch automaticamente (configurado na IAM Policy). Cada invoca&ccedil;&atilde;o gera logs com o evento recebido, registros processados e erros.</p>
+
+      <h3>SNS Topic para alertas</h3>
+
+      <pre><code class="language-bash"># Criar tópico SNS
+aws sns create-topic --name "salesforce-cdc-alerts"
+
+# Inscrever email
+aws sns subscribe \
+  --topic-arn "arn:aws:sns:us-east-1:ACCOUNT_ID:salesforce-cdc-alerts" \
+  --protocol email \
+  --notification-endpoint "seu-email@empresa.com"</code></pre>
+
+      <h3>Alarme de DLQ (mensagens na fila = problema)</h3>
+
+      <pre><code class="language-bash">aws cloudwatch put-metric-alarm \
+  --alarm-name "salesforce-cdc-dlq-not-empty" \
+  --alarm-description "Há mensagens na DLQ — eventos CDC falharam" \
+  --metric-name "ApproximateNumberOfMessagesVisible" \
+  --namespace "AWS/SQS" \
+  --statistic "Sum" \
+  --period 300 \
+  --threshold 1 \
+  --comparison-operator "GreaterThanOrEqualToThreshold" \
+  --evaluation-periods 1 \
+  --dimensions Name=QueueName,Value=salesforce-cdc-dlq \
+  --alarm-actions "arn:aws:sns:us-east-1:ACCOUNT_ID:salesforce-cdc-alerts" \
+  --treat-missing-data "notBreaching"</code></pre>
+
+      <div class="tip">
+        <strong>Dica:</strong> Configure tamb&eacute;m um alarme para erros da Lambda (<code>Errors &gt; 0</code>) e para dura&ccedil;&atilde;o acima de 30s (<code>Duration &gt; 30000</code>). Assim voc&ecirc; cobre tanto falhas quanto degrada&ccedil;&atilde;o de performance.
+      </div>
+
+      <!-- ================================================================== -->
+      <h2 id="resultado-teste">6. Resultado do teste#</h2>
+
+      <p>Com tudo configurado, hora do teste de ponta a ponta:</p>
+
+      <ol>
+        <li>Abri o Salesforce e alterei o status de uma embalagem de <strong>&ldquo;Dispon&iacute;vel&rdquo;</strong> para <strong>&ldquo;Reservado&rdquo;</strong>.</li>
+        <li>Abri o CloudWatch Logs da Lambda.</li>
+        <li>Em <strong>2.7 segundos</strong>, o log apareceu:</li>
+      </ol>
+
+      <pre><code class="language-json">{
+  "message": "TABCAVALETE atualizado: CODCAVALETE=CAV-00451, STATUS=R",
+  "timestamp": "2026-03-28T14:32:07.892Z",
+  "requestId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}</code></pre>
+
+      <p>Conferi no Firebird: <code>TABCAVALETE</code> e <code>TABBLOCOCHAPAS</code> j&aacute; refletiam o status <strong>&ldquo;R&rdquo;</strong> (Reservado). A log&iacute;stica teria a informa&ccedil;&atilde;o em tempo real.</p>
+
+      <div class="callout">
+        <strong>De 24 horas para 2.7 segundos.</strong> A reserva feita pelo vendedor &agrave;s 8h da manh&atilde; agora aparece no ERP &agrave;s 8h00min03s. A log&iacute;stica n&atilde;o movimenta mais blocos j&aacute; vendidos.
+      </div>
+
+      <!-- ================================================================== -->
+      <h2 id="problemas">7. Problemas encontrados#</h2>
+
+      <p>Documento aqui os problemas reais que encontrei durante a implementa&ccedil;&atilde;o. Se voc&ecirc; est&aacute; seguindo este guia, provavelmente vai encontrar os mesmos.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Problema</th>
+            <th>Solu&ccedil;&atilde;o</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Named Credential no formato novo (External Credential) <strong>n&atilde;o aparece</strong> na lista do Event Relay</td>
+            <td>Usar o formato <strong>legacy</strong> de Named Credential. O Event Relay s&oacute; reconhece o formato antigo.</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>URL da Named Credential &eacute; um ARN, n&atilde;o HTTPS. E a regi&atilde;o deve ser MAI&Uacute;SCULA.</td>
+            <td>Campo URL: <code>arn:aws:events:US-EAST-1:...</code>. Regi&atilde;o em UPPERCASE. Parece errado, mas &eacute; assim.</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><code>PyO3 ImportModuleError</code> ao importar <code>cryptography</code> na Lambda</td>
+            <td>Instalar depend&ecirc;ncias com comandos <code>pip</code> separados em vez de um &uacute;nico <code>pip install</code>.</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>Lambda ignorando todos os eventos &mdash; <code>entityName</code> sempre vazio</td>
+            <td>O header do CDC n&atilde;o est&aacute; em <code>event["ChangeEventHeader"]</code>. Est&aacute; em <code>event["detail"]["payload"]["ChangeEventHeader"]</code>. O EventBridge encapsula o payload do Salesforce dentro de <code>detail</code>.</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>Event Relay fica com status &ldquo;Parado&rdquo; ap&oacute;s cria&ccedil;&atilde;o</td>
+            <td>O relay <strong>n&atilde;o ativa automaticamente</strong>. Voc&ecirc; precisa clicar em &ldquo;Run&rdquo;/&ldquo;Ativar&rdquo; manualmente ap&oacute;s a cria&ccedil;&atilde;o.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ================================================================== -->
+      <h2 id="tradeoffs">8. Trade-offs e decis&otilde;es#</h2>
+
+      <h3>Por que EventBridge e n&atilde;o API Gateway?</h3>
+      <p>
+        API Gateway exigiria um webhook no Salesforce, gerenciamento de autentica&ccedil;&atilde;o, retry manual e parsing do payload. EventBridge tem integra&ccedil;&atilde;o nativa de parceiro com o Salesforce &mdash; o evento chega formatado, com retry autom&aacute;tico, DLQ nativa e sem servidor para gerenciar. Menos c&oacute;digo, menos superf&iacute;cie de ataque.
+      </p>
+
+      <h3>Por que Lambda em VPC?</h3>
+      <p>
+        O Firebird roda em uma EC2 em subnet privada. N&atilde;o h&aacute; endpoint p&uacute;blico nem Firebird managed service na AWS. A Lambda precisa estar na mesma VPC para alcan&ccedil;ar a porta 3050. O trade-off &eacute; o cold start um pouco mais lento (~1-2s extra no primeiro invoke) e a depend&ecirc;ncia do NAT Gateway para acessar a API do Salesforce.
+      </p>
+
+      <h3>Por que uma query SOQL extra?</h3>
+      <p>
+        O evento CDC traz apenas os <strong>campos que mudaram</strong>, n&atilde;o o registro completo. Se o vendedor s&oacute; alterou o status, o evento vem apenas com <code>Status__c</code> &mdash; mas para atualizar o Firebird, precisamos tamb&eacute;m do <code>Cavalete__c</code>, <code>Bloco__c</code>, <code>NumeroPeca__c</code>, etc. A query SOQL adicional (&lt;100ms) &eacute; um trade-off aceit&aacute;vel para ter consist&ecirc;ncia total.
+      </p>
+
+      <h3>Por que filtrar no c&oacute;digo e n&atilde;o no EventBridge?</h3>
+      <p>
+        O EventBridge suporta content-based filtering, mas o payload do Salesforce CDC aninha o <code>entityName</code> dentro de <code>detail.payload.ChangeEventHeader.entityName</code>. Filtros com m&uacute;ltiplos n&iacute;veis de aninhamento s&atilde;o fr&aacute;geis e dif&iacute;ceis de debugar. Filtrar no c&oacute;digo custa uma invoca&ccedil;&atilde;o extra (~$0.0000002) mas &eacute; expl&iacute;cito, test&aacute;vel e f&aacute;cil de alterar.
+      </p>
+
+      <!-- ================================================================== -->
+      <h2 id="custos">9. Estimativa de custos#</h2>
+
+      <p>Para um volume t&iacute;pico de ~500 eventos CDC/m&ecirc;s (mudan&ccedil;as de status de embalagens):</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Servi&ccedil;o</th>
+            <th>Uso estimado</th>
+            <th>Custo mensal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Lambda</td>
+            <td>500 invoca&ccedil;&otilde;es &times; 256MB &times; ~3s</td>
+            <td>~$0.10</td>
+          </tr>
+          <tr>
+            <td>EventBridge</td>
+            <td>500 eventos</td>
+            <td>~$0.005</td>
+          </tr>
+          <tr>
+            <td>Secrets Manager</td>
+            <td>2 secrets &times; 500 reads</td>
+            <td>~$0.90</td>
+          </tr>
+          <tr>
+            <td>SQS (DLQ)</td>
+            <td>~0 mensagens (idealmente)</td>
+            <td>~$0.00</td>
+          </tr>
+          <tr>
+            <td>CloudWatch Logs</td>
+            <td>~50 MB/m&ecirc;s</td>
+            <td>~$0.25</td>
+          </tr>
+          <tr>
+            <td>SNS</td>
+            <td>~5 notifica&ccedil;&otilde;es</td>
+            <td>~$0.00</td>
+          </tr>
+          <tr>
+            <td><strong>Total</strong></td>
+            <td></td>
+            <td><strong>~$1.50/m&ecirc;s</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        <strong>Compara&ccedil;&atilde;o:</strong> O pipeline anterior usava uma inst&acirc;ncia EC2 dedicada rodando 24/7 para o Jenkins (~$15-30/m&ecirc;s). Al&eacute;m de mais caro, exigia manuten&ccedil;&atilde;o do SO, patches, backup e monitoramento manual. O custo serverless de ~$1.50/m&ecirc;s inclui tudo &mdash; compute, armazenamento de secrets, logs e alertas.
+      </div>
+
+      <!-- ================================================================== -->
+      <h2 id="aprendizados">10. O que aprendi#</h2>
+
+      <ol>
+        <li><strong>Named Credential legacy &ne; novo formato.</strong> A documenta&ccedil;&atilde;o do Salesforce empurra voc&ecirc; para o formato novo, mas o Event Relay s&oacute; funciona com o formato antigo. Horas perdidas at&eacute; descobrir isso.</li>
+        <li><strong>O EventBridge encapsula o payload.</strong> O evento CDC do Salesforce &eacute; aninhado dentro de <code>event.detail.payload</code>. Se voc&ecirc; procurar o header na raiz do evento, vai encontrar nada &mdash; e vai achar que a integra&ccedil;&atilde;o n&atilde;o funciona.</li>
+        <li><strong>CDC n&atilde;o traz o registro completo.</strong> Ele traz apenas os campos alterados. Se voc&ecirc; precisa de todos os campos, fa&ccedil;a uma query SOQL complementar. &Eacute; uma request a mais, mas &eacute; a forma correta.</li>
+        <li><strong>Lambda em VPC + NAT Gateway &eacute; inevit&aacute;vel.</strong> Se o target &eacute; uma base on-prem (ou EC2 privada), n&atilde;o h&aacute; como fugir da VPC. E sem NAT, n&atilde;o h&aacute; internet &mdash; e sem internet, n&atilde;o h&aacute; acesso &agrave; API do Salesforce.</li>
+        <li><strong>Observabilidade desde o dia 1.</strong> DLQ + alarme + logs estruturados custam centavos e salvam horas de debug. O pipeline batch antigo n&atilde;o tinha nenhum desses &mdash; e falhas passavam despercebidas por dias.</li>
+        <li><strong>Serverless n&atilde;o significa &ldquo;sem complexidade&rdquo;.</strong> A quantidade de etapas de configura&ccedil;&atilde;o (IAM, VPC, Security Groups, Named Credentials, Event Relay) &eacute; significativa. A vantagem &eacute; que, uma vez configurado, n&atilde;o h&aacute; servidor para manter, patchear ou reiniciar &agrave;s 3h da manh&atilde;.</li>
+      </ol>
+
+      <!-- ================================================================== -->
+      <h2 id="checklist">11. Checklist de reprodu&ccedil;&atilde;o#</h2>
+
+      <p>Use esta tabela como guia r&aacute;pido para reproduzir a integra&ccedil;&atilde;o do zero:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Passo</th>
+            <th>Onde</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Criar secrets no Secrets Manager (Firebird + Salesforce)</td><td>AWS CLI</td></tr>
+          <tr><td>2</td><td>Criar fila SQS para DLQ com reten&ccedil;&atilde;o de 14 dias</td><td>AWS CLI</td></tr>
+          <tr><td>3</td><td>Criar Security Group para a Lambda (porta 3050)</td><td>AWS CLI</td></tr>
+          <tr><td>4</td><td>Criar IAM Role com trust policy + inline policy</td><td>AWS CLI</td></tr>
+          <tr><td>5</td><td>Habilitar CDC para <code>Embalagem__c</code> no Salesforce</td><td>Salesforce Setup</td></tr>
+          <tr><td>6</td><td>Criar IAM User com permiss&otilde;es EventBridge partner</td><td>AWS CLI</td></tr>
+          <tr><td>7</td><td>Criar Named Credential (formato LEGACY, URL = ARN, regi&atilde;o UPPERCASE)</td><td>Salesforce Setup</td></tr>
+          <tr><td>8</td><td>Criar Event Relay e ATIVAR manualmente</td><td>Salesforce Setup</td></tr>
+          <tr><td>9</td><td>Associar Partner Event Source ao Event Bus</td><td>AWS Console</td></tr>
+          <tr><td>10</td><td>Criar regra no EventBridge com target Lambda + DLQ</td><td>AWS CLI</td></tr>
+          <tr><td>11</td><td>Criar Lambda com handler.py e deploy do pacote</td><td>AWS CLI</td></tr>
+          <tr><td>12</td><td>Adicionar permiss&atilde;o para EventBridge invocar a Lambda</td><td>AWS CLI</td></tr>
+          <tr><td>13</td><td>Criar t&oacute;pico SNS e inscrever email</td><td>AWS CLI</td></tr>
+          <tr><td>14</td><td>Criar alarme CloudWatch na DLQ</td><td>AWS CLI</td></tr>
+          <tr><td>15</td><td>Testar: alterar status no Salesforce e verificar CloudWatch Logs</td><td>Salesforce + AWS</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ================================================================== -->
+      <h2 id="proximos-passos">12. Pr&oacute;ximos passos#</h2>
+
+      <ul>
+        <li><strong>Terraform/IaC:</strong> Migrar toda a infraestrutura para Terraform. Os comandos CLI s&atilde;o &oacute;timos para prototipagem, mas em produ&ccedil;&atilde;o preciso de estado declarativo, versionamento e rollback.</li>
+        <li><strong>AWS X-Ray:</strong> Habilitar tracing distribu&iacute;do para visualizar a lat&ecirc;ncia end-to-end (EventBridge &rarr; Lambda &rarr; Salesforce API &rarr; Firebird).</li>
+        <li><strong>M&eacute;tricas customizadas:</strong> Publicar m&eacute;tricas no CloudWatch via EMF (Embedded Metric Format) &mdash; registros processados por minuto, lat&ecirc;ncia por etapa, taxa de erro por tipo.</li>
+        <li><strong>Filtro no EventBridge:</strong> Quando a integra&ccedil;&atilde;o estabilizar e o formato do payload estiver bem mapeado, migrar a filtragem do c&oacute;digo para o EventBridge. Economiza invoca&ccedil;&otilde;es de Lambda desnecess&aacute;rias.</li>
+        <li><strong>Reprocessamento autom&aacute;tico da DLQ:</strong> Criar uma Lambda adicional que consome a DLQ e retenta o processamento com backoff exponencial, em vez de depender de interven&ccedil;&atilde;o manual.</li>
+        <li><strong>Dashboard CloudWatch:</strong> Painel unificado com lat&ecirc;ncia, invoca&ccedil;&otilde;es, erros, tamanho da DLQ e custo acumulado &mdash; vis&iacute;vel para o time de opera&ccedil;&otilde;es.</li>
+      </ul>
+
+    </div>
+
+    <footer class="post-footer">
+      <div class="post-author">
+        <div class="post-author-avatar">MCN</div>
+        <div>
+          <div class="post-author-name">Matheus N.</div>
+          <div class="post-author-role">Engenheiro de Infraestrutura Cloud</div>
+        </div>
+      </div>
+      <div class="post-share">
+        <span>Compartilhar:</span>
+        <a href="#" class="share-btn" title="LinkedIn">in</a>
+        <a href="#" class="share-btn" title="Twitter">X</a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer style="padding:2rem;text-align:center;color:var(--ink3);font-size:.8rem;border-top:1px solid var(--border)">
+  &copy; 2026 Cloud by MCN
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script>
+const text = document.querySelector('.post-content').innerText;
+const words = text.split(/\s+/).length;
+const minutes = Math.ceil(words / 200);
+const el = document.getElementById('readTime');
+if (el) el.textContent = minutes + ' min de leitura';
+</script>
+</body>
+</html>

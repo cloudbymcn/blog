@@ -6,6 +6,11 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://cloudbymcn.com/posts/salesforce-cdc-eventbridge-firebird.html</loc>
+    <lastmod>2026-03-30</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://cloudbymcn.com/posts/gestao-midia-aws-serverless.html</loc>
     <lastmod>2026-03-13</lastmod>
     <priority>0.8</priority>
