@@ -1,29 +1,31 @@
 # Cloud by MCN
 
-Portfolio and technical blog showcasing real-world AWS architectures, case studies, and production decisions.
+Portfolio e blog documentando arquiteturas AWS reais, case studies e decisoes tecnicas de producao.
 
-**Live:** [cloudbymcn.com](https://cloudbymcn.com)
+**Site:** [cloudbymcn.com](https://cloudbymcn.com)
 
-## Tech Stack
+## Stack
 
-- **HTML5 / CSS3 / Vanilla JS** - Zero frameworks, zero build tools
-- **Google Fonts** - Inter, Space Grotesk, DM Serif Display, JetBrains Mono
-- **Prism.js** - Syntax highlighting on post pages
+- **HTML5 / CSS3 / JavaScript puro** — zero frameworks, zero build tools
+- **Google Fonts** — Inter, Space Grotesk, DM Serif Display, JetBrains Mono
+- **Prism.js** — syntax highlighting nas paginas de post
 
-## Project Structure
+## Estrutura
 
 ```
 .
-├── index.html              # Single-page app (hero, projects, about, contact)
+├── index.html              # Pagina principal (hero, projetos, sobre, contato)
+├── robots.txt              # SEO — permissoes de indexacao
+├── sitemap.xml             # SEO — mapa do site
 ├── assets/
 │   ├── css/
-│   │   ├── style.css       # Global styles, variables, animations, responsive
-│   │   └── post.css        # Blog post page styles
-│   ├── img/                # Images, certs, video background
+│   │   ├── style.css       # Estilos globais, variaveis, animacoes, responsivo
+│   │   └── post.css        # Estilos das paginas de post
+│   ├── img/                # Imagens, certificacoes, video de fundo
 │   └── js/
-│       └── main.js         # Animations, scroll, filters, i18n, nav
+│       └── main.js         # Animacoes, scroll, filtros, i18n, nav
 ├── posts/
-│   ├── TEMPLATE.html       # Copy this to create new posts
+│   ├── TEMPLATE.html       # Copie este arquivo para criar novos posts
 │   ├── gestao-midia-aws-serverless.html
 │   ├── integracao-api-aws.html
 │   └── otimizacao-mp4.html
@@ -31,56 +33,58 @@ Portfolio and technical blog showcasing real-world AWS architectures, case studi
 └── README.md
 ```
 
-## Features
+## Funcionalidades
 
-- Bilingual support (PT/EN) via custom i18n system
-- CSS-driven animations: split-text hero, word-by-word reveal, scroll-triggered reveals
-- 3D tilt cards with glow effect (desktop)
-- Project filtering and sorting
-- SVG cloud draw loading screen
-- Scroll progress bar, circular back-to-top button
-- Fully responsive (mobile-first breakpoints at 900px, 680px, 380px)
-- Respects `prefers-reduced-motion`
+- Suporte bilingue (PT/EN) com sistema i18n proprio
+- Animacoes CSS: split-text no hero, reveal palavra por palavra, reveals no scroll
+- Cards 3D com tilt e glow (desktop)
+- Filtros e ordenacao de projetos
+- Tela de loading com desenho SVG de nuvem
+- Barra de progresso de scroll + botao voltar ao topo circular
+- Totalmente responsivo (breakpoints em 900px, 680px, 380px)
+- Respeita `prefers-reduced-motion`
+- Formulario de contato funcional via mailto
 
-## Running Locally
+## Como rodar
 
-1. Open in VS Code
-2. Install the **Live Server** extension
-3. Right-click `index.html` > **Open with Live Server**
+1. Abra no VS Code
+2. Instale a extensao **Live Server**
+3. Clique direito em `index.html` > **Open with Live Server**
 
-Or use any static server:
+Ou use qualquer servidor estatico:
 
 ```bash
 npx serve .
-# or
+# ou
 python -m http.server 8000
 ```
 
-## Adding a New Post
+## Como adicionar um novo post
 
-1. Copy `posts/TEMPLATE.html` and rename it
-2. Edit the `<title>`, meta tags, and content
-3. Add a project card in `index.html` inside `.proj-grid`
+1. Copie `posts/TEMPLATE.html` e renomeie
+2. Edite o `<title>`, meta tags e conteudo
+3. Adicione um card de projeto no `index.html` dentro de `.proj-grid`
+4. Atualize o `sitemap.xml` com a nova URL
 
-## Adding a New Project Category
+## Como adicionar nova categoria
 
-1. In `style.css`, add a color variable:
+1. No `style.css`, adicione a cor:
    ```css
    .pj[data-cat="aiml"]{--pj-c:#ec4899}
    ```
-2. In `index.html`, add a filter button:
+2. No `index.html`, adicione o botao de filtro:
    ```html
    <button class="f-btn" data-filter="aiml">AI/ML</button>
    ```
 
-## Deployment
+## Deploy
 
-Recommended options:
-- **S3 + CloudFront** (doubles as a case study)
-- **Netlify** (drag & drop or connect GitHub)
-- **Vercel** (connect GitHub repo)
-- **GitHub Pages** (free, from this repo)
+Opcoes recomendadas:
+- **S3 + CloudFront** (vira case study)
+- **Netlify** (drag & drop ou conecta ao GitHub)
+- **Vercel** (conecta ao repo)
+- **GitHub Pages** (gratis, direto deste repo)
 
-## License
+## Licenca
 
-All rights reserved. Content and design by Matheus N.
+Todos os direitos reservados. Conteudo e design por Matheus N.

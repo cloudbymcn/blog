@@ -62,8 +62,8 @@ nav.nav-dark .nav-toggle span{background:#8eabbe}
 nav.nav-dark .nav-cta{background:transparent;border-color:var(--accent);color:var(--accent)}
 nav.nav-dark .nav-cta:hover{background:var(--accent);color:#fff}
 .nav-in{width:100%;max-width:1200px;margin:0 auto;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:74px}
-.logo{display:flex;align-items:center;transition:all .3s;padding-top:20px;flex-shrink:0}
-.logo-img{width:130px;height:auto;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))}
+.logo{display:flex;align-items:center;transition:all .3s;flex-shrink:0}
+.logo-img{width:100px;height:auto;object-fit:contain}
 .logo b{color:var(--accent)}
 .nav-links{display:flex;gap:0;position:absolute;left:50%;transform:translateX(-50%)}
 .nav-r{display:flex;align-items:center;gap:.6rem}
@@ -350,8 +350,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
   .nav-links a::after{display:none}
   .nav-toggle{display:flex}
   .nav-cta{display:none}
-  .logo-img{width:100px}
-  .logo{padding-top:12px}
+  .logo-img{width:80px}
 
   /* Hero — mobile safe height + tighter spacing */
   .hero{min-height:100svh;min-height:100vh}
