@@ -84,8 +84,6 @@
         A sincroniza&ccedil;&atilde;o entre os dois mundos era feita assim:
       </p>
 
-      <details>
-      <summary>Diagrama da arquitetura anterior (batch) (clique para expandir)</summary>
       <pre><code class="language-bash">
 # Arquitetura anterior (batch)
 #
@@ -96,7 +94,6 @@
 #
 #  Latência: ~24 horas | Custo: instância EC2 dedicada 24/7
       </code></pre>
-      </details>
 
       <p>O cen&aacute;rio t&iacute;pico de dor:</p>
       <ol>
@@ -158,8 +155,6 @@
         </tbody>
       </table>
 
-      <details>
-      <summary>Diagrama da arquitetura nova (event-driven serverless) (clique para expandir)</summary>
       <pre><code class="language-bash">
 # Arquitetura nova (event-driven serverless)
 #
@@ -174,7 +169,6 @@
 #
 #  Latência: ~3 segundos | Custo: ~R$8/mês | Servidores: 0
       </code></pre>
-      </details>
 
       <div class="callout">
         <strong>N&uacute;meros:</strong> ~3 segundos de lat&ecirc;ncia end-to-end, ~R$8/m&ecirc;s de custo total, 0 servidores para gerenciar, 100% serverless.
@@ -214,7 +208,7 @@
       <p>Armazenei as credenciais do Firebird e do Salesforce de forma segura. A Lambda busca-as em runtime.</p>
 
       <details>
-      <summary>Criar secrets do Firebird e Salesforce (clique para expandir)</summary>
+      <summary><strong>Criar secrets do Firebird e Salesforce</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Secret do Firebird
 aws secretsmanager create-secret \
   --name "firebird/prod/credentials" \
@@ -251,7 +245,7 @@ aws secretsmanager create-secret \
       <p>Uma fila SQS para capturar eventos que falharam ap&oacute;s todas as tentativas. Reten&ccedil;&atilde;o de 14 dias para reprocessamento manual.</p>
 
       <details>
-      <summary>Criar fila SQS para DLQ (clique para expandir)</summary>
+      <summary><strong>Criar fila SQS para DLQ</strong> (clique para expandir)</summary>
       <pre><code class="language-bash">aws sqs create-queue \
   --queue-name "salesforce-cdc-dlq" \
   --attributes '{
@@ -268,7 +262,7 @@ aws secretsmanager create-secret \
       <p>A Lambda vai rodar dentro da VPC. Ela precisa de um Security Group que permita sa&iacute;da para o Firebird (porta 3050) e para a internet (via NAT).</p>
 
       <details>
-      <summary>Criar Security Group para a Lambda (clique para expandir)</summary>
+      <summary><strong>Criar Security Group para a Lambda</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Criar o Security Group
 aws ec2 create-security-group \
   --group-name "sg-lambda-salesforce-cdc" \
@@ -294,7 +288,7 @@ aws ec2 authorize-security-group-ingress \
 
       <p><strong>Trust Policy (quem pode assumir a role):</strong></p>
       <details>
-      <summary>Trust Policy JSON (clique para expandir)</summary>
+      <summary><strong>Trust Policy JSON</strong> (clique para expandir)</summary>
       <pre><code class="language-json">{
   "Version": "2012-10-17",
   "Statement": [
@@ -311,7 +305,7 @@ aws ec2 authorize-security-group-ingress \
 
       <p><strong>Inline Policy (o que a role pode fazer):</strong></p>
       <details>
-      <summary>IAM Inline Policy JSON (clique para expandir)</summary>
+      <summary><strong>IAM Inline Policy JSON</strong> (clique para expandir)</summary>
       <pre><code class="language-json">{
   "Version": "2012-10-17",
   "Statement": [
@@ -359,7 +353,7 @@ aws ec2 authorize-security-group-ingress \
       </details>
 
       <details>
-      <summary>Criar IAM Role via CLI (clique para expandir)</summary>
+      <summary><strong>Criar IAM Role via CLI</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Criar a role
 aws iam create-role \
   --role-name "lambda-salesforce-cdc-role" \
@@ -456,7 +450,7 @@ aws iam put-role-policy \
 
       <p><strong>Policy JSON:</strong></p>
       <details>
-      <summary>EventBridge Partner Policy JSON (clique para expandir)</summary>
+      <summary><strong>EventBridge Partner Policy JSON</strong> (clique para expandir)</summary>
       <pre><code class="language-json">{
   "Version": "2012-10-17",
   "Statement": [
@@ -475,7 +469,7 @@ aws iam put-role-policy \
       </details>
 
       <details>
-      <summary>Criar usu&aacute;rio IAM e gerar Access Key (clique para expandir)</summary>
+      <summary><strong>Criar usu&aacute;rio IAM e gerar Access Key</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Criar o usuário
 aws iam create-user --user-name "salesforce-eventbridge-relay"
 
@@ -541,7 +535,7 @@ aws iam create-access-key --user-name "salesforce-eventbridge-relay"
       <p>A regra define <strong>quais eventos</strong> devem acionar a Lambda e configura a DLQ como fallback.</p>
 
       <details>
-      <summary>EventBridge Rule + Target com DLQ (clique para expandir)</summary>
+      <summary><strong>EventBridge Rule + Target com DLQ</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Criar a regra
 aws events put-rule \
   --name "salesforce-cdc-to-lambda" \
@@ -581,7 +575,7 @@ aws events put-targets \
       <p>Finalmente, o c&oacute;digo que processa os eventos e atualiza o Firebird.</p>
 
       <details>
-      <summary>Criar Lambda e adicionar permiss&atilde;o do EventBridge (clique para expandir)</summary>
+      <summary><strong>Criar Lambda e adicionar permiss&atilde;o do EventBridge</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Criar a função Lambda
 aws lambda create-function \
   --function-name "salesforce-cdc-sync" \
@@ -615,7 +609,7 @@ aws lambda add-permission \
       <p><strong>handler.py completo:</strong></p>
 
       <details>
-      <summary>handler.py completo (clique para expandir)</summary>
+      <summary><strong>handler.py completo</strong> (clique para expandir)</summary>
       <pre><code class="language-python">"""
 Lambda: Salesforce CDC → Firebird sync
 Recebe eventos CDC do Salesforce via EventBridge e atualiza
@@ -867,7 +861,7 @@ def lambda_handler(event, context):
       <p><strong>Deploy:</strong></p>
 
       <details>
-      <summary>Build e deploy do pacote Lambda (clique para expandir)</summary>
+      <summary><strong>Build e deploy do pacote Lambda</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Criar diretório de build
 mkdir -p build &amp;&amp; cp handler.py build/
 
@@ -899,7 +893,7 @@ aws lambda update-function-code \
       <h3>SNS Topic para alertas</h3>
 
       <details>
-      <summary>Criar t&oacute;pico SNS e inscrever email (clique para expandir)</summary>
+      <summary><strong>Criar t&oacute;pico SNS e inscrever email</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Criar tópico SNS
 aws sns create-topic --name "salesforce-cdc-alerts"
 
@@ -913,7 +907,7 @@ aws sns subscribe \
       <h3>Alarme de DLQ (mensagens na fila = problema)</h3>
 
       <details>
-      <summary>Alarme CloudWatch na DLQ (clique para expandir)</summary>
+      <summary><strong>Alarme CloudWatch na DLQ</strong> (clique para expandir)</summary>
       <pre><code class="language-bash">aws cloudwatch put-metric-alarm \
   --alarm-name "salesforce-cdc-dlq-not-empty" \
   --alarm-description "Há mensagens na DLQ — eventos CDC falharam" \
@@ -944,14 +938,11 @@ aws sns subscribe \
         <li>Em <strong>2.7 segundos</strong>, o log apareceu:</li>
       </ol>
 
-      <details>
-      <summary>Log do CloudWatch (resultado do teste) (clique para expandir)</summary>
       <pre><code class="language-json">{
   "message": "TABCAVALETE atualizado: CODCAVALETE=CAV-00451, STATUS=R",
   "timestamp": "2026-03-28T14:32:07.892Z",
   "requestId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 }</code></pre>
-      </details>
 
       <p>Conferi no Firebird: <code>TABCAVALETE</code> e <code>TABBLOCOCHAPAS</code> j&aacute; refletiam o status <strong>&ldquo;R&rdquo;</strong> (Reservado). A log&iacute;stica teria a informa&ccedil;&atilde;o em tempo real.</p>
 

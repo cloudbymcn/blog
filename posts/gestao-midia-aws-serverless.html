@@ -79,8 +79,6 @@
         <div class="d">Fluxo completo: navegador do operador &rarr; CloudFront &rarr; API Gateway &rarr; Lambda &rarr; serviços AWS</div>
       </div>
 
-      <details>
-<summary>Diagrama de arquitetura — fluxo completo (clique para expandir)</summary>
       <pre><code class="language-bash">┌─────────────────────────────────────────────────────────────────┐
 │                      NAVEGADOR (celular/PC)                     │
 │                                                                 │
@@ -118,7 +116,6 @@
       │DynamoDB│ │Cognito │ │  SSM   │ │  SES   │
       │(audit) │ │(users) │ │(config)│ │(email) │
       └────────┘ └────────┘ └────────┘ └────────┘</code></pre>
-</details>
 
       <div class="tip">
         <strong>Ponto-chave:</strong> os arquivos de mídia <strong>nunca</strong> passam pela Lambda. O navegador recebe uma Presigned URL e faz o <code>PUT</code> diretamente no S3. Isso significa que a Lambda não precisa lidar com payloads grandes &mdash; ela só gera a URL (operação leve, ~50ms) e o navegador faz o trabalho pesado.
@@ -138,7 +135,7 @@
       <h3>Instalação (macOS / Linux)</h3>
 
       <details>
-<summary>Instalação — macOS / Linux (clique para expandir)</summary>
+<summary><strong>Instalação — macOS / Linux</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># AWS CLI
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
@@ -162,7 +159,7 @@ node --version</code></pre>
       <h3>Instalação (Windows)</h3>
 
       <details>
-<summary>Instalação — Windows (clique para expandir)</summary>
+<summary><strong>Instalação — Windows</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># AWS CLI — baixe o MSI:
 # https://awscli.amazonaws.com/AWSCLIV2.msi
 
@@ -184,7 +181,7 @@ node --version</code></pre>
       <p>Criei a estrutura do projeto do zero usando o SAM CLI:</p>
 
       <details>
-<summary>Estrutura do projeto (clique para expandir)</summary>
+<summary><strong>Estrutura do projeto</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Inicializar o projeto
 mkdir galeria-midia && cd galeria-midia
 sam init --runtime nodejs20.x --name galeria-midia --app-template hello-world
@@ -206,7 +203,7 @@ sam init --runtime nodejs20.x --name galeria-midia --app-template hello-world
       <p>Primeiro, o <code>package.json</code> com as dependências do AWS SDK v3. Usei o SDK v3 porque ele é modular &mdash; importei apenas os clientes necessários, reduzindo o tamanho do pacote da Lambda:</p>
 
       <details>
-<summary>package.json (clique para expandir)</summary>
+<summary><strong>package.json</strong> (clique para expandir)</summary>
       <pre><code class="language-json">{
   "name": "galeria-midia",
   "version": "1.0.0",
@@ -233,7 +230,7 @@ sam init --runtime nodejs20.x --name galeria-midia --app-template hello-world
       <p>O <code>template.yaml</code> é o coração do projeto. Ele define <strong>toda</strong> a infraestrutura como código: a Lambda, o DynamoDB, o Cognito, as permissões IAM, as rotas da API &mdash; tudo num único arquivo. Quando eu rodava <code>sam deploy</code>, o SAM transformava isso em um CloudFormation stack e criava todos os recursos automaticamente.</p>
 
       <details>
-<summary>template.yaml — Infraestrutura completa (clique para expandir)</summary>
+<summary><strong>template.yaml — Infraestrutura completa</strong> (clique para expandir)</summary>
       <pre><code class="language-yaml">AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Galeria de Midia Serverless
@@ -565,7 +562,7 @@ Outputs:
       <p>Construí o código completo assim:</p>
 
       <details>
-<summary>index.js — Lambda principal completa (clique para expandir)</summary>
+<summary><strong>index.js — Lambda principal completa</strong> (clique para expandir)</summary>
       <pre><code class="language-javascript">// ─── Imports do AWS SDK v3 ────────────────────────────────────
 const { S3Client, PutObjectCommand, DeleteObjectCommand,
         ListObjectsV2Command } = require("@aws-sdk/client-s3");
@@ -980,7 +977,7 @@ async function handleAudit(bloco, date) {
       <p>Uma decisão arquitetural que tomei: o frontend (HTML/CSS/JS) é servido <strong>pela própria Lambda</strong> em vez de ficar em um bucket S3 separado. A função usa <code>fs.readFileSync</code> com cache em memória para servir os arquivos.</p>
 
       <details>
-<summary>index.js — Cache de HTML no frontend (clique para expandir)</summary>
+<summary><strong>index.js — Cache de HTML no frontend</strong> (clique para expandir)</summary>
       <pre><code class="language-javascript">// Este trecho já está no index.js acima, mas vale destaque:
 const htmlCache = {};
 
@@ -1050,8 +1047,6 @@ if (method === "GET" && routePath === "/") {
         <li><strong>Notify:</strong> o frontend avisa a Lambda que o upload terminou (para registro de auditoria)</li>
       </ol>
 
-      <details>
-<summary>Diagrama — fluxo de upload em 3 etapas (clique para expandir)</summary>
       <pre><code class="language-bash">┌──────────┐     1. POST /api/presign     ┌──────────┐
 │          │ ──────────────────────────►   │          │
 │          │     { url, key, expiresIn }   │  Lambda  │
@@ -1066,12 +1061,11 @@ if (method === "GET" && routePath === "/") {
 │          │ ──────────────────────────►   │  Lambda  │
 │          │ ◄──────────────────────────   │(DynamoDB)│
 └──────────┘     { message: "Registrado" } └──────────┘</code></pre>
-</details>
 
       <p>O código do frontend para realizar o upload com essa cadeia sequencial:</p>
 
       <details>
-<summary>Frontend — upload com Presigned URL (clique para expandir)</summary>
+<summary><strong>Frontend — upload com Presigned URL</strong> (clique para expandir)</summary>
       <pre><code class="language-javascript">// ─── Upload com Presigned URL (frontend) ─────────────────────
 
 async function uploadFile(file, bloco, user) {
@@ -1149,7 +1143,7 @@ async function uploadMultiple(files, bloco, user) {
       <p>Para exibir uma galeria rápida sem carregar fotos de 5-10 MB cada, optei por gerar thumbnails no próprio navegador usando a Canvas API. Isso acontece <strong>antes</strong> do upload:</p>
 
       <details>
-<summary>Frontend — geração de thumbnail + upload (clique para expandir)</summary>
+<summary><strong>Frontend — geração de thumbnail + upload</strong> (clique para expandir)</summary>
       <pre><code class="language-javascript">// ─── Geração de Thumbnail no Cliente ─────────────────────────
 
 function generateThumbnail(file, maxWidth = 300) {
@@ -1249,7 +1243,7 @@ async function uploadWithThumbnail(file, bloco, user) {
       <p>Credenciais e configurações sensíveis <strong>nunca</strong> ficam no código ou em variáveis de ambiente em texto puro. Usei o <strong>AWS Systems Manager Parameter Store</strong> para armazená-las de forma segura e criptografada:</p>
 
       <details>
-<summary>SSM Parameter Store — criação de parâmetros (clique para expandir)</summary>
+<summary><strong>SSM Parameter Store — criação de parâmetros</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Criar parâmetros no SSM (executar uma vez)
 aws ssm put-parameter \
   --name "/galeria/api-key" \
@@ -1273,7 +1267,7 @@ aws ssm put-parameter \
       <p>Na Lambda, o cache do SSM evita chamadas repetidas (o código já foi mostrado no Passo 3):</p>
 
       <details>
-<summary>index.js — Cache do SSM com TTL (clique para expandir)</summary>
+<summary><strong>index.js — Cache do SSM com TTL</strong> (clique para expandir)</summary>
       <pre><code class="language-javascript">// Cache com TTL de 5 minutos
 // Se o parâmetro mudar no SSM, a Lambda pega o novo valor
 // no máximo 5 minutos depois — sem precisar de redeploy.
@@ -1314,7 +1308,7 @@ async function getConfig(paramName) {
       <p>Para que o navegador possa fazer <code>PUT</code> direto no S3 via Presigned URL, o bucket precisa de uma configuração CORS:</p>
 
       <details>
-<summary>cors.json — configuração CORS do bucket S3 (clique para expandir)</summary>
+<summary><strong>cors.json — configuração CORS do bucket S3</strong> (clique para expandir)</summary>
       <pre><code class="language-json">{
   "CORSRules": [
     {
@@ -1361,8 +1355,6 @@ aws s3api put-bucket-cors \
 
       <p>O CloudFront usa <strong>behaviors</strong> para decidir de onde buscar o conteúdo baseado no caminho da URL. A ordem de prioridade importa:</p>
 
-      <details>
-<summary>Diagrama — CloudFront behaviors e prioridade (clique para expandir)</summary>
       <pre><code class="language-bash">┌─────────────────────────────────────────────────────────┐
 │              CloudFront Distribution                    │
 │                                                         │
@@ -1384,7 +1376,6 @@ aws s3api put-bucket-cors \
 │    Cache: desabilitado                                  │
 │    → Páginas HTML servidas pela Lambda                  │
 └─────────────────────────────────────────────────────────┘</code></pre>
-</details>
 
       <div class="warning">
         <strong>A história do bug do .mp4:</strong> durante os testes, vídeos .mp4 retornavam um erro 403 no CloudFront. Depois de horas debugando, descobri que o behavior <code>/blocos/*</code> estava configurado com <code>Compress: true</code> (gzip). O CloudFront tentava comprimir o .mp4 (que já é comprimido), corrompia o cabeçalho e o S3 retornava Access Denied porque o Content-Type não batia. A solução: desabilitar compressão para o behavior de mídia, ou usar uma whitelist de Content-Types comprimíveis.
@@ -1400,7 +1391,7 @@ aws s3api put-bucket-cors \
       <p>Com toda a infraestrutura definida no <code>template.yaml</code> e o código pronto, o deploy foi surpreendentemente simples:</p>
 
       <details>
-<summary>Comandos de build e deploy (clique para expandir)</summary>
+<summary><strong>Comandos de build e deploy</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Instalar dependências
 cd src && npm install && cd ..
 
@@ -1414,7 +1405,7 @@ sam deploy --guided</code></pre>
       <p>O <code>sam deploy --guided</code> faz uma série de perguntas interativas:</p>
 
       <details>
-<summary>sam deploy --guided — perguntas interativas (clique para expandir)</summary>
+<summary><strong>sam deploy --guided — perguntas interativas</strong> (clique para expandir)</summary>
       <pre><code class="language-bash">Configuring SAM deploy
 ======================
 
@@ -1443,7 +1434,7 @@ sam deploy --guided</code></pre>
       </ol>
 
       <details>
-<summary>Output do deploy (clique para expandir)</summary>
+<summary><strong>Output do deploy</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Output do deploy:
 CloudFormation outputs from deployed stack
 ───────────────────────────────────────────────────────────
@@ -1464,7 +1455,7 @@ AuditTableName      galeria-audit-log
         <strong>Criar o primeiro usuário admin:</strong> como o Cognito está configurado para <code>AllowAdminCreateUserOnly</code>, eu precisei criar o primeiro usuário pelo CLI:
 
         <details>
-<summary>Cognito — criar primeiro admin (clique para expandir)</summary>
+<summary><strong>Cognito — criar primeiro admin</strong> (clique para expandir)</summary>
         <pre><code class="language-bash">aws cognito-idp admin-create-user \
   --user-pool-id sa-east-1_ExEmPlO \
   --username admin \
@@ -1479,7 +1470,7 @@ AuditTableName      galeria-audit-log
       <p>Ao versionar o projeto, é crítico não vazar credenciais ou artefatos desnecessários:</p>
 
       <details>
-<summary>.gitignore (clique para expandir)</summary>
+<summary><strong>.gitignore</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># .gitignore
 node_modules/
 .aws-sam/
@@ -1513,7 +1504,7 @@ Thumbs.db</code></pre>
       <h3>Problema 1: BinaryMediaTypes no API Gateway</h3>
 
       <details>
-<summary>template.yaml — BinaryMediaTypes fix (clique para expandir)</summary>
+<summary><strong>template.yaml — BinaryMediaTypes fix</strong> (clique para expandir)</summary>
       <pre><code class="language-yaml"># SEM isso no Globals:
 Globals:
   Api:
@@ -1532,7 +1523,7 @@ Globals:
       <h3>Problema 2: ListBucket com ARN errado</h3>
 
       <details>
-<summary>IAM — ListBucket ARN correto vs errado (clique para expandir)</summary>
+<summary><strong>IAM — ListBucket ARN correto vs errado</strong> (clique para expandir)</summary>
       <pre><code class="language-yaml"># ERRADO (não funciona):
 - Effect: Allow
   Action:
@@ -1551,7 +1542,7 @@ Globals:
       <h3>Problema 3: Rotas não declaradas no SAM</h3>
 
       <details>
-<summary>template.yaml — rotas faltando no Events (clique para expandir)</summary>
+<summary><strong>template.yaml — rotas faltando no Events</strong> (clique para expandir)</summary>
       <pre><code class="language-yaml"># Se a Lambda tem um handler para /api/audit
 # mas o template.yaml não declara o Event:
 #
@@ -1571,7 +1562,7 @@ Globals:
       <h3>Problema 4: CloudFront Behavior Conflicts</h3>
 
       <details>
-<summary>CloudFront — conflito de behaviors (clique para expandir)</summary>
+<summary><strong>CloudFront — conflito de behaviors</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Se existem dois behaviors:
 #   /blocos/*  → S3
 #   /*         → API Gateway (default)
@@ -1590,7 +1581,7 @@ Globals:
       <h3>Problema 5: HTML com divs mal aninhadas</h3>
 
       <details>
-<summary>HTML — problema de divs mal aninhadas (clique para expandir)</summary>
+<summary><strong>HTML — problema de divs mal aninhadas</strong> (clique para expandir)</summary>
       <pre><code class="language-bash"># Quando o frontend é servido pela Lambda como string:
 # Um &lt;/div&gt; faltando ou sobrando pode não causar erro visual
 # no Chrome (que é tolerante), mas quebra completamente
