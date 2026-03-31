@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestão de Mídia Corporativa no S3: do File Gateway ao Serverless | Cloud by MCN</title>
+<meta name="description" content="Como eliminei a latência do SMB, o caos de upload manual de vídeos e construí uma galeria web serverless com Lambda, Presigned URLs, CloudFront e Cognito.">
+<meta property="og:title" content="Gestão de Mídia Corporativa no S3: do File Gateway ao Serverless">
+<meta property="og:description" content="Como eliminei a latência do SMB, o caos de upload manual de vídeos e construí uma galeria web serverless com Lambda, Presigned URLs, CloudFront e Cognito.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body class="post-page">
+
+<nav id="nav" class="scrolled">
+  <div class="nav-in">
+    <a href="../index.html" class="logo">
+      <img class="logo-img" src="../assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-r">
+      <div class="nav-links" id="navLinks">
+        <a href="../index.html#projetos">Projetos</a>
+        <a href="../index.html#sobre">Sobre</a>
+        <a href="../index.html#contato">Contato</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="post-main">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a>
+    <span>/</span>
+    <a href="../index.html#projetos">Projetos</a>
+    <span>/</span>
+    <span class="current">AWS · S3 · Serverless</span>
+  </div>
+
+  <article class="post-article">
+    <header class="post-header">
+      <div class="post-meta-bar">
+        <span class="post-date-tag">13 Mar 2026</span>
+        <span class="post-reading" id="readTime"></span>
+      </div>
+      <h1>Gestão de Mídia Corporativa no S3: do File Gateway ao Serverless</h1>
+      <p class="post-subtitle">Como eliminei a latência do SMB, o caos de upload manual de vídeos e construí uma galeria web serverless com Lambda, Presigned URLs, CloudFront e Cognito.</p>
+    </header>
+
+    <div class="post-content">
+
+      <p>
+        Dois problemas operacionais reais em uma empresa de beneficiamento mineral: operadores acessando milhares de fotos de blocos de granito via SMB montado sobre File Gateway — lento, inconsistente, sem pré-visualização — e o mesmo operador enviando vídeos de inspeção pelo WhatsApp para um colega subir manualmente no servidor. Esse post documenta como resolvi os dois com uma única arquitetura serverless: galeria web com upload direto ao S3, autenticação via Cognito e entrega via CloudFront.
+      </p>
+
+      <h2 id="tldr">Resumo direto (TL;DR)#</h2>
+      <ul>
+        <li><strong>Problema 1:</strong> File Gateway + SMB com latência alta, cache inconsistente e zero pré-visualização para fotos de blocos.</li>
+        <li><strong>Problema 2:</strong> Upload de vídeo dependia de um operador mandar o arquivo por WhatsApp para outro subir no servidor — processo frágil, sem rastreabilidade, com perda de qualidade.</li>
+        <li><strong>Solução:</strong> Galeria web serverless com upload direto ao S3 via Presigned URL, protegida por Cognito, distribuída por CloudFront, orquestrada por Lambda + API Gateway.</li>
+        <li><strong>IaC:</strong> AWS SAM — deploy com <code>sam build &amp;&amp; sam deploy</code>.</li>
+        <li><strong>Resultado:</strong> Operador abre o browser, digita o número do bloco, vê as fotos e faz upload de foto ou vídeo em segundos — sem depender de ninguém.</li>
+      </ul>
+
+      <h2 id="as-dores">As duas dores reais#</h2>
+
+      <h3>Dor 1 — File Gateway como interface permanente</h3>
+      <p>
+        O fluxo original: S3 → AWS Storage Gateway (modo File Gateway) → share SMB → montado como unidade de rede no Windows dos operadores. Funciona em cenário de migração gradual. Vira armadilha quando se torna operação permanente.
+      </p>
+      <p>
+        Com pastas contendo 3.000+ JPEGs por bloco, cada abertura no Windows Explorer gerava listagem síncrona via SMB — levava segundos. O cache local do File Gateway divergia entre operadores que faziam upload simultâneo. Não havia pré-visualização: o operador abria o arquivo, esperava o download completo, revisava, fechava. Para revisão em lote de fotos de produção, completamente inviável.
+      </p>
+
+      <h3>Dor 2 — Upload de vídeo via WhatsApp</h3>
+      <p>
+        Cada bloco tem um vídeo de inspeção — câmera percorrendo a superfície da pedra, usado pelo time comercial e pela diretoria para apresentar o material a compradores. O processo real era esse:
+      </p>
+      <ul>
+        <li>Operador grava o vídeo em campo com o celular.</li>
+        <li>Manda o MP4 por WhatsApp para um colega no escritório.</li>
+        <li>O colega faz download, renomeia e sobe manualmente para a pasta SMB.</li>
+        <li>A pasta SMB sincroniza com o S3 via File Gateway — com delay variável.</li>
+      </ul>
+      <p>
+        Resultado: vídeos comprimidos pelo WhatsApp com perda de qualidade, arquivos com nome errado caindo em blocos errados, zero rastreabilidade de quem subiu o quê e quando, e toda a operação dependendo de duas pessoas disponíveis ao mesmo tempo.
+      </p>
+
+      <h2 id="arquitetura">Arquitetura da solução#</h2>
+
+<pre><code class="language-bash">Browser (Operador)
+    │
+    ▼
+CloudFront Distribution
+    ├── /api/*  ─────►  API Gateway (REST)
+    │                        │
+    │                        ▼
+    │                  Lambda Node.js
+    │                  (fotos-manager)
+    │                        │
+    │             ┌──────────┼───────────┐
+    │             ▼          ▼           ▼
+    │         ListObjects  Presign    Delete
+    │                      URL
+    │
+    └── /*  ─────►  S3 (frontend estático)
+
+# Upload: browser faz PUT direto ao S3 com Presigned URL
+Browser ──PUT──► S3 bucket (mídia)
+                  └── FotosGranito/{bloco}/
+                      ├── foto_001.jpg
+                      ├── foto_001_P.jpg   ← thumbnail gerado no browser
+                      └── video_bloco.mp4
+
+Amazon Cognito User Pool
+    └── JWT Authorizer no API Gateway (todas as rotas)</code></pre>
+
+      <p>
+        Ponto central do design: o arquivo <strong>nunca passa pela Lambda</strong>. A Lambda gera uma Presigned URL com TTL de 5 minutos. O browser executa o PUT direto ao S3. Isso elimina o limite de payload do API Gateway (10 MB) e o timeout da Lambda — permite upload de vídeos de centenas de MB sem restrição da camada de aplicação.
+      </p>
+
+      <h2 id="sam">Infraestrutura como Código (SAM)#</h2>
+      <p>
+        Todo o stack vive em um único <code>template.yaml</code>. A escolha por SAM ao invés de Terraform puro foi pragmática: as abstrações nativas para Lambda + API Gateway reduzem o boilerplate para esse padrão.
+      </p>
+
+<pre><code class="language-bash"># template.yaml — estrutura principal
+
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Api:
+    BinaryMediaTypes:
+      - 'image~1jpeg'
+      - 'video~1mp4'
+    Cors:
+      AllowMethods: "'GET,POST,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type,Authorization'"
+      AllowOrigin: "'https://app.empresa.com'"
+
+Resources:
+  MediaManagerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/index.handler
+      Runtime: nodejs20.x
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          DEST_BUCKET: !Ref MediaBucket
+      Policies:
+        - Statement:
+            # ATENÇÃO: ListBucket no ARN do BUCKET (sem /*).
+            # Com /* retorna AccessDenied genérico — erro clássico.
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource: !Sub "arn:aws:s3:::${MediaBucket}"
+              Condition:
+                StringLike:
+                  s3:prefix: "FotosGranito/*"
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: !Sub "arn:aws:s3:::${MediaBucket}/FotosGranito/*"
+      Events:
+        # Rota genérica para fotos e frontend
+        ApiProxy:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+        # Rotas de vídeo declaradas EXPLICITAMENTE
+        # Se omitir, o API GW não roteia — sem erro no deploy, sem log claro
+        PresignUploadVideo:
+          Type: Api
+          Properties:
+            Path: /presign-upload-video/{bloco}/{filename}
+            Method: GET
+        NotifyVideo:
+          Type: Api
+          Properties:
+            Path: /notify-video/{bloco}
+            Method: POST
+        ListVideos:
+          Type: Api
+          Properties:
+            Path: /videos/{bloco}
+            Method: GET</code></pre>
+
+      <h2 id="lambda-rotas">Lambda: estrutura das rotas#</h2>
+      <p>
+        A Lambda serve o frontend HTML embutido e expõe todas as rotas via roteamento manual — sem framework. O código usa AWS SDK v3 (<code>@aws-sdk/client-s3</code> + <code>@aws-sdk/s3-request-presigner</code>).
+      </p>
+
+<pre><code class="language-bash"># Mapa de rotas (src/index.js)
+
+GET  /                              → HTML da galeria (embutido na Lambda)
+GET  /fotos/:bloco                  → ListObjectsV2 + Presigned URLs GET (1h)
+GET  /presign-upload/:bloco/:file   → Presigned URL PUT para foto (5min)
+GET  /videos/:bloco                 → ListObjectsV2 filtrando .mp4 + Presigned URLs GET
+GET  /presign-upload-video/:bloco/:file → Presigned URL PUT para vídeo (5min)
+POST /notify-video/:bloco           → confirma upload concluído, atualiza estado da UI
+DELETE /foto                        → DeleteObject no S3</code></pre>
+
+<pre><code class="language-bash"># Geração de Presigned URL (foto ou vídeo — mesma função)
+
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+
+const s3 = new S3Client({ region: process.env.AWS_REGION });
+
+async function gerarPresignedUpload(bloco, filename, contentType) {
+  const key = `FotosGranito/${bloco}/${filename}`;
+  const cmd = new PutObjectCommand({
+    Bucket: process.env.DEST_BUCKET,
+    Key: key,
+    ContentType: contentType,  // 'image/jpeg' ou 'video/mp4'
+  });
+  // URL expira em 5 minutos. Expirada = upload falha com 403.
+  return getSignedUrl(s3, cmd, { expiresIn: 300 });
+}</code></pre>
+
+      <h2 id="upload-video">Upload de vídeo: fluxo completo#</h2>
+      <p>
+        O upload de vídeo segue o mesmo padrão da foto com uma etapa extra de notificação. Como vídeos chegam a centenas de MB, o browser confirma para a Lambda que o PUT foi concluído — isso atualiza a UI sem depender de polling no S3 ou evento S3 assíncrono.
+      </p>
+
+<pre><code class="language-bash"># Fluxo no browser (JavaScript)
+
+async function uploadVideo(bloco, file) {
+  atualizarProgresso('Solicitando autorização...');
+
+  // 1. Solicita Presigned URL PUT à Lambda
+  const res = await fetch(`${API}/presign-upload-video/${bloco}/${file.name}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const { url } = await res.json();
+
+  atualizarProgresso('Enviando vídeo diretamente ao S3...');
+
+  // 2. PUT direto ao S3 — não passa pela Lambda nem pelo API Gateway
+  const upload = await fetch(url, {
+    method: 'PUT',
+    body: file,
+    headers: { 'Content-Type': 'video/mp4' }
+  });
+  if (!upload.ok) throw new Error('Falha no upload');
+
+  // 3. Notifica Lambda: upload concluído
+  await fetch(`${API}/notify-video/${bloco}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: file.name, size: file.size })
+  });
+
+  atualizarProgresso('Vídeo disponível na galeria.');
+}</code></pre>
+
+      <p>
+        Com esse fluxo, o operador abre a galeria no celular em campo, seleciona o vídeo gravado, aguarda o upload e o vídeo aparece imediatamente na galeria — identificado com seu usuário Cognito. Fim do WhatsApp, fim do intermediário.
+      </p>
+
+      <h2 id="thumbnail">Thumbnails gerados no cliente#</h2>
+      <p>
+        Cada foto precisa de uma versão thumbnail (<code>_P.jpg</code>) usada como capa em outros sistemas internos. A geração foi implementada via Canvas API no browser, antes do upload do original — sem Lambda de processamento, sem fila de eventos, sem custo adicional de compute.
+      </p>
+
+<pre><code class="language-bash"># Geração de thumbnail via Canvas API
+
+async function gerarThumbnail(file) {
+  return new Promise((resolve) => {
+    const img  = new Image();
+    const burl = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ratio  = Math.min(300 / img.width, 300 / img.height);
+      canvas.width  = img.width  * ratio;
+      canvas.height = img.height * ratio;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(resolve, 'image/jpeg', 0.7);
+      URL.revokeObjectURL(burl);
+    };
+    img.src = burl;
+  });
+}
+
+// Fluxo de upload: original → thumbnail com sufixo _P
+const thumb     = await gerarThumbnail(file);
+const thumbName = file.name.replace('.jpg', '_P.jpg');
+const thumbUrl  = await getPresignedUpload(bloco, thumbName, 'image/jpeg');
+await fetch(thumbUrl, { method: 'PUT', body: thumb, headers: { 'Content-Type': 'image/jpeg' } });</code></pre>
+
+      <h2 id="cloudfront">CloudFront: dois origins, uma URL, um problema de ordem#</h2>
+      <p>
+        O CloudFront unifica TLS, CORS e cache em um único ponto de entrada:
+      </p>
+      <ul>
+        <li><code>/api/*</code> → origin do API Gateway, TTL = 0, sem cache</li>
+        <li><code>/*</code> → origin do S3 com frontend estático</li>
+      </ul>
+      <p>
+        <strong>Problema real encontrado:</strong> um behavior configurado para <code>*.mp4</code> com cache agressivo (para entrega de vídeos) estava interceptando requests de <code>/api/presign-upload-video/57816/video.mp4</code> antes de chegar ao API Gateway. O browser recebia o binário do S3 ao invés do JSON com a Presigned URL. O erro era silencioso — status 200, mas body corrompido.
+      </p>
+      <p>
+        A correção foi garantir que o behavior <code>/api/*</code> tenha número de prioridade menor (mais prioritário) do que qualquer pattern de extensão de arquivo. Na console do CloudFront, número menor = maior prioridade.
+      </p>
+
+      <h2 id="cognito">Modelo de segurança: Cognito + JWT Authorizer#</h2>
+      <p>
+        Toda rota da API é protegida por um Cognito User Pool Authorizer no API Gateway. O JWT é validado antes de invocar a Lambda — requests sem token retornam 401 sem custo de invocação.
+      </p>
+      <p>
+        Dois grupos no User Pool, autorização granular feita pela Lambda via claim <code>cognito:groups</code>:
+      </p>
+      <ul>
+        <li><strong>operadores:</strong> listagem, visualização, upload de foto e vídeo. Sem delete.</li>
+        <li><strong>gestores:</strong> acesso completo, incluindo delete e listagem cruzada de blocos.</li>
+      </ul>
+      <p>
+        O API Gateway só valida autenticação. A autorização granular fica na Lambda — esse é o ponto de equilíbrio correto. Colocar regras de negócio no API Gateway cria acoplamento que você vai pagar caro quando a lógica de acesso evoluir.
+      </p>
+
+      <h2 id="problemas">Problemas reais que custaram tempo#</h2>
+      <ul>
+        <li>
+          <strong>Template literals quebrando o HTML embutido na Lambda:</strong> o frontend é servido como string via <code>html.push()</code>. Usar backticks dentro do HTML causava <code>SyntaxError</code> em runtime — o parser da Lambda confunde os delimitadores. Solução: concatenação de strings em todo o HTML gerado, sem backtick, sem exceção.
+        </li>
+        <li>
+          <strong>Div nesting invisível:</strong> ao adicionar novos painéis de UI via push, uma <code>&lt;/div&gt;</code> ausente colapsa todos os painéis subsequentes dentro do painel errado. O browser renderiza algo — só que errado. Detecção via script Python que rastreia profundidade de div no arquivo inteiro.
+        </li>
+        <li>
+          <strong>ListBucket no ARN errado:</strong> <code>s3:ListBucket</code> precisa do ARN do bucket sem <code>/*</code>. Inversão retorna <code>AccessDenied</code> genérico. Trinta minutos olhando para o lugar errado antes de perceber.
+        </li>
+        <li>
+          <strong>Rotas de vídeo ausentes no SAM template:</strong> o API Gateway não roteia paths não declarados explicitamente. O deploy não falha, o log não diz nada claro — o endpoint simplesmente retorna 403. Solução: declarar cada rota de vídeo como evento separado na função.
+        </li>
+      </ul>
+
+      <h2 id="checklist">Checklist de implementação#</h2>
+      <ul>
+        <li>☑ IAM: <code>ListBucket</code> no ARN do bucket (sem <code>/*</code>), object actions no ARN com prefixo restrito</li>
+        <li>☑ CORS do bucket S3 restrito ao domínio da aplicação — nunca <code>*</code></li>
+        <li>☑ Presigned URL: TTL 5 min para upload, 1h para visualização</li>
+        <li>☑ JWT Authorizer do Cognito em todas as rotas</li>
+        <li>☑ Rotas de vídeo declaradas explicitamente no SAM template</li>
+        <li>☑ CloudFront: behavior <code>/api/*</code> com prioridade maior que patterns de extensão</li>
+        <li>☑ Upload sempre direto ao S3 via Presigned URL — nunca proxy via Lambda</li>
+        <li>☑ Thumbnail gerado no cliente antes do upload (sem Lambda de processamento)</li>
+        <li>☑ Notificação pós-upload de vídeo para sincronizar estado da UI</li>
+        <li>☑ <code>samconfig.toml</code> versionado — zero flags manuais no deploy a partir do segundo run</li>
+      </ul>
+
+      <h2 id="conclusao">Conclusão#</h2>
+      <p>
+        O File Gateway foi o ponto de partida certo para migração gradual — mas usá-lo como interface permanente de operação criou atrito acumulado que ninguém media porque estava normalizado. A galeria serverless eliminou a latência SMB, o processo de vídeo via WhatsApp e a dependência de intermediários. O operador hoje opera de forma autônoma, de qualquer dispositivo, com rastreabilidade completa via Cognito. O próximo passo natural é um trigger S3 (<code>s3:ObjectCreated</code>) disparando um SNS para notificar o time comercial automaticamente quando um novo vídeo de bloco entra — sem nenhuma mudança no fluxo do operador.
+      </p>
+
+    </div>
+
+    <footer class="post-footer">
+      <div class="post-author">
+        <div class="post-author-avatar">MCN</div>
+        <div>
+          <div class="post-author-name">Matheus N.</div>
+          <div class="post-author-role">Engenheiro de Infraestrutura Cloud</div>
+        </div>
+      </div>
+      <div class="post-share">
+        <span>Compartilhar:</span>
+        <a href="#" class="share-btn" title="LinkedIn">in</a>
+        <a href="#" class="share-btn" title="Twitter">X</a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer style="padding:2rem;text-align:center;color:var(--ink3);font-size:.8rem;border-top:1px solid var(--border)">
+  © 2026 Cloud by MCN
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script>
+const text = document.querySelector('.post-content').innerText;
+const words = text.split(/\s+/).length;
+const minutes = Math.ceil(words / 200);
+const el = document.getElementById('readTime');
+if (el) el.textContent = minutes + ' min de leitura';
+</script>
+</body>
+</html>

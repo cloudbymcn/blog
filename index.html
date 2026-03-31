@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Cloud by MCN — Arquiteturas AWS reais de produção. Case studies, decisões técnicas e implementações completas.">
+<meta name="author" content="Matheus N.">
+<meta property="og:title" content="Cloud by MCN — beyond the cloud">
+<meta property="og:description" content="Arquiteturas AWS reais. Case studies de produção com decisões técnicas e trade-offs.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://cloudbymcn.com">
+<title>Cloud by MCN — beyond the cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<!-- LOADING SCREEN — SVG Cloud Draw -->
+<div class="loader" id="loader">
+  <div class="loader-inner">
+    <svg class="loader-svg" viewBox="0 0 140 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path class="loader-path" d="M35 70 Q15 70 15 55 Q15 42 30 40 Q32 22 52 22 Q68 22 72 36 Q74 34 80 34 Q95 34 95 48 Q115 48 115 62 Q115 70 105 70 Z" stroke="#e8890c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path class="loader-path-fill" d="M35 70 Q15 70 15 55 Q15 42 30 40 Q32 22 52 22 Q68 22 72 36 Q74 34 80 34 Q95 34 95 48 Q115 48 115 62 Q115 70 105 70 Z" fill="rgba(232,137,12,.08)"/>
+    </svg>
+    <div class="loader-brand">
+      <span class="lb-cloud">CLOUD BY</span>
+      <span class="lb-mcn">MCN</span>
+    </div>
+    <div class="loader-bar"><div class="loader-fill"></div></div>
+  </div>
+</div>
+
+<!-- SVG SPRITE -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-li" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></symbol>
+  <symbol id="i-ig" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M1.5 8.67v8.58a3 3 0 003 3h15a3 3 0 003-3V8.67l-8.928 5.493a3 3 0 01-3.144 0L1.5 8.67z"/><path d="M22.5 6.908V6.75a3 3 0 00-3-3h-15a3 3 0 00-3 3v.158l9.714 5.978a1.5 1.5 0 001.572 0L22.5 6.908z"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></symbol>
+</svg>
+
+<!-- NAV — Centered links + CTA -->
+<nav id="nav">
+  <div class="scroll-progress" id="scrollProgress"></div>
+  <div class="nav-in">
+    <a href="index.html" class="logo">
+      <img class="logo-img" src="assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-links" id="navLinks">
+      <a href="#projetos" data-section="projetos" data-i18n="nav_proj">Projetos</a>
+      <a href="#sobre" data-section="sobre" data-i18n="nav_about">Sobre</a>
+      <a href="#contato" data-section="contato" data-i18n="nav_contact">Contato</a>
+    </div>
+    <div class="nav-r">
+      <div class="lang-tog"><button class="lang-b on" data-lang="pt">PT</button><button class="lang-b" data-lang="en">EN</button></div>
+      <a href="#contato" class="nav-cta mag" data-i18n="nav_cta">Fale comigo</a>
+      <button class="nav-toggle" id="navTog" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO — Asymmetric layout -->
+<section class="hero" id="hero">
+  <div class="sky" id="sky">
+    <video class="sky-video" id="skyVideo" autoplay muted loop playsinline>
+      <source src="assets/img/bg_sun.mp4" type="video/mp4">
+    </video>
+  </div>
+  <div class="hero-content">
+    <h1 id="heroTitle" data-i18n-html="hero_title">beyond<br>the <em>cloud</em></h1>
+    <p class="hero-sub" id="heroSub" data-i18n-html="hero_sub">arquiteturas AWS reais. decisões técnicas. <strong>casos de estudo e projetos.</strong></p>
+    <div class="hero-ctas">
+      <a href="#projetos" class="btn-p mag" data-i18n="hero_btn1">Ver Projetos →</a>
+      <a href="#sobre" class="btn-s mag" data-i18n="hero_btn2">Sobre mim</a>
+    </div>
+  </div>
+  <div class="scroll-hint"><span>Scroll</span><div class="scroll-line"></div></div>
+</section>
+
+<!-- CERTS -->
+<div class="certs">
+  <div class="certs-in">
+    <div class="cert rv rv-flip stagger"><img class="cert-badge" src="assets/img/cert-saa.png" alt="Solutions Architect Associate"><div><div class="name">Solutions Architect</div><div class="code">SAA-C03 · Associate</div></div></div>
+    <div class="cert rv rv-flip stagger"><img class="cert-badge" src="assets/img/cert-clf.webp" alt="Cloud Practitioner"><div><div class="name">Cloud Practitioner</div><div class="code">CLF-C02 · Foundational</div></div></div>
+    <div class="cert rv rv-flip stagger"><img class="cert-badge" src="assets/img/cert-aif.png" alt="AI Practitioner"><div><div class="name">AI Practitioner</div><div class="code">AIF-C01 · Foundational</div></div></div>
+  </div>
+</div>
+
+<!-- PROJETOS -->
+<section id="projetos">
+  <div class="sec-in">
+    <div class="sec-label rv rv-up">// portfólio</div>
+    <h2 class="sec-title rv rv-up" data-i18n="proj_title">Projetos</h2>
+    <p class="sec-desc rv rv-up" data-i18n="proj_desc">Case studies de produção com arquitetura e implementação completa.</p>
+    <div class="proj-controls rv rv-up">
+      <div class="proj-filters">
+        <button class="f-btn on" data-filter="all"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg><span data-i18n="filter_all">Todos</span></button>
+        <button class="f-btn" data-filter="cloudops"><svg viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>CloudOps</button>
+        <button class="f-btn" data-filter="devops"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>DevOps</button>
+        <button class="f-btn" data-filter="aiml"><svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 014 4v1a4 4 0 01-8 0V6a4 4 0 014-4z"/><path d="M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><circle cx="12" cy="7" r="4"/></svg>AI/ML</button>
+      </div>
+      <select class="sort-select" id="sortSelect">
+        <option value="newest" data-i18n="sort_new">Mais recente</option>
+        <option value="oldest" data-i18n="sort_old">Mais antigo</option>
+      </select>
+    </div>
+
+    <div class="proj-grid" id="projGrid">
+      <article class="pj rv rv-up stagger tilt-card" data-cat="cloudops" data-date="2026-03-13">
+        <div class="card-glow"></div>
+        <div class="card-border-glow"></div>
+        <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">13 Mar 2026</span></div>
+        <h3><a href="posts/gestao-midia-aws-serverless.html">Gestão de Mídia Corporativa no S3: do File Gateway ao Serverless</a></h3>
+        <p>Galeria web serverless com upload direto ao S3 via Presigned URL, autenticação Cognito e entrega CloudFront. IaC com AWS SAM.</p>
+        <div class="pj-stack"><span>S3</span><span>Lambda</span><span>API Gateway</span><span>Cognito</span><span>CloudFront</span><span>SAM</span></div>
+        <div class="pj-cta"><a href="posts/gestao-midia-aws-serverless.html" data-i18n="read_case">Ler case study →</a></div>
+      </article>
+
+      <article class="pj rv rv-up stagger tilt-card" data-cat="devops" data-date="2026-02-12">
+        <div class="card-glow"></div>
+        <div class="card-border-glow"></div>
+        <div class="pj-head"><span class="pj-cat">DevOps</span><span class="pj-date">12 Fev 2026</span></div>
+        <h3><a href="posts/integracao-api-aws.html">Integração segura entre API externa → banco de dados na AWS</a></h3>
+        <p>API Node.js com HTTPS via Nginx + Let's Encrypt, allowlist via Security Groups, banco isolado em VPC privada.</p>
+        <div class="pj-stack"><span>EC2</span><span>VPC</span><span>Security Groups</span><span>Nginx</span><span>Let's Encrypt</span><span>Node.js</span></div>
+        <div class="pj-cta"><a href="posts/integracao-api-aws.html" data-i18n="read_case">Ler case study →</a></div>
+      </article>
+
+      <article class="pj rv rv-up stagger tilt-card" data-cat="cloudops" data-date="2026-02-04">
+        <div class="card-glow"></div>
+        <div class="card-border-glow"></div>
+        <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">04 Fev 2026</span></div>
+        <h3><a href="posts/otimizacao-mp4.html">Otimização de Vídeos: Entrega Global sem Alterar URLs</a></h3>
+        <p>MediaConvert + S3 Batch + Lambda para fast start em milhares de MP4. Entrega via CloudFront sem quebrar URLs do Salesforce.</p>
+        <div class="pj-stack"><span>MediaConvert</span><span>S3 Batch</span><span>Lambda</span><span>CloudFront</span><span>S3</span></div>
+        <div class="pj-cta"><a href="posts/otimizacao-mp4.html" data-i18n="read_case">Ler case study →</a></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- SOBRE -->
+<section id="sobre">
+  <div class="sec-in">
+    <div class="sec-label rv rv-right">// sobre</div>
+    <h2 class="sec-title rv rv-right" data-i18n="about_title">Quem sou eu?</h2>
+    <div class="sobre-grid">
+      <aside class="sobre-sidebar rv rv-scale">
+        <div class="s-card">
+          <div class="s-avatar-wrap">
+            <div class="s-avatar">MCN</div>
+            <div class="avatar-ring"></div>
+          </div>
+          <h3>Matheus N.</h3>
+          <p class="role" data-i18n="about_role">Engenheiro de Infraestrutura Cloud</p>
+          <div class="badges"><span class="badge">SAA-C03</span><span class="badge">CLF-C02</span><span class="badge">AIF-C01</span></div>
+          <p style="font-size:.78rem;color:var(--ink3);margin-bottom:.3rem" data-i18n="about_postgrad">Pós-graduando em Arquitetura Cloud</p>
+          <p style="font-size:.78rem;color:var(--ink3)" data-i18n="about_focus">IA · Escalabilidade · Sistemas Distribuídos</p>
+          <div class="s-links">
+            <a href="https://www.linkedin.com/in/m-cnascimento/" target="_blank" class="s-link" aria-label="LinkedIn"><svg><use href="#i-li"/></svg></a>
+            <a href="https://www.instagram.com/cloudbymcn/" target="_blank" class="s-link" aria-label="Instagram"><svg><use href="#i-ig"/></svg></a>
+            <a href="mailto:matheuscamposti@gmail.com" class="s-link" aria-label="Email"><svg><use href="#i-mail"/></svg></a>
+          </div>
+        </div>
+        <div class="study-box"><h4 data-i18n="about_studying">Estudando agora</h4><p data-i18n="about_study_desc">AWS Solutions Architect Professional (SAP-C02). Foco em multi-account e DR cross-region.</p></div>
+      </aside>
+      <div class="sobre-text rv rv-right">
+        <h3 data-i18n="about_what">O que faço</h3>
+        <p data-i18n="about_what_p1">Engenheiro de infraestrutura focado em <strong>AWS</strong>, com experiência em soluções cloud reais. Pós-graduando em Arquitetura Cloud, com foco em IA, escalabilidade e sistemas distribuídos.</p>
+        <p data-i18n="about_what_p2">Este blog documenta <strong>arquiteturas reais, decisões técnicas e implementações completas</strong>. Automação, otimização de custos, pipelines de mídia e infraestrutura que funciona.</p>
+        <h3 data-i18n="about_why">Por que contribuo</h3>
+        <p data-i18n="about_why_p">Cada vez que resolvo um problema em produção, documento. Cada vez que erro, documento melhor ainda. Se meu erro pode evitar que outra pessoa perca 4 horas debugando, o post já valeu.</p>
+        <h3>Timeline</h3>
+        <div class="timeline" id="tl">
+          <div class="tl-item"><div class="yr">2024</div><div class="desc">AWS Cloud Practitioner (CLF-C02)</div></div>
+          <div class="tl-item"><div class="yr">2024</div><div class="desc">AWS AI Practitioner (AIF-C01)</div></div>
+          <div class="tl-item"><div class="yr">2025</div><div class="desc">AWS Solutions Architect Associate (SAA-C03)</div></div>
+          <div class="tl-item"><div class="yr">2026</div><div class="desc" data-i18n="tl_launch">Lançamento do Cloud by MCN</div></div>
+          <div class="tl-item"><div class="yr">2026</div><div class="desc" style="color:var(--accent);font-weight:600" data-i18n="tl_postgrad">Pós-graduação em Arquitetura Cloud →</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NEWSLETTER -->
+<div class="nl">
+  <div class="nl-grid"></div>
+  <div class="nl-glow"></div>
+  <h2 class="rv rv-scale" data-i18n="nl_title">Receba 1 arquitetura real por semana.</h2>
+  <p class="rv rv-scale" data-i18n="nl_desc">Sem spam. Só decisões técnicas, diagramas e lições de produção.</p>
+  <div class="nl-form rv rv-up"><input type="email" placeholder="seu@email.com"><button class="btn-p mag" data-i18n="nl_btn">Assinar →</button></div>
+</div>
+
+<!-- CONTATO — Enhanced horizontal cards -->
+<section id="contato">
+  <div class="sec-in">
+    <div class="sec-label rv rv-up">// contato</div>
+    <h2 class="sec-title rv rv-up" data-i18n="contact_title">Vamos conversar</h2>
+    <div class="ct-grid">
+      <div class="ct-info rv rv-left">
+        <h3 data-i18n="contact_channels">Canais</h3>
+        <p data-i18n="contact_channels_desc">Email para propostas formais, LinkedIn para networking.</p>
+        <div class="ct-chs">
+          <a href="mailto:matheuscamposti@gmail.com" class="ct-ch">
+            <div class="ct-ch-icon"><svg><use href="#i-mail"/></svg></div>
+            <div class="ct-ch-body">
+              <div class="ct-ch-name">Email</div>
+              <div class="ct-ch-detail">matheuscamposti@gmail.com</div>
+            </div>
+            <div class="ct-ch-arrow">→</div>
+          </a>
+          <a href="https://www.linkedin.com/in/m-cnascimento/" target="_blank" class="ct-ch">
+            <div class="ct-ch-icon"><svg><use href="#i-li"/></svg></div>
+            <div class="ct-ch-body">
+              <div class="ct-ch-name">LinkedIn</div>
+              <div class="ct-ch-detail">linkedin.com/in/m-cnascimento</div>
+            </div>
+            <div class="ct-ch-arrow">→</div>
+          </a>
+          <a href="https://www.instagram.com/cloudbymcn/" target="_blank" class="ct-ch">
+            <div class="ct-ch-icon"><svg><use href="#i-ig"/></svg></div>
+            <div class="ct-ch-body">
+              <div class="ct-ch-name">Instagram</div>
+              <div class="ct-ch-detail">@cloudbymcn</div>
+            </div>
+            <div class="ct-ch-arrow">→</div>
+          </a>
+        </div>
+      </div>
+      <div class="ct-form rv rv-right">
+        <h3 data-i18n="contact_form_title">Envie uma mensagem</h3>
+        <div class="fg"><label data-i18n="form_name">Nome</label><input type="text" placeholder="Seu nome"></div>
+        <div class="fg"><label data-i18n="form_email">Email</label><input type="email" placeholder="seu@email.com"></div>
+        <div class="fg"><label data-i18n="form_subject">Assunto</label><select><option data-i18n="form_opt1">Palestra / workshop</option><option data-i18n="form_opt2">Colaboração técnica</option><option data-i18n="form_opt3">Consultoria AWS</option><option data-i18n="form_opt4">Outro</option></select></div>
+        <div class="fg"><label data-i18n="form_msg">Mensagem</label><textarea placeholder="Descreva sua proposta..."></textarea></div>
+        <button class="ct-submit mag" data-i18n="form_send">Enviar mensagem →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER — Rich multi-column -->
+<footer>
+  <div class="ft-in">
+    <div class="ft-col ft-brand-col">
+      <div class="ft-brand">CLOUD BY <b>MCN</b></div>
+      <p class="ft-desc" data-i18n="ft_desc">Arquiteturas AWS reais. Decisões técnicas documentadas para a comunidade.</p>
+      <div class="ft-social">
+        <a href="https://www.linkedin.com/in/m-cnascimento/" target="_blank" class="ft-soc" aria-label="LinkedIn"><svg><use href="#i-li"/></svg></a>
+        <a href="https://www.instagram.com/cloudbymcn/" target="_blank" class="ft-soc" aria-label="Instagram"><svg><use href="#i-ig"/></svg></a>
+        <a href="mailto:matheuscamposti@gmail.com" class="ft-soc" aria-label="Email"><svg><use href="#i-mail"/></svg></a>
+      </div>
+    </div>
+    <div class="ft-col">
+      <h4 data-i18n="ft_nav">Navegação</h4>
+      <a href="#projetos" data-i18n="nav_proj">Projetos</a>
+      <a href="#sobre" data-i18n="nav_about">Sobre</a>
+      <a href="#contato" data-i18n="nav_contact">Contato</a>
+    </div>
+    <div class="ft-col">
+      <h4 data-i18n="ft_tech">Tecnologias</h4>
+      <span>AWS</span>
+      <span>Serverless</span>
+      <span>Infrastructure as Code</span>
+      <span>CI/CD</span>
+    </div>
+    <div class="ft-col">
+      <h4>Newsletter</h4>
+      <p class="ft-nl-desc" data-i18n="ft_nl_desc">1 arquitetura real por semana.</p>
+      <div class="ft-nl-form"><input type="email" placeholder="seu@email.com"><button>→</button></div>
+    </div>
+  </div>
+  <div class="ft-bottom">
+    <span>© 2026 Cloud by MCN. <span data-i18n="ft_rights">Todos os direitos reservados.</span></span>
+  </div>
+</footer>
+
+<!-- BTT with circular progress -->
+<button class="btt" id="bttBtn" aria-label="Topo" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+  <svg class="btt-ring" viewBox="0 0 40 40">
+    <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(15,28,46,.08)" stroke-width="2"/>
+    <circle class="btt-fill" id="bttFill" cx="20" cy="20" r="18" fill="none" stroke="#e8890c" stroke-width="2.5" stroke-linecap="round" transform="rotate(-90 20 20)"/>
+  </svg>
+  <svg class="btt-icon"><use href="#i-up"/></svg>
+</button>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>

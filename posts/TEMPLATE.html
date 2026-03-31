@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- ╔═══════════════════════════════════════════════╗
+     ║  EDITE AQUI para cada novo post:              ║
+     ╚═══════════════════════════════════════════════╝ -->
+<title>TITULO DO POST | Cloud by MCN</title>
+<meta name="description" content="DESCRICAO CURTA DO POST">
+<meta property="og:title" content="TITULO DO POST">
+<meta property="og:description" content="DESCRICAO CURTA DO POST">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body class="post-page">
+
+<nav id="nav" class="scrolled">
+  <div class="nav-in">
+    <a href="../index.html" class="logo">
+      <img class="logo-img" src="../assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-r">
+      <div class="nav-links" id="navLinks">
+        <a href="../index.html#projetos">Projetos</a>
+        <a href="../index.html#sobre">Sobre</a>
+        <a href="../index.html#contato">Contato</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="post-main">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a>
+    <span>/</span>
+    <a href="../index.html#projetos">Projetos</a>
+    <span>/</span>
+    <!-- EDITE: tags do post -->
+    <span class="current">AWS · S3 · Lambda</span>
+  </div>
+
+  <article class="post-article">
+    <header class="post-header">
+      <div class="post-meta-bar">
+        <!-- EDITE: data -->
+        <span class="post-date-tag">13 Mar 2026</span>
+        <span class="post-reading" id="readTime"></span>
+      </div>
+      <!-- EDITE: título -->
+      <h1>Título do Seu Post Aqui</h1>
+      <!-- EDITE: subtítulo -->
+      <p class="post-subtitle">Uma frase resumindo o que o leitor vai aprender.</p>
+    </header>
+
+    <div class="post-content">
+
+      <!-- ╔═══════════════════════════════════════════╗
+           ║  ESCREVA O CONTEÚDO AQUI                  ║
+           ║                                            ║
+           ║  Use as tags HTML normalmente:             ║
+           ║  <h2> para seções                          ║
+           ║  <h3> para sub-seções                      ║
+           ║  <p> para parágrafos                       ║
+           ║  <ul>/<ol> para listas                     ║
+           ║  <pre><code class="language-xxx">          ║
+           ║     para blocos de código                  ║
+           ║  <img src="../assets/img/xxx.png">         ║
+           ║     para imagens                           ║
+           ║                                            ║
+           ║  Classes úteis:                            ║
+           ║  .callout = destaque laranja               ║
+           ║  .warning = destaque vermelho              ║
+           ║  .tip = destaque verde                     ║
+           ╚═══════════════════════════════════════════╝ -->
+
+      <h2>Seção 1</h2>
+      <p>Conteúdo aqui...</p>
+
+    </div>
+
+    <footer class="post-footer">
+      <div class="post-author">
+        <div class="post-author-avatar">MCN</div>
+        <div>
+          <div class="post-author-name">Matheus N.</div>
+          <div class="post-author-role">Engenheiro de Infraestrutura Cloud</div>
+        </div>
+      </div>
+      <div class="post-share">
+        <span>Compartilhar:</span>
+        <a href="#" class="share-btn" title="LinkedIn">in</a>
+        <a href="#" class="share-btn" title="Twitter">X</a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer style="padding:2rem;text-align:center;color:var(--ink3);font-size:.8rem;border-top:1px solid var(--border)">
+  © 2026 Cloud by MCN
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script>
+const text = document.querySelector('.post-content').innerText;
+const words = text.split(/\s+/).length;
+const minutes = Math.ceil(words / 200);
+const el = document.getElementById('readTime');
+if (el) el.textContent = minutes + ' min de leitura';
+</script>
+</body>
+</html>
