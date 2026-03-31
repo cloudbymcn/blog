@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Como migrei um ETL legado para AWS Lambda gastando R$ 3/m&ecirc;s | Cloud by MCN</title>
+<meta name="description" content="Pipeline Pentaho + Jenkins substitu&iacute;do por Lambda + EventBridge Scheduler + Terraform. Zero servidor, zero manuten&ccedil;&atilde;o, observabilidade real.">
+<meta property="og:title" content="Como migrei um ETL legado para AWS Lambda gastando R$ 3/m&ecirc;s">
+<meta property="og:description" content="Pipeline Pentaho + Jenkins substitu&iacute;do por Lambda + EventBridge Scheduler + Terraform. Zero servidor, zero manuten&ccedil;&atilde;o, observabilidade real.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body class="post-page">
+
+<nav id="nav" class="scrolled">
+  <div class="nav-in">
+    <a href="../index.html" class="logo">
+      <img class="logo-img" src="../assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-r">
+      <div class="nav-links" id="navLinks">
+        <a href="../index.html#projetos">Projetos</a>
+        <a href="../index.html#sobre">Sobre</a>
+        <a href="../index.html#contato">Contato</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="post-main">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a><span>/</span>
+    <a href="../index.html#projetos">Projetos</a><span>/</span>
+    <span class="current">AWS &middot; Lambda &middot; EventBridge &middot; Terraform &middot; Serverless</span>
+  </div>
+
+  <article class="post-article">
+    <header class="post-header">
+      <div class="post-meta-bar">
+        <span class="post-date-tag">31 Mar 2026</span>
+        <span class="post-reading" id="readTime"></span>
+      </div>
+      <h1>Como migrei um ETL legado para AWS Lambda gastando R$ 3/m&ecirc;s</h1>
+      <p class="post-subtitle">Pipeline Pentaho + Jenkins substitu&iacute;do por Lambda + EventBridge Scheduler + Terraform. Zero servidor, zero manuten&ccedil;&atilde;o, observabilidade real.</p>
+    </header>
+
+    <div class="post-content">
+
+      <!-- ================================================================== -->
+      <!-- CONTEXTO -->
+      <!-- ================================================================== -->
+
+      <h2>Contexto</h2>
+
+      <p>
+        Eu trabalho em uma empresa do setor de exporta&ccedil;&atilde;o. Todos os dias, o time financeiro precisa da cota&ccedil;&atilde;o do d&oacute;lar (PTAX) atualizada no ERP para precifica&ccedil;&atilde;o de contratos. A fonte oficial &eacute; a API p&uacute;blica do Banco Central do Brasil.
+      </p>
+      <p>
+        O pipeline antigo fazia isso: um arquivo <code>.ktr</code> do Pentaho Data Integration, agendado no Jenkins rodando em um EC2, consultava a API do BCB, transformava o retorno e gravava no Firebird (o banco legado do ERP). Funcionou durante anos &mdash; at&eacute; que um dia parou silenciosamente. Ningu&eacute;m foi notificado. O financeiro s&oacute; percebeu quando os pre&ccedil;os come&ccedil;aram a sair errados.
+      </p>
+      <p>
+        Esse foi o gatilho para eu reescrever tudo do zero em uma arquitetura serverless.
+      </p>
+
+      <!-- ================================================================== -->
+      <!-- OS GARGALOS -->
+      <!-- ================================================================== -->
+
+      <h2>Os gargalos</h2>
+
+      <p>Mapeei os problemas do pipeline antigo lado a lado com o que eu queria na nova arquitetura:</p>
+
+      <div class="comparison">
+        <div class="comparison-card before">
+          <h4>Antes (Jenkins + Pentaho)</h4>
+          <ul>
+            <li>Senha hardcoded em XML (plain text no .ktr)</li>
+            <li>Sem alertas de falha &mdash; erros silenciosos</li>
+            <li>Janela fixa de 5 dias &uacute;teis (hardcoded)</li>
+            <li>EC2 rodando 24/7 para um job de 5 segundos/dia</li>
+            <li>Race condition na gera&ccedil;&atilde;o de PK</li>
+            <li>Timeout de 50 minutos configurado no Jenkins</li>
+            <li>500+ linhas de XML no arquivo .ktr</li>
+          </ul>
+        </div>
+        <div class="comparison-card after">
+          <h4>Depois (Lambda + EventBridge)</h4>
+          <ul>
+            <li>Secrets Manager + KMS (credenciais criptografadas)</li>
+            <li>SNS envia e-mail em qualquer erro ou sucesso</li>
+            <li>Janela din&acirc;mica via <code>MAX(DATA)</code> no banco</li>
+            <li>Serverless &mdash; Lambda roda s&oacute; quando necess&aacute;rio</li>
+            <li>PK sequencial calculada no c&oacute;digo</li>
+            <li>Timeout de 60 segundos (execu&ccedil;&atilde;o real: ~5s)</li>
+            <li>~100 linhas de Python leg&iacute;vel</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- ARQUITETURA -->
+      <!-- ================================================================== -->
+
+      <h2>Arquitetura</h2>
+
+      <p>O fluxo completo da nova solu&ccedil;&atilde;o:</p>
+
+      <!-- Architecture SVG - stays OPEN, not in details/summary -->
+      <div class="diagram-container">
+        <svg viewBox="0 0 880 400" style="width:100%;max-width:880px;font-family:'Inter',sans-serif">
+          <defs>
+            <marker id="aw" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6" fill="#FF9900"/>
+            </marker>
+            <marker id="ag" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6" fill="#888"/>
+            </marker>
+            <marker id="ab" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6" fill="#059669"/>
+            </marker>
+          </defs>
+
+          <!-- Title -->
+          <text x="440" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="#333">Pipeline PTAX &mdash; Arquitetura Serverless</text>
+
+          <!-- EventBridge Scheduler -->
+          <rect x="20" y="100" width="140" height="60" rx="12" fill="#34d399" opacity=".12" stroke="#059669" stroke-width="1.5"/>
+          <text x="90" y="126" text-anchor="middle" font-size="12" font-weight="700" fill="#059669">EventBridge</text>
+          <text x="90" y="144" text-anchor="middle" font-size="9" fill="#555">Scheduler (cron)</text>
+
+          <!-- Lambda -->
+          <rect x="230" y="80" width="160" height="100" rx="12" fill="#FF9900" opacity=".15" stroke="#FF9900" stroke-width="2"/>
+          <text x="310" y="112" text-anchor="middle" font-size="13" font-weight="700" fill="#FF9900">Lambda</text>
+          <text x="310" y="130" text-anchor="middle" font-size="10" fill="#555">Python 3.12 / ARM64</text>
+          <text x="310" y="146" text-anchor="middle" font-size="9" fill="#888">VPC &middot; 128 MB</text>
+          <text x="310" y="162" text-anchor="middle" font-size="9" fill="#888">Timeout 60s</text>
+
+          <!-- Secrets Manager -->
+          <rect x="230" y="230" width="160" height="50" rx="10" fill="#232F3E" opacity=".08" stroke="#232F3E" stroke-width="1"/>
+          <text x="310" y="260" text-anchor="middle" font-size="11" font-weight="600" fill="#232F3E">Secrets Manager + KMS</text>
+
+          <!-- API PTAX (BCB) -->
+          <rect x="480" y="60" width="140" height="55" rx="10" fill="#1a73e8" opacity=".12" stroke="#1a73e8" stroke-width="1.5"/>
+          <text x="550" y="84" text-anchor="middle" font-size="12" font-weight="600" fill="#1a73e8">API PTAX (BCB)</text>
+          <text x="550" y="100" text-anchor="middle" font-size="9" fill="#555">olinda.bcb.gov.br</text>
+
+          <!-- Firebird -->
+          <rect x="480" y="140" width="140" height="55" rx="10" fill="#e67e22" opacity=".12" stroke="#e67e22" stroke-width="1.5"/>
+          <text x="550" y="164" text-anchor="middle" font-size="12" font-weight="700" fill="#e67e22">Firebird</text>
+          <text x="550" y="180" text-anchor="middle" font-size="9" fill="#555">ERP (VPC privada)</text>
+
+          <!-- CloudWatch -->
+          <rect x="480" y="230" width="140" height="50" rx="10" fill="#232F3E" opacity=".08" stroke="#232F3E" stroke-width="1"/>
+          <text x="550" y="260" text-anchor="middle" font-size="11" font-weight="600" fill="#232F3E">CloudWatch Logs</text>
+
+          <!-- SNS -->
+          <rect x="700" y="230" width="120" height="50" rx="10" fill="#d93025" opacity=".10" stroke="#d93025" stroke-width="1.5"/>
+          <text x="760" y="260" text-anchor="middle" font-size="11" font-weight="700" fill="#d93025">SNS (e-mail)</text>
+
+          <!-- GitHub Actions -->
+          <rect x="700" y="100" width="120" height="50" rx="10" fill="#333" opacity=".08" stroke="#333" stroke-width="1"/>
+          <text x="760" y="122" text-anchor="middle" font-size="11" font-weight="600" fill="#333">GitHub Actions</text>
+          <text x="760" y="138" text-anchor="middle" font-size="9" fill="#555">CI/CD</text>
+
+          <!-- Arrows -->
+          <!-- EventBridge -> Lambda -->
+          <line x1="160" y1="130" x2="228" y2="130" stroke="#FF9900" stroke-width="1.5" marker-end="url(#aw)"/>
+          <text x="190" y="122" font-size="8" fill="#888">trigger</text>
+
+          <!-- Lambda -> API PTAX -->
+          <line x1="390" y1="110" x2="478" y2="90" stroke="#1a73e8" stroke-width="1.5" marker-end="url(#ag)"/>
+          <text x="425" y="92" font-size="8" fill="#888">HTTPS</text>
+
+          <!-- Lambda -> Firebird -->
+          <line x1="390" y1="145" x2="478" y2="160" stroke="#e67e22" stroke-width="1.5" marker-end="url(#ag)"/>
+          <text x="425" y="162" font-size="8" fill="#888">SQL</text>
+
+          <!-- Lambda -> Secrets Manager -->
+          <line x1="310" y1="180" x2="310" y2="228" stroke="#888" stroke-width="1" stroke-dasharray="4"/>
+          <text x="318" y="210" font-size="8" fill="#888">get secret</text>
+
+          <!-- Lambda -> CloudWatch -->
+          <line x1="390" y1="165" x2="478" y2="245" stroke="#888" stroke-width="1" stroke-dasharray="3"/>
+
+          <!-- Lambda -> SNS -->
+          <line x1="390" y1="155" x2="698" y2="250" stroke="#d93025" stroke-width="1" stroke-dasharray="3"/>
+          <text x="560" y="200" font-size="8" fill="#888">notify</text>
+
+          <!-- GitHub Actions -> Lambda (deploy) -->
+          <line x1="700" y1="125" x2="392" y2="125" stroke="#888" stroke-width="1" stroke-dasharray="4"/>
+          <text x="540" y="118" font-size="8" fill="#888">deploy</text>
+        </svg>
+        <div class="diagram-caption">EventBridge Scheduler dispara a Lambda de segunda a sexta &agrave;s 18:05 (BRT). A Lambda consulta a API do BCB e grava no Firebird.</div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- SERVI&Ccedil;OS UTILIZADOS -->
+      <!-- ================================================================== -->
+
+      <h2>Servi&ccedil;os utilizados</h2>
+
+      <p>Cada servi&ccedil;o e por que ele est&aacute; na arquitetura:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Servi&ccedil;o</th>
+            <th>Fun&ccedil;&atilde;o</th>
+            <th>Por que este e n&atilde;o outro</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>AWS Lambda</strong></td>
+            <td>Executa o c&oacute;digo Python que consulta a API do BCB e grava no Firebird</td>
+            <td>Workload de ~5s/dia. Pagar EC2 24/7 para isso &eacute; desperd&iacute;cio. Lambda cobra por milissegundo.</td>
+          </tr>
+          <tr>
+            <td><strong>EventBridge Scheduler</strong></td>
+            <td>Agenda a execu&ccedil;&atilde;o da Lambda (seg-sex, 18:05 BRT)</td>
+            <td>Suporta timezone nativo (America/Sao_Paulo). CloudWatch Events n&atilde;o suporta.</td>
+          </tr>
+          <tr>
+            <td><strong>Secrets Manager</strong></td>
+            <td>Armazena credenciais do Firebird criptografadas com KMS</td>
+            <td>Rota&ccedil;&atilde;o autom&aacute;tica, audit trail, zero plain text.</td>
+          </tr>
+          <tr>
+            <td><strong>CloudWatch</strong></td>
+            <td>Logs estruturados e m&eacute;tricas de cada execu&ccedil;&atilde;o</td>
+            <td>Integra&ccedil;&atilde;o nativa com Lambda. Sem setup extra.</td>
+          </tr>
+          <tr>
+            <td><strong>SNS</strong></td>
+            <td>Envia e-mail com resultado de cada execu&ccedil;&atilde;o (sucesso ou erro)</td>
+            <td>Simples, barato, integra direto com Lambda via SDK.</td>
+          </tr>
+          <tr>
+            <td><strong>IAM</strong></td>
+            <td>Roles e policies de least privilege para a Lambda</td>
+            <td>A Lambda s&oacute; acessa os recursos que precisa. Nada mais.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ================================================================== -->
+      <!-- CALLOUT CLOUDOPS -->
+      <!-- ================================================================== -->
+
+      <div class="callout info">
+        <strong>Classifica&ccedil;&atilde;o CloudOps</strong>
+        Este projeto se enquadra como <em>CloudOps</em>: migra&ccedil;&atilde;o de workload legado para a nuvem com foco em automa&ccedil;&atilde;o, observabilidade e redu&ccedil;&atilde;o de custo operacional. N&atilde;o &eacute; um projeto novo &mdash; &eacute; a moderniza&ccedil;&atilde;o de algo que j&aacute; existia e precisava funcionar melhor.
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- IMPLEMENTA&Ccedil;&Atilde;O PASSO A PASSO -->
+      <!-- ================================================================== -->
+
+      <h2>Implementa&ccedil;&atilde;o passo a passo</h2>
+
+      <!-- Step 1 -->
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Engenharia reversa do pipeline Pentaho</h4>
+          <p>
+            O arquivo <code>.ktr</code> original tinha mais de 500 linhas de XML. Abri no Spoon (editor visual do Pentaho) e mapeei cada step. Na pr&aacute;tica, o pipeline fazia apenas 4 opera&ccedil;&otilde;es &uacute;teis: (1) conectar no Firebird, (2) consultar a API do BCB, (3) transformar o JSON, (4) inserir no banco. O resto era boilerplate XML, tratamento de erro in&uacute;til (steps <em>Dummy</em>) e configura&ccedil;&otilde;es de conex&atilde;o duplicadas.
+          </p>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Reescrita em Python (~100 linhas)</h4>
+          <p>
+            Reescrevi as 4 opera&ccedil;&otilde;es em Python puro. A diferen&ccedil;a principal: em vez de uma janela fixa de 5 dias, eu consulto <code>MAX(DATA)</code> no banco para saber a &uacute;ltima cota&ccedil;&atilde;o gravada e busco apenas o que falta. Isso torna o pipeline idempotente &mdash; posso rodar quantas vezes quiser sem duplicar dados.
+          </p>
+
+          <details>
+          <summary><strong>lambda_handler.py</strong> (clique para expandir)</summary>
+          <pre><code class="language-python">import json
+import os
+import logging
+from datetime import datetime, timedelta
+
+import firebirdsql
+import boto3
+import urllib.request
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+sns = boto3.client("sns")
+sm = boto3.client("secretsmanager")
+
+SNS_TOPIC_ARN = os.environ["SNS_TOPIC_ARN"]
+SECRET_NAME = os.environ["SECRET_NAME"]
+FB_DATABASE = os.environ["FB_DATABASE"]
+
+BCB_URL = (
+    "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/"
+    "odata/CotacaoDolarPeriodo(dataInicial=@di,dataFinalCotacao=@df)"
+    "?@di='{start}'&amp;@df='{end}'"
+    "&amp;$format=json&amp;$orderby=dataHoraCotacao%20asc"
+)
+
+
+def lambda_handler(event, context):
+    """Pipeline PTAX: 7 passos sequenciais."""
+
+    # 1. Buscar credenciais no Secrets Manager
+    secret = json.loads(
+        sm.get_secret_value(SecretId=SECRET_NAME)["SecretString"]
+    )
+    logger.info("Credenciais obtidas do Secrets Manager")
+
+    # 2. Conectar no Firebird
+    conn = firebirdsql.connect(
+        host=secret["host"],
+        port=int(secret["port"]),
+        database=FB_DATABASE,
+        user=secret["user"],
+        password=secret["password"],
+        charset="UTF8",
+    )
+    cur = conn.cursor()
+    logger.info("Conectado ao Firebird")
+
+    # 3. Obter estado atual (ultima data + proximo ID)
+    cur.execute("SELECT MAX(DATA) FROM COTACAO_DOLAR")
+    last_date = cur.fetchone()[0]
+
+    cur.execute("SELECT MAX(ID) FROM COTACAO_DOLAR")
+    max_id = cur.fetchone()[0] or 0
+
+    start = (last_date + timedelta(days=1)).strftime("%m-%d-%Y") if last_date else "01-01-2024"
+    end = datetime.now().strftime("%m-%d-%Y")
+    logger.info(f"Janela dinamica: {start} ate {end}")
+
+    # 4. Consultar API PTAX do BCB
+    url = BCB_URL.format(start=start, end=end)
+    with urllib.request.urlopen(url, timeout=15) as resp:
+        data = json.loads(resp.read().decode())
+
+    rows = data.get("value", [])
+    logger.info(f"API retornou {len(rows)} cotacoes")
+
+    # 5. Inserir novas cotacoes
+    inserted = 0
+    for row in rows:
+        max_id += 1
+        dt = datetime.strptime(
+            row["dataHoraCotacao"][:10], "%Y-%m-%d"
+        ).date()
+        cur.execute(
+            "INSERT INTO COTACAO_DOLAR (ID, DATA, COMPRA, VENDA) VALUES (?, ?, ?, ?)",
+            (max_id, dt, row["cotacaoCompra"], row["cotacaoVenda"]),
+        )
+        inserted += 1
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    logger.info(f"{inserted} cotacoes inseridas")
+
+    # 6. Notificar via SNS
+    msg = f"PTAX pipeline OK: {inserted} cotacoes inseridas ({start} a {end})"
+    sns.publish(TopicArn=SNS_TOPIC_ARN, Subject="PTAX Pipeline", Message=msg)
+
+    # 7. Retornar resultado
+    return {
+        "statusCode": 200,
+        "body": json.dumps({
+            "inserted": inserted,
+            "window": {"start": start, "end": end},
+        }),
+    }</code></pre>
+          </details>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Testes locais com pytest</h4>
+          <p>
+            Escrevi 9 testes unit&aacute;rios cobrindo os cen&aacute;rios cr&iacute;ticos: API retornando vazio, API retornando dados v&aacute;lidos, banco sem registros anteriores (cold start), tratamento de erros de conex&atilde;o, e valida&ccedil;&atilde;o do payload SNS. Todos rodando com mocks &mdash; sem depender de infra real.
+          </p>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>Mapear infra existente</h4>
+          <p>
+            Antes de criar qualquer recurso, inspecionei a conta AWS. Descobri que j&aacute; existia um Security Group configurado para acesso ao Firebird (porta 3050) na VPC corporativa. Em vez de criar um novo, referenciei o existente no Terraform com <code>data.aws_security_group</code>. Isso evitou duplica&ccedil;&atilde;o e conflito de regras.
+          </p>
+        </div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h4>Terraform &mdash; Infrastructure as Code</h4>
+          <p>
+            Toda a infra est&aacute; em Terraform: Lambda, EventBridge Scheduler, IAM Role, Secrets Manager, SNS Topic e CloudWatch Log Group. O deploy &eacute; reproduz&iacute;vel e audit&aacute;vel.
+          </p>
+
+          <details>
+          <summary><strong>main.tf (trechos principais)</strong> (clique para expandir)</summary>
+          <pre><code class="language-bash"># ── Lambda Function ──────────────────────────────────────
+resource "aws_lambda_function" "ptax" {
+  function_name = "bcb-ptax-ingestion"
+  runtime       = "python3.12"
+  handler       = "lambda_handler.lambda_handler"
+  architectures = ["arm64"]   # Graviton — 20% mais barato
+  timeout       = 60
+  memory_size   = 128
+
+  filename         = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  role             = aws_iam_role.lambda_role.arn
+
+  vpc_config {
+    subnet_ids         = var.private_subnet_ids
+    security_group_ids = [data.aws_security_group.firebird.id]
+  }
+
+  environment {
+    variables = {
+      SECRET_NAME   = aws_secretsmanager_secret.firebird_creds.name
+      FB_DATABASE   = var.firebird_database_path
+      SNS_TOPIC_ARN = aws_sns_topic.ptax_alerts.arn
+    }
+  }
+
+  layers = [aws_lambda_layer_version.deps.arn]
+
+  depends_on = [aws_cloudwatch_log_group.ptax]
+}
+
+# ── EventBridge Scheduler ────────────────────────────────
+resource "aws_scheduler_schedule" "ptax_daily" {
+  name                = "ptax-daily-ingestion"
+  schedule_expression = "cron(5 18 ? * MON-FRI *)"  # 18:05 BRT
+
+  schedule_expression_timezone = "America/Sao_Paulo"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.ptax.arn
+    role_arn = aws_iam_role.scheduler_role.arn
+
+    retry_policy {
+      maximum_retry_attempts = 2
+    }
+  }
+}</code></pre>
+          </details>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <h4>Deploy e teste</h4>
+          <p>
+            Rodei <code>terraform apply</code> e invoquei a Lambda manualmente para validar. O primeiro resultado retornou 0 inser&ccedil;&otilde;es porque o pipeline legado j&aacute; tinha rodado naquele dia &mdash; exatamente o comportamento esperado (idempot&ecirc;ncia funcionando).
+          </p>
+
+          <details>
+          <summary><strong>Resposta da primeira execu&ccedil;&atilde;o</strong> (clique para expandir)</summary>
+          <pre><code class="language-json">{
+  "statusCode": 200,
+  "body": "{\"inserted\": 0, \"window\": {\"start\": \"03-31-2026\", \"end\": \"03-31-2026\"}}"
+}</code></pre>
+          </details>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- DECIS&Otilde;ES DE ARQUITETURA -->
+      <!-- ================================================================== -->
+
+      <h2>Decis&otilde;es de arquitetura</h2>
+
+      <div class="card">
+        <div class="card-title">Por que Lambda e n&atilde;o ECS ou EC2?</div>
+        <p>O workload total &eacute; ~5 segundos por dia. Manter um container (ECS) ou uma inst&acirc;ncia (EC2) ligada 24/7 para isso seria desperd&iacute;cio de dinheiro e complexidade operacional. Lambda cobra por milissegundo de execu&ccedil;&atilde;o &mdash; o custo mensal &eacute; virtualmente zero.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Por que ARM64 (Graviton)?</div>
+        <p>Lambda com Graviton &eacute; 20% mais barato que x86 e tem performance equivalente (ou melhor) para workloads I/O bound como este. Como eu uso apenas bibliotecas pure Python (firebirdsql, urllib), n&atilde;o h&aacute; depend&ecirc;ncia bin&aacute;ria que quebre em ARM.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Por que EventBridge Scheduler e n&atilde;o CloudWatch Events?</div>
+        <p>EventBridge Scheduler suporta <strong>timezone nativo</strong> (<code>America/Sao_Paulo</code>). Com CloudWatch Events, eu teria que calcular o offset UTC manualmente e lidar com hor&aacute;rio de ver&atilde;o. Al&eacute;m disso, o Scheduler tem retry policy nativo (configurei 2 tentativas).</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Por que Lambda dentro da VPC?</div>
+        <p>O Firebird roda em uma rede privada corporativa. A Lambda precisa estar na mesma VPC para acessar a porta 3050. O tradeoff &eacute; que Lambda em VPC precisa de NAT Gateway para acessar a internet (API do BCB) e o Secrets Manager &mdash; mas esse NAT j&aacute; existia na infra.</p>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- MODELO DE SEGURAN&Ccedil;A -->
+      <!-- ================================================================== -->
+
+      <h2>Modelo de seguran&ccedil;a</h2>
+
+      <p>Tr&ecirc;s camadas de prote&ccedil;&atilde;o:</p>
+
+      <div class="card">
+        <div class="card-title">1. Credenciais &mdash; Secrets Manager + KMS</div>
+        <p>As credenciais do Firebird ficam no Secrets Manager, criptografadas com uma chave KMS gerenciada pela AWS. A Lambda busca em runtime via SDK &mdash; nunca ficam em vari&aacute;vel de ambiente, c&oacute;digo-fonte ou reposit&oacute;rio. Rota&ccedil;&atilde;o autom&aacute;tica dispon&iacute;vel quando necess&aacute;rio.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2. Rede &mdash; VPC + Security Group</div>
+        <p>A Lambda roda em subnets privadas da VPC corporativa. O Security Group permite apenas sa&iacute;da para a porta 3050 (Firebird) e HTTPS (443). Sem acesso SSH, sem portas abertas para a internet.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">3. IAM &mdash; Least Privilege</div>
+        <p>A IAM Role da Lambda tem permiss&otilde;es m&iacute;nimas: <code>secretsmanager:GetSecretValue</code> apenas para o secret espec&iacute;fico, <code>logs:PutLogEvents</code> para CloudWatch, <code>sns:Publish</code> para o t&oacute;pico de alertas, e permiss&otilde;es de VPC networking. Nada mais.</p>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- CUSTO -->
+      <!-- ================================================================== -->
+
+      <h2>Custo</h2>
+
+      <div class="cost-comparison">
+        <div class="cost-bar">
+          <span class="cost-label">ANTES</span>
+          <div class="cost-track">
+            <div class="cost-fill old">R$ 200/m&ecirc;s</div>
+          </div>
+        </div>
+        <div class="cost-bar">
+          <span class="cost-label">DEPOIS</span>
+          <div class="cost-track">
+            <div class="cost-fill new">R$ 3/m&ecirc;s</div>
+          </div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Componente</th>
+            <th>Custo estimado/m&ecirc;s</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Lambda</strong> (22 invoca&ccedil;&otilde;es/m&ecirc;s, ~5s cada, 128 MB ARM64)</td>
+            <td>~R$ 0,00 (free tier)</td>
+          </tr>
+          <tr>
+            <td><strong>EventBridge Scheduler</strong></td>
+            <td>~R$ 0,00 (free tier)</td>
+          </tr>
+          <tr>
+            <td><strong>Secrets Manager</strong> (1 secret, ~22 chamadas)</td>
+            <td>~R$ 2,50</td>
+          </tr>
+          <tr>
+            <td><strong>CloudWatch Logs</strong></td>
+            <td>~R$ 0,10</td>
+          </tr>
+          <tr>
+            <td><strong>SNS</strong> (22 e-mails)</td>
+            <td>~R$ 0,00</td>
+          </tr>
+          <tr>
+            <td><strong>NAT Gateway</strong></td>
+            <td>J&aacute; existente (compartilhado)</td>
+          </tr>
+          <tr>
+            <td><strong>Total</strong></td>
+            <td><strong>~R$ 3,00/m&ecirc;s</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>A infraestrutura anterior custava ~R$ 200/m&ecirc;s (EC2 t3.medium 24/7 + licen&ccedil;a Jenkins + manuten&ccedil;&atilde;o). A nova custa <strong>98,5% menos</strong>.</p>
+
+      <!-- ================================================================== -->
+      <!-- O QUE APRENDI -->
+      <!-- ================================================================== -->
+
+      <h2>O que aprendi</h2>
+
+      <div class="card">
+        <div class="card-title">1. Mapeie a infra existente antes de criar qualquer coisa</div>
+        <p>Eu quase criei um Security Group novo para a Lambda. Quando inspecionei a VPC, descobri que j&aacute; existia um SG configurado com acesso ao Firebird. Referenciei com <code>data.aws_security_group</code> no Terraform e economizei tempo e conflitos de regras.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2. PowerShell + JSON = armadilha</div>
+        <p>Durante o desenvolvimento, tentei testar a Lambda via <code>aws lambda invoke</code> no PowerShell. O retorno JSON vinha com encoding errado e aspas escapadas de forma diferente do bash. Perdi tempo at&eacute; perceber que o problema n&atilde;o era a Lambda &mdash; era o shell. Passei a testar sempre via bash ou diretamente no console da AWS.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">3. Lambda em VPC precisa de NAT para acessar a internet</div>
+        <p>Quando coloquei a Lambda na VPC para acessar o Firebird, ela perdeu acesso &agrave; internet (API do BCB e Secrets Manager). Lambda em VPC roda em subnet privada &mdash; sem NAT Gateway, n&atilde;o sai para a internet. No meu caso, o NAT j&aacute; existia, mas se n&atilde;o existisse seria um custo adicional (~$32/m&ecirc;s). Alternativa: VPC Endpoints para Secrets Manager.</p>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- PR&Oacute;XIMOS PASSOS -->
+      <!-- ================================================================== -->
+
+      <h2>Pr&oacute;ximos passos</h2>
+
+      <div class="tip">
+        <strong>Roadmap:</strong> o Firebird &eacute; o maior gargalo t&eacute;cnico restante. A migra&ccedil;&atilde;o para Aurora PostgreSQL Serverless v2 j&aacute; est&aacute; no backlog &mdash; eliminaria a necessidade de VPC, NAT Gateway e o driver <code>firebirdsql</code>. Enquanto isso, o pipeline PTAX roda de forma est&aacute;vel e autom&aacute;tica.
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- REPOSIT&Oacute;RIO -->
+      <!-- ================================================================== -->
+
+      <h2>Reposit&oacute;rio</h2>
+
+      <p>
+        C&oacute;digo-fonte, Terraform e testes dispon&iacute;veis em:
+        <a href="https://github.com/cloudbymcn/bcb-ptax-ingestion" target="_blank" rel="noopener">github.com/cloudbymcn/bcb-ptax-ingestion</a>
+      </p>
+
+    </div>
+
+    <footer class="post-footer">
+      <div class="post-author">
+        <div class="post-author-avatar">MCN</div>
+        <div>
+          <div class="post-author-name">Matheus N.</div>
+          <div class="post-author-role">Engenheiro de Infraestrutura Cloud</div>
+        </div>
+      </div>
+      <div class="post-share">
+        <span>Compartilhar:</span>
+        <a href="#" class="share-btn" title="LinkedIn">in</a>
+        <a href="#" class="share-btn" title="Twitter">X</a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer style="padding:2rem;text-align:center;color:var(--ink3);font-size:.8rem;border-top:1px solid var(--border)">
+  &copy; 2026 Cloud by MCN
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script>
+const text = document.querySelector('.post-content').innerText;
+const words = text.split(/\s+/).length;
+const minutes = Math.ceil(words / 200);
+const el = document.getElementById('readTime');
+if (el) el.textContent = minutes + ' min de leitura';
+</script>
+</body>
+</html>

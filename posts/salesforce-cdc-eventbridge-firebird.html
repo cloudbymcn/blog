@@ -70,7 +70,7 @@
         <li><strong>Connected App no Salesforce</strong> com OAuth 2.0 habilitado (Client Credentials Flow ou Username-Password Flow).</li>
       </ul>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Dica:</strong> Eu ainda n&atilde;o tinha NAT Gateway configurado, ent&atilde;o criei um apenas na subnet da Lambda. NAT Gateway custa ~$32/m&ecirc;s fixo &mdash; mas sem ele, a Lambda em VPC n&atilde;o acessa a internet (e portanto n&atilde;o consulta a API do Salesforce).
       </div>
 
@@ -111,7 +111,7 @@
         <li><strong>Zero observabilidade:</strong> sem logs estruturados, sem alertas, sem m&eacute;tricas. &ldquo;Funcionou?&rdquo; era respondido verificando o Firebird manualmente.</li>
       </ul>
 
-      <div class="warning">
+      <div class="callout danger">
         <strong>Impacto real:</strong> blocos j&aacute; vendidos sendo movimentados no p&aacute;tio, reservas duplicadas, retrabalho de log&iacute;stica. Problema operacional com impacto financeiro direto.
       </div>
 
@@ -170,8 +170,34 @@
 #  Latência: ~3 segundos | Custo: ~R$8/mês | Servidores: 0
       </code></pre>
 
-      <div class="callout">
-        <strong>N&uacute;meros:</strong> ~3 segundos de lat&ecirc;ncia end-to-end, ~R$8/m&ecirc;s de custo total, 0 servidores para gerenciar, 100% serverless.
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value">~3s</span>
+          <span class="metric-label">Lat&ecirc;ncia end-to-end</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~R$8</span>
+          <span class="metric-label">Custo mensal</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">0</span>
+          <span class="metric-label">Servidores</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">100%</span>
+          <span class="metric-label">Serverless</span>
+        </div>
+      </div>
+
+      <div class="cost-comparison">
+        <div class="cost-bar">
+          <span class="cost-label">Antes (EC2 Jenkins 24/7)</span>
+          <div class="cost-track"><div class="cost-fill old">~$15-30/m&ecirc;s</div></div>
+        </div>
+        <div class="cost-bar">
+          <span class="cost-label">Depois (Serverless)</span>
+          <div class="cost-track"><div class="cost-fill new">~$1.50/m&ecirc;s</div></div>
+        </div>
       </div>
 
       <!-- ================================================================== -->
@@ -203,7 +229,10 @@
       <p>Foram 11 etapas. Cada uma inclui os comandos CLI completos ou as configura&ccedil;&otilde;es que utilizei.</p>
 
       <!-- Etapa 1 -->
-      <h3 id="etapa-1">Etapa 1 &mdash; Criar Secrets no Secrets Manager</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+      <h3 id="etapa-1">Criar Secrets no Secrets Manager</h3>
 
       <p>Armazenei as credenciais do Firebird e do Salesforce de forma segura. A Lambda busca-as em runtime.</p>
 
@@ -235,12 +264,17 @@ aws secretsmanager create-secret \
   }'</code></pre>
       </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Dica:</strong> Use nomes de secret com path (<code>firebird/prod/...</code>) para organizar por ambiente. Facilita policies IAM com wildcard (<code>firebird/prod/*</code>).
+      </div>
+        </div>
       </div>
 
       <!-- Etapa 2 -->
-      <h3 id="etapa-2">Etapa 2 &mdash; Criar DLQ (SQS)</h3>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+      <h3 id="etapa-2">Criar DLQ (SQS)</h3>
 
       <p>Uma fila SQS para capturar eventos que falharam ap&oacute;s todas as tentativas. Reten&ccedil;&atilde;o de 14 dias para reprocessamento manual.</p>
 
@@ -256,8 +290,14 @@ aws secretsmanager create-secret \
 # Anote o QueueUrl e o ARN retornados — usei nas próximas etapas</code></pre>
       </details>
 
+        </div>
+      </div>
+
       <!-- Etapa 3 -->
-      <h3 id="etapa-3">Etapa 3 &mdash; Criar Security Group para a Lambda</h3>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+      <h3 id="etapa-3">Criar Security Group para a Lambda</h3>
 
       <p>A Lambda vai rodar dentro da VPC. Ela precisa de um Security Group que permita sa&iacute;da para o Firebird (porta 3050) e para a internet (via NAT).</p>
 
@@ -277,12 +317,17 @@ aws ec2 authorize-security-group-ingress \
   --cidr "10.0.0.0/16"</code></pre>
       </details>
 
-      <div class="callout">
+      <div class="callout warn">
         <strong>Nota:</strong> O Security Group do Firebird (na EC2) tamb&eacute;m precisa permitir conex&otilde;es na porta 3050 vindo do SG da Lambda. N&atilde;o esque&ccedil;a de liberar no lado do Firebird tamb&eacute;m.
+      </div>
+        </div>
       </div>
 
       <!-- Etapa 4 -->
-      <h3 id="etapa-4">Etapa 4 &mdash; Criar IAM Role para a Lambda</h3>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+      <h3 id="etapa-4">Criar IAM Role para a Lambda</h3>
 
       <p>A Role precisa de permiss&otilde;es para: ler secrets, enviar para DLQ, escrever logs e criar ENIs na VPC.</p>
 
@@ -366,8 +411,14 @@ aws iam put-role-policy \
   --policy-document file://inline-policy.json</code></pre>
       </details>
 
+        </div>
+      </div>
+
       <!-- Etapa 5 -->
-      <h3 id="etapa-5">Etapa 5 &mdash; Habilitar CDC no Salesforce</h3>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+      <h3 id="etapa-5">Habilitar CDC no Salesforce</h3>
 
       <p>Aqui come&ccedil;ou a parte Salesforce. Precisei definir quais objetos devem publicar eventos de mudan&ccedil;a.</p>
 
@@ -386,10 +437,16 @@ aws iam put-role-policy \
 
       <p>A partir deste momento, qualquer cria&ccedil;&atilde;o, atualiza&ccedil;&atilde;o ou exclus&atilde;o em <code>Embalagem__c</code> gera um evento no canal <code>/data/Embalagem__ChangeEvent</code>.</p>
 
-      <!-- Etapa 6 -->
-      <h3 id="etapa-6">Etapa 6 &mdash; Criar Named Credential (formato legacy)</h3>
+        </div>
+      </div>
 
-      <div class="warning">
+      <!-- Etapa 6 -->
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+      <h3 id="etapa-6">Criar Named Credential (formato legacy)</h3>
+
+      <div class="callout danger">
         <strong>Aten&ccedil;&atilde;o cr&iacute;tica:</strong> &Eacute; obrigat&oacute;rio usar o formato legacy de Named Credential. O formato novo (com External Credential) <strong>n&atilde;o aparece</strong> na lista de Named Credentials dispon&iacute;veis ao configurar o Event Relay. Este foi um dos maiores pontos de confus&atilde;o que encontrei na integra&ccedil;&atilde;o.
       </div>
 
@@ -437,14 +494,19 @@ aws iam put-role-policy \
         </tbody>
       </table>
 
-      <div class="warning">
+      <div class="callout danger">
         <strong>Dois erros que me travaram:</strong><br>
         1. A URL &eacute; o <strong>ARN do Event Bus</strong>, n&atilde;o uma URL HTTPS. Parece estranho colocar um ARN em um campo &ldquo;URL&rdquo;, mas &eacute; assim que funciona.<br>
         2. A regi&atilde;o no ARN deve estar em <strong>MAI&Uacute;SCULAS</strong>: <code>US-EAST-1</code>, n&atilde;o <code>us-east-1</code>. Se estiver em min&uacute;sculas, o Event Relay falha silenciosamente.
       </div>
+        </div>
+      </div>
 
       <!-- Etapa 7 -->
-      <h3 id="etapa-7">Etapa 7 &mdash; Criar usu&aacute;rio IAM para Event Relay</h3>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-content">
+      <h3 id="etapa-7">Criar usu&aacute;rio IAM para Event Relay</h3>
 
       <p>O Salesforce precisa de credenciais AWS para publicar eventos no EventBridge. Criamos um usu&aacute;rio IAM dedicado com permiss&otilde;es m&iacute;nimas.</p>
 
@@ -485,12 +547,17 @@ aws iam create-access-key --user-name "salesforce-eventbridge-relay"
 # ANOTE o AccessKeyId e SecretAccessKey — usei na Named Credential (Etapa 6)</code></pre>
       </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Dica:</strong> Sim, a Etapa 7 gera as credenciais usadas na Etapa 6. Na pr&aacute;tica, fiz a Etapa 7 primeiro e depois preenchi a Named Credential. A ordem aqui &eacute; conceitual.
+      </div>
+        </div>
       </div>
 
       <!-- Etapa 8 -->
-      <h3 id="etapa-8">Etapa 8 &mdash; Criar Event Relay e ativar</h3>
+      <div class="step">
+        <div class="step-num">8</div>
+        <div class="step-content">
+      <h3 id="etapa-8">Criar Event Relay e ativar</h3>
 
       <div class="print">
         <div class="t">Salesforce Setup &rarr; Event Relays</div>
@@ -505,12 +572,17 @@ aws iam create-access-key --user-name "salesforce-eventbridge-relay"
         <li>Salve e <strong>ative o relay manualmente</strong> &mdash; ele n&atilde;o ativa sozinho.</li>
       </ol>
 
-      <div class="warning">
+      <div class="callout warn">
         <strong>Aten&ccedil;&atilde;o:</strong> Ap&oacute;s criar o Event Relay, ele fica com status &ldquo;Parado&rdquo;. &Eacute; preciso clicar em <strong>&ldquo;Run&rdquo;</strong> ou <strong>&ldquo;Ativar&rdquo;</strong> para iniciar o envio de eventos. Quase esqueci disso &mdash; nada acontecia e n&atilde;o havia erro vis&iacute;vel.
+      </div>
+        </div>
       </div>
 
       <!-- Etapa 9 -->
-      <h3 id="etapa-9">Etapa 9 &mdash; Associar Partner Event Source no AWS</h3>
+      <div class="step">
+        <div class="step-num">9</div>
+        <div class="step-content">
+      <h3 id="etapa-9">Associar Partner Event Source no AWS</h3>
 
       <p>Quando o Event Relay &eacute; ativado no Salesforce, ele cria automaticamente um <strong>Partner Event Source</strong> no EventBridge da AWS. Precisei associ&aacute;-lo a um Event Bus.</p>
 
@@ -529,8 +601,14 @@ aws iam create-access-key --user-name "salesforce-eventbridge-relay"
 
       <p>A partir da&iacute;, eu tinha um Event Bus dedicado ao Salesforce. Eventos CDC come&ccedil;aram a fluir.</p>
 
+        </div>
+      </div>
+
       <!-- Etapa 10 -->
-      <h3 id="etapa-10">Etapa 10 &mdash; Criar regra no EventBridge</h3>
+      <div class="step">
+        <div class="step-num">10</div>
+        <div class="step-content">
+      <h3 id="etapa-10">Criar regra no EventBridge</h3>
 
       <p>A regra define <strong>quais eventos</strong> devem acionar a Lambda e configura a DLQ como fallback.</p>
 
@@ -565,12 +643,17 @@ aws events put-targets \
   ]'</code></pre>
       </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Dica:</strong> O <code>event-pattern</code> aqui captura <strong>todos</strong> os eventos do Salesforce nesse bus. A filtragem por objeto (<code>Embalagem__c</code>) &eacute; feita no c&oacute;digo da Lambda (veja Etapa 11). Motivo: o payload do CDC varia entre objetos e filtros no EventBridge para campos aninhados em <code>detail.payload</code> s&atilde;o fr&aacute;geis.
+      </div>
+        </div>
       </div>
 
       <!-- Etapa 11 -->
-      <h3 id="etapa-11">Etapa 11 &mdash; Criar Lambda e fazer deploy</h3>
+      <div class="step">
+        <div class="step-num">11</div>
+        <div class="step-content">
+      <h3 id="etapa-11">Criar Lambda e fazer deploy</h3>
 
       <p>Finalmente, o c&oacute;digo que processa os eventos e atualiza o Firebird.</p>
 
@@ -878,8 +961,10 @@ aws lambda update-function-code \
   --zip-file fileb://deployment-package.zip</code></pre>
       </details>
 
-      <div class="warning">
+      <div class="callout danger">
         <strong>PyO3 ImportModuleError:</strong> Ao instalar todas as depend&ecirc;ncias com um &uacute;nico <code>pip install</code>, ocorreu um conflito de vers&otilde;es do <code>cryptography</code> que causava <code>ImportModuleError</code> do PyO3 no runtime da Lambda. Instalar <code>simple-salesforce</code> e <code>firebirdsql</code> em comandos <code>pip</code> separados resolveu o problema.
+      </div>
+        </div>
       </div>
 
       <!-- ================================================================== -->
@@ -923,7 +1008,7 @@ aws sns subscribe \
   --treat-missing-data "notBreaching"</code></pre>
       </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Dica:</strong> Configurei tamb&eacute;m um alarme para erros da Lambda (<code>Errors &gt; 0</code>) e para dura&ccedil;&atilde;o acima de 30s (<code>Duration &gt; 30000</code>). Assim cobri tanto falhas quanto degrada&ccedil;&atilde;o de performance.
       </div>
 
@@ -946,7 +1031,7 @@ aws sns subscribe \
 
       <p>Conferi no Firebird: <code>TABCAVALETE</code> e <code>TABBLOCOCHAPAS</code> j&aacute; refletiam o status <strong>&ldquo;R&rdquo;</strong> (Reservado). A log&iacute;stica teria a informa&ccedil;&atilde;o em tempo real.</p>
 
-      <div class="callout">
+      <div class="callout success">
         <strong>De 24 horas para 2.7 segundos.</strong> A reserva feita pelo vendedor &agrave;s 8h da manh&atilde; agora aparece no ERP &agrave;s 8h00min03s. A log&iacute;stica n&atilde;o movimenta mais blocos j&aacute; vendidos.
       </div>
 
@@ -995,25 +1080,33 @@ aws sns subscribe \
       <!-- ================================================================== -->
       <h2 id="tradeoffs">8. Trade-offs e decis&otilde;es</h2>
 
-      <h3>Por que EventBridge e n&atilde;o API Gateway?</h3>
-      <p>
-        API Gateway exigiria um webhook no Salesforce, gerenciamento de autentica&ccedil;&atilde;o, retry manual e parsing do payload. EventBridge tem integra&ccedil;&atilde;o nativa de parceiro com o Salesforce &mdash; o evento chega formatado, com retry autom&aacute;tico, DLQ nativa e sem servidor para gerenciar. Menos c&oacute;digo, menos superf&iacute;cie de ataque.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que EventBridge e n&atilde;o API Gateway?</div>
+        <p>
+          API Gateway exigiria um webhook no Salesforce, gerenciamento de autentica&ccedil;&atilde;o, retry manual e parsing do payload. EventBridge tem integra&ccedil;&atilde;o nativa de parceiro com o Salesforce &mdash; o evento chega formatado, com retry autom&aacute;tico, DLQ nativa e sem servidor para gerenciar. Menos c&oacute;digo, menos superf&iacute;cie de ataque.
+        </p>
+      </div>
 
-      <h3>Por que Lambda em VPC?</h3>
-      <p>
-        O Firebird roda em uma EC2 em subnet privada. N&atilde;o h&aacute; endpoint p&uacute;blico nem Firebird managed service na AWS. A Lambda precisa estar na mesma VPC para alcan&ccedil;ar a porta 3050. O trade-off &eacute; o cold start um pouco mais lento (~1-2s extra no primeiro invoke) e a depend&ecirc;ncia do NAT Gateway para acessar a API do Salesforce.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que Lambda em VPC?</div>
+        <p>
+          O Firebird roda em uma EC2 em subnet privada. N&atilde;o h&aacute; endpoint p&uacute;blico nem Firebird managed service na AWS. A Lambda precisa estar na mesma VPC para alcan&ccedil;ar a porta 3050. O trade-off &eacute; o cold start um pouco mais lento (~1-2s extra no primeiro invoke) e a depend&ecirc;ncia do NAT Gateway para acessar a API do Salesforce.
+        </p>
+      </div>
 
-      <h3>Por que uma query SOQL extra?</h3>
-      <p>
-        O evento CDC traz apenas os <strong>campos que mudaram</strong>, n&atilde;o o registro completo. Se o vendedor s&oacute; alterou o status, o evento vem apenas com <code>Status__c</code> &mdash; mas para atualizar o Firebird, precisamos tamb&eacute;m do <code>Cavalete__c</code>, <code>Bloco__c</code>, <code>NumeroPeca__c</code>, etc. A query SOQL adicional (&lt;100ms) &eacute; um trade-off aceit&aacute;vel para ter consist&ecirc;ncia total.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que uma query SOQL extra?</div>
+        <p>
+          O evento CDC traz apenas os <strong>campos que mudaram</strong>, n&atilde;o o registro completo. Se o vendedor s&oacute; alterou o status, o evento vem apenas com <code>Status__c</code> &mdash; mas para atualizar o Firebird, precisamos tamb&eacute;m do <code>Cavalete__c</code>, <code>Bloco__c</code>, <code>NumeroPeca__c</code>, etc. A query SOQL adicional (&lt;100ms) &eacute; um trade-off aceit&aacute;vel para ter consist&ecirc;ncia total.
+        </p>
+      </div>
 
-      <h3>Por que filtrar no c&oacute;digo e n&atilde;o no EventBridge?</h3>
-      <p>
-        O EventBridge suporta content-based filtering, mas o payload do Salesforce CDC aninha o <code>entityName</code> dentro de <code>detail.payload.ChangeEventHeader.entityName</code>. Filtros com m&uacute;ltiplos n&iacute;veis de aninhamento s&atilde;o fr&aacute;geis e dif&iacute;ceis de debugar. Filtrar no c&oacute;digo custa uma invoca&ccedil;&atilde;o extra (~$0.0000002) mas &eacute; expl&iacute;cito, test&aacute;vel e f&aacute;cil de alterar.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que filtrar no c&oacute;digo e n&atilde;o no EventBridge?</div>
+        <p>
+          O EventBridge suporta content-based filtering, mas o payload do Salesforce CDC aninha o <code>entityName</code> dentro de <code>detail.payload.ChangeEventHeader.entityName</code>. Filtros com m&uacute;ltiplos n&iacute;veis de aninhamento s&atilde;o fr&aacute;geis e dif&iacute;ceis de debugar. Filtrar no c&oacute;digo custa uma invoca&ccedil;&atilde;o extra (~$0.0000002) mas &eacute; expl&iacute;cito, test&aacute;vel e f&aacute;cil de alterar.
+        </p>
+      </div>
 
       <!-- ================================================================== -->
       <h2 id="custos">9. Estimativa de custos</h2>
@@ -1067,7 +1160,7 @@ aws sns subscribe \
         </tbody>
       </table>
 
-      <div class="callout">
+      <div class="callout success">
         <strong>Compara&ccedil;&atilde;o:</strong> O pipeline anterior usava uma inst&acirc;ncia EC2 dedicada rodando 24/7 para o Jenkins (~$15-30/m&ecirc;s). Al&eacute;m de mais caro, exigia manuten&ccedil;&atilde;o do SO, patches, backup e monitoramento manual. O custo serverless de ~$1.50/m&ecirc;s inclui tudo &mdash; compute, armazenamento de secrets, logs e alertas.
       </div>
 

@@ -104,7 +104,7 @@
         </tbody>
       </table>
 
-      <div class="warning">
+      <div class="callout danger">
         <strong>Risco real:</strong> credenciais em plain text em um arquivo .ktr significam que qualquer usu&aacute;rio com acesso ao servidor (ou ao reposit&oacute;rio de jobs) tem acesso total ao Azure AD e ao banco Firebird. Esse foi o ponto que mais me preocupou.
       </div>
 
@@ -285,8 +285,23 @@
         <line x1="655" y1="155" x2="750" y2="358" stroke="#888" stroke-width="1" stroke-dasharray="3"/>
       </svg>
 
-      <div class="callout">
-        <strong>Resultado:</strong> ~4 segundos de lat&ecirc;ncia end-to-end no caminho real-time, ~R$5/m&ecirc;s de custo total, 0 servidores on-premise, 100% dos erros rastre&aacute;veis.
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value">~4s</span>
+          <span class="metric-label">Lat&ecirc;ncia real-time</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~R$5</span>
+          <span class="metric-label">Custo mensal</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">0</span>
+          <span class="metric-label">Servidores on-premise</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">100%</span>
+          <span class="metric-label">Erros rastre&aacute;veis</span>
+        </div>
       </div>
 
       <!-- ================================================================== -->
@@ -382,7 +397,7 @@ aws secretsmanager create-secret \
   }'</code></pre>
       </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Dica:</strong> Use nomes com path (<code>sharepoint/prod/...</code>) para organizar por ambiente. Facilita policies IAM com wildcard (<code>sharepoint/prod/*</code>).
       </div>
 
@@ -479,7 +494,7 @@ aws iam put-role-policy \
         As Lambdas precisam de dois pacotes Python: <code>firebirdsql</code> (driver puro para Firebird) e <code>requests</code> (para chamar a API do SharePoint). Empacotei ambos em um Lambda Layer compartilhado.
       </p>
 
-      <div class="warning">
+      <div class="callout warn">
         <strong>Aten&ccedil;&atilde;o:</strong> o pacote <code>firebirdsql</code> &eacute; pure Python &mdash; n&atilde;o tem depend&ecirc;ncias bin&aacute;rias, ent&atilde;o funciona direto no Lambda. Se voc&ecirc; precisasse de <code>fdb</code> (que depende de <code>libfbclient</code>), teria que compilar para Linux x86_64 ou usar um container image. No meu caso, <code>firebirdsql</code> resolveu.
       </div>
 
@@ -508,7 +523,7 @@ aws lambda publish-layer-version \
   --compatible-architectures x86_64</code></pre>
       </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Dica:</strong> como <code>firebirdsql</code> e <code>requests</code> s&atilde;o pure Python, o <code>--only-binary=:all:</code> pode falhar para eles. Se isso acontecer, remova essa flag e instale normalmente com <code>pip install firebirdsql requests -t lambda-layer/python</code>. Funciona igual no Lambda.
       </div>
 
@@ -863,8 +878,9 @@ aws lambda add-permission \
   --source-arn "arn:aws:execute-api:us-east-1:ACCOUNT_ID:API_ID/*"</code></pre>
       </details>
 
-      <div class="callout">
-        <strong>Por que HTTP API e n&atilde;o REST API?</strong> O API Gateway HTTP &eacute; mais barato (~70% menos), mais r&aacute;pido (menor lat&ecirc;ncia) e suficiente para este caso. REST API s&oacute; faz sentido se eu precisasse de features avan&ccedil;adas como API keys, request validation ou caching &mdash; que n&atilde;o preciso aqui.
+      <div class="card">
+        <div class="card-title">Por que HTTP API e n&atilde;o REST API?</div>
+        <p>O API Gateway HTTP &eacute; mais barato (~70% menos), mais r&aacute;pido (menor lat&ecirc;ncia) e suficiente para este caso. REST API s&oacute; faz sentido se eu precisasse de features avan&ccedil;adas como API keys, request validation ou caching &mdash; que n&atilde;o preciso aqui.</p>
       </div>
 
       <!-- ============ ETAPA 6 ============ -->
@@ -930,7 +946,7 @@ aws scheduler create-schedule \
   }'</code></pre>
       </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Por que 1x/hora e n&atilde;o 10 min?</strong> O caminho prim&aacute;rio j&aacute; &eacute; real-time. O scheduler &eacute; s&oacute; rede de seguran&ccedil;a. 1x/hora &eacute; suficiente para capturar edi&ccedil;&otilde;es diretas e custa menos. Se eu precisasse de consist&ecirc;ncia mais agressiva, bastaria mudar para <code>rate(10 minutes)</code>.
       </div>
 
@@ -970,7 +986,7 @@ aws scheduler create-schedule \
 }</code></pre>
       </details>
 
-      <div class="callout">
+      <div class="callout info">
         <strong>Nota:</strong> O Power Automate n&atilde;o precisa enviar os dados do item no body &mdash; a Lambda sync busca tudo diretamente na API do SharePoint. O POST serve apenas como <em>sinal</em> de que algo mudou. Isso simplifica o fluxo e evita problemas de dados incompletos no trigger.
       </div>
 
@@ -1026,7 +1042,7 @@ aws cloudwatch put-metric-alarm \
 }</code></pre>
       </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Dica:</strong> Logs estruturados em JSON permitem criar <strong>CloudWatch Insights queries</strong> poderosas. Por exemplo: <code>fields @timestamp, action, stats.errors | filter action = "sync_complete" and stats.errors > 0</code> mostra rapidamente todas as execu&ccedil;&otilde;es com erro.
       </div>
 
@@ -1035,6 +1051,38 @@ aws cloudwatch put-metric-alarm \
       <!-- ================================================================== -->
 
       <h2>6. Resultados</h2>
+
+      <div class="comparison">
+        <div class="comparison-card before">
+          <h4>Antes (Jenkins + PDI)</h4>
+          <ul>
+            <li>Lat&ecirc;ncia: ~10 minutos (cron)</li>
+            <li>1 servidor on-premise dedicado</li>
+            <li>Credenciais em plain text</li>
+            <li>Zero rastreabilidade de erros</li>
+          </ul>
+        </div>
+        <div class="comparison-card after">
+          <h4>Depois (Lambda Serverless)</h4>
+          <ul>
+            <li>Lat&ecirc;ncia: ~4 segundos (event-driven)</li>
+            <li>0 servidores (100% serverless)</li>
+            <li>Secrets Manager (criptografado)</li>
+            <li>100% dos erros rastre&aacute;veis</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="cost-comparison">
+        <div class="cost-bar">
+          <span class="cost-label">Antes (servidor dedicado)</span>
+          <div class="cost-track"><div class="cost-fill old">Servidor + licen&ccedil;as</div></div>
+        </div>
+        <div class="cost-bar">
+          <span class="cost-label">Depois (Serverless)</span>
+          <div class="cost-track"><div class="cost-fill new">~R$5/m&ecirc;s</div></div>
+        </div>
+      </div>
 
       <table>
         <thead>
@@ -1084,25 +1132,33 @@ aws cloudwatch put-metric-alarm \
 
       <h2>7. Decis&otilde;es de Design</h2>
 
-      <h3>Por que Lambda e n&atilde;o ECS/Fargate?</h3>
-      <p>
-        A execu&ccedil;&atilde;o dura ~4 segundos, roda poucas vezes por hora e n&atilde;o precisa de estado persistente. Lambda &eacute; o servi&ccedil;o certo para workloads curtos e espor&aacute;dicos. ECS/Fargate faria sentido se eu precisasse de processos long-running ou containers customizados &mdash; mas aqui seria overengineering.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que Lambda e n&atilde;o ECS/Fargate?</div>
+        <p>
+          A execu&ccedil;&atilde;o dura ~4 segundos, roda poucas vezes por hora e n&atilde;o precisa de estado persistente. Lambda &eacute; o servi&ccedil;o certo para workloads curtos e espor&aacute;dicos. ECS/Fargate faria sentido se eu precisasse de processos long-running ou containers customizados &mdash; mas aqui seria overengineering.
+        </p>
+      </div>
 
-      <h3>Por que o padr&atilde;o wrapper (async invoke)?</h3>
-      <p>
-        O API Gateway tem timeout m&aacute;ximo de 29 segundos. Mesmo que minha Lambda sync normalmente termine em ~4s, em picos (5000+ itens no SharePoint ou Firebird lento) ela pode ultrapassar 29s. O padr&atilde;o wrapper garante que o API Gateway <strong>sempre</strong> responde r&aacute;pido (202), e o trabalho pesado acontece em background sem risco de timeout.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que o padr&atilde;o wrapper (async invoke)?</div>
+        <p>
+          O API Gateway tem timeout m&aacute;ximo de 29 segundos. Mesmo que minha Lambda sync normalmente termine em ~4s, em picos (5000+ itens no SharePoint ou Firebird lento) ela pode ultrapassar 29s. O padr&atilde;o wrapper garante que o API Gateway <strong>sempre</strong> responde r&aacute;pido (202), e o trabalho pesado acontece em background sem risco de timeout.
+        </p>
+      </div>
 
-      <h3>Por que Power Automate e n&atilde;o webhook do SharePoint?</h3>
-      <p>
-        O SharePoint Online suporta webhooks nativos, mas eles t&ecirc;m limita&ccedil;&otilde;es: notificam que <em>algo mudou</em> na lista (sem dizer o qu&ecirc;), exigem um endpoint de valida&ccedil;&atilde;o e t&ecirc;m retry logic pr&oacute;prio que pode conflitar com o do Lambda. Power Automate &eacute; mais simples de configurar, mais vis&iacute;vel para o time (interface gr&aacute;fica) e j&aacute; fazia parte do licenciamento Microsoft 365 da empresa.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que Power Automate e n&atilde;o webhook do SharePoint?</div>
+        <p>
+          O SharePoint Online suporta webhooks nativos, mas eles t&ecirc;m limita&ccedil;&otilde;es: notificam que <em>algo mudou</em> na lista (sem dizer o qu&ecirc;), exigem um endpoint de valida&ccedil;&atilde;o e t&ecirc;m retry logic pr&oacute;prio que pode conflitar com o do Lambda. Power Automate &eacute; mais simples de configurar, mais vis&iacute;vel para o time (interface gr&aacute;fica) e j&aacute; fazia parte do licenciamento Microsoft 365 da empresa.
+        </p>
+      </div>
 
-      <h3>Por que scheduler 1x/hora e n&atilde;o 10 min?</h3>
-      <p>
-        O caminho prim&aacute;rio (Power Automate &rarr; API Gateway &rarr; Lambda) j&aacute; &eacute; real-time. O scheduler existe apenas como fallback para edi&ccedil;&otilde;es diretas no SharePoint ou falhas no Power Automate. 1x/hora &eacute; mais do que suficiente para esse cen&aacute;rio e mant&eacute;m o custo baixo. Se a empresa precisar de consist&ecirc;ncia mais agressiva no futuro, basta alterar o <code>rate()</code>.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que scheduler 1x/hora e n&atilde;o 10 min?</div>
+        <p>
+          O caminho prim&aacute;rio (Power Automate &rarr; API Gateway &rarr; Lambda) j&aacute; &eacute; real-time. O scheduler existe apenas como fallback para edi&ccedil;&otilde;es diretas no SharePoint ou falhas no Power Automate. 1x/hora &eacute; mais do que suficiente para esse cen&aacute;rio e mant&eacute;m o custo baixo. Se a empresa precisar de consist&ecirc;ncia mais agressiva no futuro, basta alterar o <code>rate()</code>.
+        </p>
+      </div>
 
       <!-- ================================================================== -->
       <!-- LI&Ccedil;&Otilde;ES APRENDIDAS -->

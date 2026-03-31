@@ -65,7 +65,7 @@
         <li><strong>Sem controle de acesso granular:</strong> qualquer pessoa com acesso ao share podia apagar arquivos de qualquer bloco.</li>
       </ul>
 
-      <div class="callout">
+      <div class="callout info">
         <strong>Meu objetivo era claro:</strong> construir uma interface web que qualquer operador pudesse abrir no celular, selecionar o bloco, tirar fotos ou gravar vídeos, e ter tudo organizado automaticamente no S3 &mdash; rápido, seguro e sem servidor permanente.
       </div>
 
@@ -117,7 +117,7 @@
       │(audit) │ │(users) │ │(config)│ │(email) │
       └────────┘ └────────┘ └────────┘ └────────┘</code></pre>
 
-      <div class="tip">
+      <div class="callout success">
         <strong>Ponto-chave:</strong> os arquivos de mídia <strong>nunca</strong> passam pela Lambda. O navegador recebe uma Presigned URL e faz o <code>PUT</code> diretamente no S3. Isso significa que a Lambda não precisa lidar com payloads grandes &mdash; ela só gera a URL (operação leve, ~50ms) e o navegador faz o trabalho pesado.
       </div>
 
@@ -220,8 +220,9 @@ sam init --runtime nodejs20.x --name galeria-midia --app-template hello-world
 }</code></pre>
 </details>
 
-      <div class="callout">
-        <strong>Por que SDK v3 e não v2?</strong> O AWS SDK v2 (<code>aws-sdk</code>) inclui todos os 300+ serviços da AWS num único pacote de ~70 MB. O SDK v3 é modular: cada serviço é um pacote separado. Para Lambda, isso significa cold starts mais rápidos e menos memória consumida.
+      <div class="card">
+        <div class="card-title">Por que SDK v3 e não v2?</div>
+        <p>O AWS SDK v2 (<code>aws-sdk</code>) inclui todos os 300+ serviços da AWS num único pacote de ~70 MB. O SDK v3 é modular: cada serviço é um pacote separado. Para Lambda, isso significa cold starts mais rápidos e menos memória consumida.</p>
       </div>
 
       <!-- ====== PASSO 2 ====== -->
@@ -536,11 +537,11 @@ Outputs:
     Value: !Ref AuditTable</code></pre>
 </details>
 
-      <div class="warning">
+      <div class="callout danger">
         <strong>Atenção ao DeletionPolicy: Retain</strong> na tabela DynamoDB. Sem isso, se o stack do CloudFormation for deletado (por exemplo, durante um teste), <strong>todos os dados de auditoria são apagados permanentemente</strong>. O <code>Retain</code> garante que a tabela sobrevive mesmo se o stack for removido.
       </div>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Por que PAY_PER_REQUEST no DynamoDB?</strong> O modo on-demand cobra apenas pelas leituras e escritas realizadas, sem necessidade de provisionar capacidade. Para workloads imprevisíveis como esta (muitos uploads durante o dia, zero à noite), é significativamente mais barato do que provisionar RCU/WCU fixos.
       </div>
 
@@ -963,11 +964,12 @@ async function handleAudit(bloco, date) {
 }</code></pre>
 </details>
 
-      <div class="callout">
-        <strong>Sobre o Router Manual:</strong> em vez de usar um framework como Express (que adicionaria peso desnecessário à Lambda), usei um simples <code>if/else</code> no <code>event.path</code> e <code>event.httpMethod</code>. Para ~12 rotas, essa abordagem é mais rápida, mais leve e mais fácil de debugar do que qualquer framework.
+      <div class="card">
+        <div class="card-title">Sobre o Router Manual</div>
+        <p>Em vez de usar um framework como Express (que adicionaria peso desnecessário à Lambda), usei um simples <code>if/else</code> no <code>event.path</code> e <code>event.httpMethod</code>. Para ~12 rotas, essa abordagem é mais rápida, mais leve e mais fácil de debugar do que qualquer framework.</p>
       </div>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Por que fire-and-forget na auditoria?</strong> O <code>logAudit</code> tem um <code>try/catch</code> que engole erros silenciosamente (só loga no CloudWatch). Isso é intencional: se o DynamoDB estiver com problemas, eu não queria que isso impedisse o operador de fazer upload. A auditoria é importante, mas a operação do negócio vem primeiro.
       </div>
 
@@ -1133,7 +1135,7 @@ async function uploadMultiple(files, bloco, user) {
 }</code></pre>
 </details>
 
-      <div class="warning">
+      <div class="callout warn">
         <strong>Por que sequencial e não paralelo?</strong> Em dispositivos móveis com conexão limitada (que é exatamente o cenário da serraria), disparar 10 uploads simultâneos satura a rede e todos ficam lentos. Upload sequencial garante que cada arquivo completa rapidamente, dando feedback visual ao operador. Se a conexão for boa, a diferença de tempo é imperceptível para 5-10 fotos.
       </div>
 
@@ -1220,7 +1222,7 @@ async function uploadWithThumbnail(file, bloco, user) {
 }</code></pre>
 </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Por que gerar thumbnails no cliente e não no servidor?</strong> Três motivos:
         <br>1. <strong>Custo zero:</strong> a CPU do celular do operador faz o trabalho, não a Lambda.
         <br>2. <strong>Sem dependências nativas:</strong> bibliotecas de manipulação de imagem no Lambda (Sharp, ImageMagick) exigem layers com binários compilados para Amazon Linux. A Canvas API do navegador funciona em qualquer dispositivo.
@@ -1299,7 +1301,7 @@ async function getConfig(paramName) {
         <li><strong>SSM:</strong> apenas <code>GetParameter</code> em parâmetros com prefixo <code>/galeria/*</code>.</li>
       </ul>
 
-      <div class="warning">
+      <div class="callout danger">
         <strong>Erro comum: ListBucket ARN.</strong> A ação <code>s3:ListBucket</code> se aplica ao <strong>bucket</strong> (<code>arn:aws:s3:::meu-bucket</code>), não aos objetos (<code>arn:aws:s3:::meu-bucket/*</code>). Se colocar <code>/*</code> no final, o <code>ListBucket</code> simplesmente não funciona e retorna Access Denied &mdash; sem nenhuma mensagem clara.
       </div>
 
@@ -1326,7 +1328,7 @@ aws s3api put-bucket-cors \
   --cors-configuration file://cors.json</code></pre>
 </details>
 
-      <div class="callout">
+      <div class="callout danger">
         <strong>Sem CORS no S3, o upload falha silenciosamente.</strong> O navegador faz o <code>PUT</code>, o S3 rejeita por CORS, e o erro aparece no console do browser como "blocked by CORS policy". A Presigned URL está correta, a permissão IAM está correta, mas sem CORS no bucket, nada funciona.
       </div>
 
@@ -1377,11 +1379,11 @@ aws s3api put-bucket-cors \
 │    → Páginas HTML servidas pela Lambda                  │
 └─────────────────────────────────────────────────────────┘</code></pre>
 
-      <div class="warning">
+      <div class="callout danger">
         <strong>A história do bug do .mp4:</strong> durante os testes, vídeos .mp4 retornavam um erro 403 no CloudFront. Depois de horas debugando, descobri que o behavior <code>/blocos/*</code> estava configurado com <code>Compress: true</code> (gzip). O CloudFront tentava comprimir o .mp4 (que já é comprimido), corrompia o cabeçalho e o S3 retornava Access Denied porque o Content-Type não batia. A solução: desabilitar compressão para o behavior de mídia, ou usar uma whitelist de Content-Types comprimíveis.
       </div>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>OAI (Origin Access Identity)</strong> garante que o bucket S3 só pode ser acessado via CloudFront. Ninguém consegue acessar as imagens diretamente pela URL do S3 &mdash; apenas pelo domínio do CloudFront. Isso evita que URLs de imagens "vazem" e sejam acessadas sem autenticação.
       </div>
 
@@ -1447,11 +1449,11 @@ AuditTableName      galeria-audit-log
 ───────────────────────────────────────────────────────────</code></pre>
 </details>
 
-      <div class="tip">
+      <div class="callout info">
         <strong>Deploys subsequentes:</strong> depois do primeiro <code>--guided</code>, o SAM salva as configurações em <code>samconfig.toml</code>. Nos próximos deploys, basta rodar <code>sam build && sam deploy</code> sem perguntas.
       </div>
 
-      <div class="callout">
+      <div class="callout warn">
         <strong>Criar o primeiro usuário admin:</strong> como o Cognito está configurado para <code>AllowAdminCreateUserOnly</code>, eu precisei criar o primeiro usuário pelo CLI:
 
         <details>
@@ -1483,7 +1485,7 @@ samconfig.toml      # contém nome do bucket e região
 Thumbs.db</code></pre>
 </details>
 
-      <div class="warning">
+      <div class="callout danger">
         <strong>NUNCA commite o <code>samconfig.toml</code>!</strong> Ele contém o nome do bucket S3 do CloudFormation, a região e os valores dos parâmetros (incluindo nomes de buckets reais). Use SSM Parameter Store para qualquer configuração sensível e mantenha o <code>samconfig.toml</code> no <code>.gitignore</code>.
       </div>
 
@@ -1516,7 +1518,7 @@ Globals:
 # Com "*/*", ele trata tudo como binário e a resposta chega intacta.</code></pre>
 </details>
 
-      <div class="callout">
+      <div class="callout warn">
         <strong>Sintoma:</strong> a página HTML aparece como texto codificado em Base64 no navegador. A Lambda retorna o HTML corretamente (verificado no CloudWatch), mas o API Gateway "ajuda" fazendo encoding. A solução é contraintuitiva: marcar <code>*/*</code> como binary media type e setar <code>isBase64Encoded: false</code> na resposta da Lambda.
       </div>
 
@@ -1596,7 +1598,7 @@ Globals:
 
       <p>Antes de liberar para os operadores, validei cada item:</p>
 
-      <div class="tip">
+      <div class="callout success">
         <strong>Checklist de Validação:</strong>
         <br>&#9745; Bucket S3 criado com versionamento habilitado
         <br>&#9745; CORS configurado no bucket (PUT e GET)
@@ -1618,6 +1620,36 @@ Globals:
 
       <!-- ====== CONCLUSÃO ====== -->
       <h2>Conclusão e Resultados</h2>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value">2-3s</span>
+          <span class="metric-label">Upload de foto (5 MB)</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~$5</span>
+          <span class="metric-label">Custo mensal</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">95%</span>
+          <span class="metric-label">Adesão dos operadores</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">0</span>
+          <span class="metric-label">Servidores permanentes</span>
+        </div>
+      </div>
+
+      <div class="cost-comparison">
+        <div class="cost-bar">
+          <span class="cost-label">Antes (File Gateway)</span>
+          <div class="cost-track"><div class="cost-fill old">~$150/mês</div></div>
+        </div>
+        <div class="cost-bar">
+          <span class="cost-label">Depois (Serverless)</span>
+          <div class="cost-track"><div class="cost-fill new">~$5/mês</div></div>
+        </div>
+      </div>
 
       <h3>Antes vs Depois</h3>
 
@@ -1676,7 +1708,7 @@ Globals:
         <li><strong>Conversão para WebP:</strong> usar Lambda@Edge ou S3 Events para converter imagens automaticamente para WebP, reduzindo o tamanho em ~30% sem perda visual.</li>
       </ul>
 
-      <div class="callout">
+      <div class="callout success">
         <strong>O que eu aprendi com esse projeto:</strong> serverless não é apenas sobre economia (embora de $150/mês para $5/mês seja difícil de ignorar). É sobre construir sistemas que escalam para zero quando ninguém está usando e respondem em milissegundos quando precisam. O File Gateway era a solução "enterprise" para o problema. A combinação Lambda + S3 + Presigned URLs é a solução <strong>certa</strong>.
       </div>
 

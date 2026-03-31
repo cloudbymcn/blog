@@ -57,7 +57,7 @@
     <div class="post-content">
 
       <h2 id="objetivo">Objetivo</h2>
-      <div class="callout">
+      <div class="callout info">
         Preparar o nosso ambiente em nuvem para receber uma API de um terceiro para fazer consultas no nosso banco de dados, isso de modo seguro e funcional. Optamos por escolher esse modelo pois teriamos controle de todo ambiente.
       </div>
 
@@ -77,7 +77,7 @@
         <li><strong>Configuração errada de DNS/SSL</strong>: certificado em domínio errado ou proxy ativado no Cloudflare = quebra de emissão/renovação.</li>
       </ul>
 
-      <div class="callout">
+      <div class="callout success">
         <b>Postura final de segurança</b>
         <ul>
           <li><b>SSH (22)</b> liberado apenas para meu IP</li>
@@ -101,85 +101,133 @@
         <li>Porta do banco: <code>1234</code></li>
       </ul>
 
-      <h3>1) Criar a EC2 Ubuntu (servidor da API)</h3>
-      <ol>
-        <li>AWS Console → EC2 → <b>Launch instance</b></li>
-        <li>Nome: <code>api-consultorPRO-proxy</code></li>
-        <li>AMI: <b>Ubuntu Server 24.04 LTS</b></li>
-        <li>Instance type: <code>t3.micro</code> (ajuste conforme carga)</li>
-        <li>Network: <b>mesma VPC</b> do servidor do banco</li>
-        <li>Subnet: <b>pública</b> (para receber HTTPS)</li>
-        <li>Auto-assign public IP: <b>Enabled</b></li>
-      </ol>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Criar a EC2 Ubuntu (servidor da API)</h3>
+          <ol>
+            <li>AWS Console → EC2 → <b>Launch instance</b></li>
+            <li>Nome: <code>api-consultorPRO-proxy</code></li>
+            <li>AMI: <b>Ubuntu Server 24.04 LTS</b></li>
+            <li>Instance type: <code>t3.micro</code> (ajuste conforme carga)</li>
+            <li>Network: <b>mesma VPC</b> do servidor do banco</li>
+            <li>Subnet: <b>pública</b> (para receber HTTPS)</li>
+            <li>Auto-assign public IP: <b>Enabled</b></li>
+          </ol>
+        </div>
+      </div>
 
-      <h3>2) Criar a Key Pair (.pem) para acesso SSH</h3>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Criar a Key Pair (.pem) para acesso SSH</h3>
       <p>
         Para acessar com segurança, criei uma chave dedicada. Em ambiente corporativo, evite compartilhar a chave "padrão" com terceiros.
         Se a ConsultorPRO precisar acesso, o ideal é criar um usuário e chave exclusivos (ou você executar os comandos).
       </p>
-      <ol>
-        <li>Na criação da instância: <b>Create new key pair</b></li>
-        <li>Tipo: <b>RSA</b></li>
-        <li>Formato: <b>.pem</b></li>
-        <li>Salvar em local seguro</li>
-      </ol>
+          <ol>
+            <li>Na criação da instância: <b>Create new key pair</b></li>
+            <li>Tipo: <b>RSA</b></li>
+            <li>Formato: <b>.pem</b></li>
+            <li>Salvar em local seguro</li>
+          </ol>
+        </div>
+      </div>
 
-      <h3>3) Security Group inicial (bootstrap)</h3>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Security Group inicial (bootstrap)</h3>
       <p>No início, eu preciso instalar pacotes, validar HTTP e emitir SSL. Então criei um SG temporário.</p>
       <pre><code>Inbound (temporário):
 - SSH 22  → meu IP (/32)
 - HTTP 80 → 0.0.0.0/0 (validação Let's Encrypt)
 - HTTPS 443 → 0.0.0.0/0 (testes iniciais)</code></pre>
 
-      <div class="callout">
-        <b>Por que HTTP 80 fica aberto no começo?</b>
-        O Let's Encrypt (HTTP-01) precisa validar o host em 80. Depois, você mantém 80 só para redirect ou fecha, dependendo do desenho.
+          <div class="callout info">
+            <b>Por que HTTP 80 fica aberto no começo?</b>
+            O Let's Encrypt (HTTP-01) precisa validar o host em 80. Depois, você mantém 80 só para redirect ou fecha, dependendo do desenho.
+          </div>
+
+          <p><b>[PRINT-04] Security Group inicial (bootstrap)</b><br>
+          Print do SG mostrando SSH/80/443 (fase temporária).</p>
+        </div>
       </div>
 
-      <p><b>[PRINT-04] Security Group inicial (bootstrap)</b><br>
-      Print do SG mostrando SSH/80/443 (fase temporária).</p>
-
-      <h3>4) Elastic IP (IP fixo)</h3>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>Elastic IP (IP fixo)</h3>
       <ol>
         <li>EC2 → <b>Elastic IPs</b> → Allocate Elastic IP</li>
         <li>Selecionar o Elastic IP → Actions → <b>Associate</b> → escolher a EC2</li>
       </ol>
-      <p><strong>Caso não tenha IPs elásticos sobrando pode usar o privado mas saiba que se reiniciar a instância o IP irá mudar e você tem que se atentar a isso.</strong></p>
+          <p><strong>Caso não tenha IPs elásticos sobrando pode usar o privado mas saiba que se reiniciar a instância o IP irá mudar e você tem que se atentar a isso.</strong></p>
+        </div>
+      </div>
 
-      <h3>5) DNS no Cloudflare (subdomínio → IP)</h3>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>DNS no Cloudflare (subdominio → IP)</h3>
       <pre><code>Type: A
 Name: ConsultorPRO
 Content: 203.0.113.10
 Proxy: DNS only (cinza)</code></pre>
 
-      <img src="../assets/img/cloud.png" alt="Descrição do conteúdo da imagem">
+          <img src="../assets/img/cloud.png" alt="Descrição do conteúdo da imagem">
+        </div>
+      </div>
 
-      <h3>6) Validar DNS</h3>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <h3>Validar DNS</h3>
       <pre><code>nslookup consultorPRO.exemplo.com</code></pre>
-      <p>É necessário ver o IP sendo resolvido.</p>
+          <p>É necessário ver o IP sendo resolvido.</p>
+        </div>
+      </div>
 
-      <h3>7) Acessar EC2 via SSH e atualizar</h3>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-content">
+          <h3>Acessar EC2 via SSH e atualizar</h3>
       <p>Você tem 2 opções a primeira é gerar a chave .ppk a partir da chave .pem e a outra é o modo abaixo. Ambos via PuTTY.</p>
       <pre><code class="language-bash">ssh -i api-access-key.pem ubuntu@consultorPRO.exemplo.com
 sudo apt update
 sudo apt upgrade -y</code></pre>
 
-      <img src="../assets/img/linux.png" alt="Descrição do conteúdo da imagem">
+          <img src="../assets/img/linux.png" alt="Descrição do conteúdo da imagem">
+        </div>
+      </div>
 
-      <h3>8) Instalar Nginx</h3>
+      <div class="step">
+        <div class="step-num">8</div>
+        <div class="step-content">
+          <h3>Instalar Nginx</h3>
       <pre><code class="language-bash">sudo apt install nginx -y
 sudo systemctl enable nginx
 sudo systemctl start nginx
 sudo systemctl status nginx --no-pager</code></pre>
+        </div>
+      </div>
 
-      <h3>9) Emitir SSL (Let's Encrypt)</h3>
+      <div class="step">
+        <div class="step-num">9</div>
+        <div class="step-content">
+          <h3>Emitir SSL (Let's Encrypt)</h3>
       <pre><code class="language-bash">sudo systemctl stop nginx
 sudo apt install certbot -y
 sudo certbot certonly --standalone -d consultorPRO.exemplo.com
 sudo ls -la /etc/letsencrypt/live/consultorPRO.exemplo.com/
 sudo systemctl start nginx</code></pre>
+        </div>
+      </div>
 
-      <h3>10) Configurar Nginx com HTTPS + endpoints preparados</h3>
+      <div class="step">
+        <div class="step-num">10</div>
+        <div class="step-content">
+          <h3>Configurar Nginx com HTTPS + endpoints preparados</h3>
       <h3>Nginx config (sites-available)</h3>
       <pre><code class="language-bash">server {
   listen 80;
@@ -206,68 +254,116 @@ server {
       <pre><code class="language-bash">sudo ln -s /etc/nginx/sites-available/consultorPRO /etc/nginx/sites-enabled/consultorPRO
 sudo nginx -t
 sudo systemctl restart nginx</code></pre>
+        </div>
+      </div>
 
-      <h3>11) Descobrir porta do banco</h3>
-      <pre><code>netstat -ano | findstr LISTENING</code></pre>
+      <div class="step">
+        <div class="step-num">11</div>
+        <div class="step-content">
+          <h3>Descobrir porta do banco</h3>
+          <pre><code>netstat -ano | findstr LISTENING</code></pre>
+        </div>
+      </div>
 
-      <h3>12) Liberar PORTA no SG da instância do BANCO só para o SG da EC2 da API</h3>
+      <div class="step">
+        <div class="step-num">12</div>
+        <div class="step-content">
+          <h3>Liberar PORTA no SG da instância do BANCO só para o SG da EC2 da API</h3>
       <pre><code>Type: Custom TCP
 Port: 3050
 Source: Security Group da EC2 API (sg-api-consultorPRO-proxy)</code></pre>
 
-      <img src="../assets/img/porta.png" alt="Descrição do conteúdo da imagem">
+          <img src="../assets/img/porta.png" alt="Descrição do conteúdo da imagem">
+        </div>
+      </div>
 
-      <h3>13) Fechar o SG da API (estado final): Liberar os IPs da empresa ConsultorPRO na instância linux</h3>
+      <div class="step">
+        <div class="step-num">13</div>
+        <div class="step-content">
+          <h3>Fechar o SG da API (estado final): Liberar os IPs da empresa ConsultorPRO na instância linux</h3>
       <p>Você vai remover todos os ips que estavam liberados e deixam somente o SSH pra você e os IPs requisitados pela empresa.</p>
       <pre><code>SSH 22   → meu IP (/32)
 HTTPS 443 → IPs fixos consultorPRO (/32)</code></pre>
+        </div>
+      </div>
 
       <h2 id="validacoes">Validações e testes antes do deploy da API</h2>
-      <p><b>DNS</b></p>
-      <pre><code>nslookup consultorPRO.exemplo.com</code></pre>
 
-      <p><b>HTTPS</b></p>
-      <pre><code>Abrir: https://consultorPRO.exemplo.com</code></pre>
-
-      <p><b>Conectividade EC2 → Banco de Dados</b></p>
-      <pre><code>nc -zv 10.0.2.25 PORTA</code></pre>
+      <table>
+        <thead>
+          <tr>
+            <th>Teste</th>
+            <th>Comando / Ação</th>
+            <th>Resultado esperado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>DNS</strong></td>
+            <td><code>nslookup consultorPRO.exemplo.com</code></td>
+            <td>Resolve para o Elastic IP correto</td>
+          </tr>
+          <tr>
+            <td><strong>HTTPS</strong></td>
+            <td>Abrir: <code>https://consultorPRO.exemplo.com</code></td>
+            <td>Certificado válido, resposta 200</td>
+          </tr>
+          <tr>
+            <td><strong>Conectividade EC2 → Banco</strong></td>
+            <td><code>nc -zv 10.0.2.25 PORTA</code></td>
+            <td>Connection succeeded</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h2 id="decisoes">Decisões de design (por que fiz assim)</h2>
 
-      <h3>Por que EC2 Linux para a API?</h3>
-      <p>
-        Porque eu preciso de um ponto controlado para expor HTTPS e aplicar política de rede (allowlist) sem tocar direto no servidor do Athenas.
-        Linux + Nginx = simples, barato, previsível e fácil de auditar.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que EC2 Linux para a API?</div>
+        <p>
+          Porque eu preciso de um ponto controlado para expor HTTPS e aplicar política de rede (allowlist) sem tocar direto no servidor do Athenas.
+          Linux + Nginx = simples, barato, previsível e fácil de auditar.
+        </p>
+      </div>
 
-      <h3>Por que Nginx na frente?</h3>
-      <p>
-        Nginx me dá TLS confiável, logs, reverse proxy e flexibilidade para publicar apenas os endpoints necessários (<code>/status</code> e <code>/q</code>),
-        mantendo a aplicação atrás de uma porta interna.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que Nginx na frente?</div>
+        <p>
+          Nginx me dá TLS confiável, logs, reverse proxy e flexibilidade para publicar apenas os endpoints necessários (<code>/status</code> e <code>/q</code>),
+          mantendo a aplicação atrás de uma porta interna.
+        </p>
+      </div>
 
-      <h3>Por que Let's Encrypt?</h3>
-      <p>
-        Resolve SSL de forma prática e padronizada. Em produção, o mais importante é ser válido e renovável sem manual.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que Let's Encrypt?</div>
+        <p>
+          Resolve SSL de forma prática e padronizada. Em produção, o mais importante é ser válido e renovável sem manual.
+        </p>
+      </div>
 
-      <h3>Por que allowlist por IP?</h3>
-      <p>
-        É o requisito. E é uma defesa direta contra varredura/ataque: mesmo que o domínio seja público, ninguém fora da lista chega na API.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que allowlist por IP?</div>
+        <p>
+          É o requisito. E é uma defesa direta contra varredura/ataque: mesmo que o domínio seja público, ninguém fora da lista chega na API.
+        </p>
+      </div>
 
-      <h3>Por que liberar o banco só para o SG da API?</h3>
-      <p>
-        Isso elimina exposição acidental. A porta <code>3050</code> do Firebird fica aberta apenas para o "identificador" da VM da API (Security Group),
-        não para a internet e nem para sub-redes inteiras.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que liberar o banco só para o SG da API?</div>
+        <p>
+          Isso elimina exposição acidental. A porta <code>3050</code> do Firebird fica aberta apenas para o "identificador" da VM da API (Security Group),
+          não para a internet e nem para sub-redes inteiras.
+        </p>
+      </div>
 
-      <h3>Por que abrir "pro mundo" no começo e depois fechar?</h3>
-      <p>
-        Durante bootstrap (instalar Nginx/Certbot, validar DNS/HTTP-01, testar TLS), é comum abrir temporariamente.
-        Mas a regra é: <strong>abrir só o mínimo, por pouco tempo, e fechar imediatamente</strong>.
-        O estado final tem que ser restrito.
-      </p>
+      <div class="card">
+        <div class="card-title">Por que abrir "pro mundo" no começo e depois fechar?</div>
+        <p>
+          Durante bootstrap (instalar Nginx/Certbot, validar DNS/HTTP-01, testar TLS), é comum abrir temporariamente.
+          Mas a regra é: <strong>abrir só o mínimo, por pouco tempo, e fechar imediatamente</strong>.
+          O estado final tem que ser restrito.
+        </p>
+      </div>
 
       <h2 id="handoff">O que eu preciso da consultorPRO agora</h2>
       <ul>
@@ -276,7 +372,7 @@ HTTPS 443 → IPs fixos consultorPRO (/32)</code></pre>
         <li>Parâmetros/segredos (string de conexão, user read-only, etc.)</li>
       </ul>
 
-      <div class="callout">
+      <div class="callout warn">
         Melhor cenário: você executa os comandos enviados. Se for necessário acesso, crie usuário/chave dedicados (não compartilhe sua key principal).
       </div>
 
@@ -290,30 +386,25 @@ HTTPS 443 → IPs fixos consultorPRO (/32)</code></pre>
 
       <h2 id="checklist">Checklist final para produção</h2>
 
-      <h3>Rede & DNS</h3>
-      <ul>
-        <li>Domínio resolve para Elastic IP correto</li>
-        <li>DNS only durante SSL (se usando HTTP-01)</li>
-      </ul>
-
-      <h3>Segurança</h3>
-      <ul>
-        <li>443 só para IPs consultorPRO</li>
-        <li>22 só para seu IP</li>
-        <li>3050 só para SG da EC2 API</li>
-      </ul>
-
-      <h3>HTTPS</h3>
-      <ul>
-        <li>Certificado válido</li>
-        <li><code>nginx -t</code> sem erro</li>
-      </ul>
-
-      <h3>Pronto para deploy</h3>
-      <ul>
-        <li>Nginx preparado para <code>/status</code> e <code>/q</code></li>
-        <li>Conectividade com banco testada</li>
-      </ul>
+      <table>
+        <thead>
+          <tr>
+            <th>Categoria</th>
+            <th>Item</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Rede & DNS</strong></td><td>Domínio resolve para Elastic IP correto</td></tr>
+          <tr><td><strong>Rede & DNS</strong></td><td>DNS only durante SSL (se usando HTTP-01)</td></tr>
+          <tr><td><strong>Segurança</strong></td><td>443 só para IPs consultorPRO</td></tr>
+          <tr><td><strong>Segurança</strong></td><td>22 só para seu IP</td></tr>
+          <tr><td><strong>Segurança</strong></td><td>3050 só para SG da EC2 API</td></tr>
+          <tr><td><strong>HTTPS</strong></td><td>Certificado válido</td></tr>
+          <tr><td><strong>HTTPS</strong></td><td><code>nginx -t</code> sem erro</td></tr>
+          <tr><td><strong>Deploy</strong></td><td>Nginx preparado para <code>/status</code> e <code>/q</code></td></tr>
+          <tr><td><strong>Deploy</strong></td><td>Conectividade com banco testada</td></tr>
+        </tbody>
+      </table>
 
       <p>Observação: todos os IPs/nomes/domínios neste artigo foram anonimizados.</p>
 

@@ -78,13 +78,40 @@
       <hr />
 
       <h2 id="tl-dr">Resumo direto (TL;DR)</h2>
-      <ul>
-        <li><strong>Problema:</strong> MP4s legados iniciando lentamente (especialmente em redes móveis).</li>
-        <li><strong>Restrição:</strong> as URLs já consumidas pelo Salesforce não podiam ser alteradas.</li>
-        <li><strong>Ideia central:</strong> gerar um MP4 otimizado para "start rápido" e <strong>substituir o arquivo no mesmo caminho/nome</strong>.</li>
-        <li><strong>Como:</strong> MediaConvert para gerar MP4 com "fast start" + S3 Batch Operations + Lambda para sobrescrever em lote.</li>
-        <li><strong>Segurança:</strong> backup em lote antes, e rollback possível.</li>
-      </ul>
+
+      <div class="comparison">
+        <div class="comparison-card before">
+          <h4>Antes</h4>
+          <ul>
+            <li>MP4s com início lento em redes móveis</li>
+            <li>Metadados no final do arquivo</li>
+            <li>Player precisa baixar mais dados antes do play</li>
+          </ul>
+        </div>
+        <div class="comparison-card after">
+          <h4>Depois</h4>
+          <ul>
+            <li>MP4s com "fast start" (progressive download)</li>
+            <li>Metadados no início do arquivo</li>
+            <li>Play quase imediato, mesmas URLs</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value">0</span>
+          <span class="metric-label">URLs alteradas</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">5</span>
+          <span class="metric-label">Etapas do processo</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">100%</span>
+          <span class="metric-label">Rollback possível</span>
+        </div>
+      </div>
 
       <hr />
 
@@ -94,8 +121,9 @@
         Em alto nível, o fluxo fica assim:
       </p>
 
-      <div class="callout">
+      <div class="diagram-container">
         <img src="../assets/img/timelie.jpg" alt="arquitetura">
+        <div class="diagram-caption">Visão geral da arquitetura de otimização MP4</div>
       </div>
 
 <pre><code class="language-bash">S3 (images/&lt;bloco&gt;/&lt;video&gt;.mp4)
@@ -131,7 +159,10 @@
 
       <hr />
 
-      <h2 id="etapa-1-mediaconvert">Etapa 1 — Criar 1 job "modelo" no MediaConvert (para validar com confiança)</h2>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+      <h2 id="etapa-1-mediaconvert">Criar 1 job "modelo" no MediaConvert (para validar com confiança)</h2>
 
       <p>
         Antes de qualquer automação em massa, o primeiro passo foi validar se a otimização realmente funcionava
@@ -241,9 +272,15 @@
         A partir daqui, ele pode ser reutilizado com segurança na automação em lote (Etapa 2).
       </p>
 
+        </div>
+      </div>
+
       <hr />
 
-      <h2 id="etapa-2-automatizar-mediaconvert">Etapa 2 — Automatizar a criação de jobs do MediaConvert (em lote, do jeito certo)</h2>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+      <h2 id="etapa-2-automatizar-mediaconvert">Automatizar a criação de jobs do MediaConvert (em lote, do jeito certo)</h2>
 
       <p>
         Depois de validar manualmente um job no MediaConvert (Etapa 1), o próximo desafio era escalar.
@@ -255,7 +292,7 @@
         Aqui é importante deixar algo bem claro, porque é um erro comum (e eu mesmo caí nisso no início):
       </p>
 
-      <div class="callout">
+      <div class="callout warn">
         <strong>Atenção:</strong> o CloudShell abre por padrão em modo <strong>bash</strong>.
         Código Python <strong>não pode ser colado direto no terminal</strong>.
         O script precisa ser salvo em um arquivo <code>.py</code> e executado explicitamente com <code>python3</code>.
@@ -278,8 +315,9 @@
 
 python3 generate_mp4_opt_cloudshell.py</code></pre>
 
-      <div class="callout">
+      <div class="diagram-container">
         <img src="../assets/img/cloudshell.png" alt="arquitetura">
+        <div class="diagram-caption">CloudShell executando o script de automação</div>
       </div>
 
       <hr />
@@ -484,9 +522,15 @@ if __name__ == "__main__":
         mais seguro, escalável e fácil de manter.
       </p>
 
+        </div>
+      </div>
+
       <hr />
 
-      <h2 id="etapa-3-backup">Etapa 3 — Backup total dos MP4 originais (antes de qualquer substituição)</h2>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+      <h2 id="etapa-3-backup">Backup total dos MP4 originais (antes de qualquer substituição)</h2>
       <p>
         Antes de sobrescrever qualquer arquivo, eu fiz backup via <strong>S3 Batch Operations (Copy)</strong>.
         Como o bucket não tinha versionamento habilitado, esse backup foi o meu "cinto de segurança".
@@ -509,17 +553,25 @@ if __name__ == "__main__":
         <li>Execute e acompanhe a taxa de sucesso.</li>
       </ol>
 
-      <div class="callout">
+      <div class="diagram-container">
         <img src="../assets/img/batch.png" alt="arquitetura">
+        <div class="diagram-caption">S3 Batch Operations -- configuração do job de backup</div>
       </div>
 
-      <div class="callout">
+      <div class="diagram-container">
         <img src="../assets/img/batch1.png" alt="arquitetura">
+        <div class="diagram-caption">S3 Batch Operations -- resultado da execução</div>
+      </div>
+
+        </div>
       </div>
 
       <hr />
 
-      <h2 id="etapa-4-overwrite">Etapa 4 — Substituir os originais mantendo o mesmo nome (Batch + Lambda)</h2>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+      <h2 id="etapa-4-overwrite">Substituir os originais mantendo o mesmo nome (Batch + Lambda)</h2>
       <p>
         Aqui está o objetivo final, de forma bem direta: o Salesforce continua acessando
         <code>images/&lt;bloco&gt;/&lt;video&gt;.mp4</code> e, "por baixo", esse arquivo passa a ser o otimizado.
@@ -538,8 +590,9 @@ if __name__ == "__main__":
         Esse passo é crítico porque é onde você garante a promessa do projeto: <strong>mesma URL, arquivo melhor</strong>.
       </p>
 
-      <div class="callout">
+      <div class="diagram-container">
         <img src="../assets/img/lambda.png" alt="arquitetura">
+        <div class="diagram-caption">Lambda de sobrescrita dos MP4 otimizados</div>
       </div>
 
 <pre><code class="language-python">
@@ -615,9 +668,15 @@ def lambda_handler(event, context):
         <li><strong>Manifest errado</strong> → se você mandar arquivos que não são os otimizados, a Lambda pode calcular destinos incorretos.</li>
       </ul>
 
+        </div>
+      </div>
+
       <hr />
 
-      <h2 id="etapa-5-cloudfront">Etapa 5 — CloudFront: cache sob controle (para não "parecer" que não mudou)</h2>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+      <h2 id="etapa-5-cloudfront">CloudFront: cache sob controle (para não "parecer" que não mudou)</h2>
       <p>
         Mesmo substituindo o arquivo no S3, o CloudFront pode continuar servindo uma versão em cache por algum tempo.
         Portanto, é importante revisar as regras de cache do path onde os MP4s são entregues.
@@ -635,16 +694,27 @@ def lambda_handler(event, context):
         Eu ativei <strong>Origin Shield</strong> (us-east-1) para reduzir cache misses e aliviar o S3 em cenários de muitas requisições repetidas.
       </p>
 
+        </div>
+      </div>
+
       <hr />
 
       <h2 id="testes">Checklist de testes (o que validar antes de considerar "pronto")</h2>
-      <ul>
-        <li>Abra a <strong>URL antiga</strong> do MP4 (a usada pelo Salesforce) e confirme que toca normalmente.</li>
-        <li>Teste em Wi-Fi e em 4G/5G (se possível, em mais de uma operadora).</li>
-        <li>Confirme que o arquivo final mantém o nome <code>.mp4</code> (sem quebrar integrações e embeds).</li>
-        <li>Verifique headers de cache do CloudFront (HIT/MISS) para entender se você está vendo versão antiga ou nova.</li>
-        <li>Confira CloudWatch Logs da Lambda para garantir que não houve falhas em massa.</li>
-      </ul>
+      <table>
+        <thead>
+          <tr>
+            <th>Teste</th>
+            <th>O que verificar</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>URL antiga</strong></td><td>Abra a URL do MP4 usada pelo Salesforce e confirme que toca normalmente</td></tr>
+          <tr><td><strong>Rede móvel</strong></td><td>Teste em Wi-Fi e em 4G/5G (se possível, em mais de uma operadora)</td></tr>
+          <tr><td><strong>Nome do arquivo</strong></td><td>Confirme que o arquivo final mantém o nome <code>.mp4</code> (sem quebrar integrações)</td></tr>
+          <tr><td><strong>Cache CloudFront</strong></td><td>Verifique headers HIT/MISS para entender se está vendo versão antiga ou nova</td></tr>
+          <tr><td><strong>CloudWatch Logs</strong></td><td>Confira logs da Lambda para garantir que não houve falhas em massa</td></tr>
+        </tbody>
+      </table>
 
       <hr />
 
@@ -657,10 +727,10 @@ def lambda_handler(event, context):
       <hr />
 
       <h2 id="conclusao">Conclusão</h2>
-      <p>
-        O resultado prático foi o que importava: vídeos iniciando mais rápido (principalmente em mobile), sem alterar URLs,
+      <div class="callout success">
+        <strong>Resultado:</strong> vídeos iniciando mais rápido (principalmente em mobile), sem alterar URLs,
         sem exigir mudanças no Salesforce e com um processo que escala para milhares de arquivos com segurança.
-      </p>
+      </div>
 
       <p>
         Após isso o passo natural é automatizar para que novos vídeos sejam otimizados automaticamente.
