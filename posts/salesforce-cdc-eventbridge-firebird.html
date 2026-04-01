@@ -1208,18 +1208,6 @@ aws sns subscribe \
         </tbody>
       </table>
 
-      <!-- ================================================================== -->
-      <h2 id="proximos-passos">12. Pr&oacute;ximos passos</h2>
-
-      <ul>
-        <li><strong>Terraform/IaC:</strong> Migrar toda a infraestrutura para Terraform. Os comandos CLI s&atilde;o &oacute;timos para prototipagem, mas em produ&ccedil;&atilde;o preciso de estado declarativo, versionamento e rollback.</li>
-        <li><strong>AWS X-Ray:</strong> Habilitar tracing distribu&iacute;do para visualizar a lat&ecirc;ncia end-to-end (EventBridge &rarr; Lambda &rarr; Salesforce API &rarr; Firebird).</li>
-        <li><strong>M&eacute;tricas customizadas:</strong> Publicar m&eacute;tricas no CloudWatch via EMF (Embedded Metric Format) &mdash; registros processados por minuto, lat&ecirc;ncia por etapa, taxa de erro por tipo.</li>
-        <li><strong>Filtro no EventBridge:</strong> Quando a integra&ccedil;&atilde;o estabilizar e o formato do payload estiver bem mapeado, migrar a filtragem do c&oacute;digo para o EventBridge. Economiza invoca&ccedil;&otilde;es de Lambda desnecess&aacute;rias.</li>
-        <li><strong>Reprocessamento autom&aacute;tico da DLQ:</strong> Criar uma Lambda adicional que consome a DLQ e retenta o processamento com backoff exponencial, em vez de depender de interven&ccedil;&atilde;o manual.</li>
-        <li><strong>Dashboard CloudWatch:</strong> Painel unificado com lat&ecirc;ncia, invoca&ccedil;&otilde;es, erros, tamanho da DLQ e custo acumulado &mdash; vis&iacute;vel para o time de opera&ccedil;&otilde;es.</li>
-      </ul>
-
     </div>
 
     <footer class="post-footer">

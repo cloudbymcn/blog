@@ -1695,19 +1695,6 @@ Globals:
         </tbody>
       </table>
 
-      <h3>Próximos Passos</h3>
-
-      <p>A solução está em produção e funcionando, mas deixei espaço para evolução:</p>
-
-      <ul>
-        <li><strong>S3 Event Notifications:</strong> usar eventos do S3 para triggar processamentos automáticos (ex.: quando um arquivo chega, disparar análise de qualidade com Rekognition).</li>
-        <li><strong>S3 Intelligent-Tiering:</strong> mover automaticamente arquivos antigos para classes de armazenamento mais baratas. Blocos de 6 meses atrás não precisam estar em S3 Standard.</li>
-        <li><strong>Migrar para CDK:</strong> o SAM é excelente para começar, mas o CDK (Cloud Development Kit) oferece mais flexibilidade para infraestrutura complexa, com TypeScript em vez de YAML.</li>
-        <li><strong>CI/CD com GitHub Actions:</strong> automatizar o <code>sam build && sam deploy</code> a cada push na branch <code>main</code>.</li>
-        <li><strong>Monitoramento:</strong> CloudWatch Alarms para erros de Lambda, X-Ray para tracing de requests lentos, e um dashboard consolidado.</li>
-        <li><strong>Conversão para WebP:</strong> usar Lambda@Edge ou S3 Events para converter imagens automaticamente para WebP, reduzindo o tamanho em ~30% sem perda visual.</li>
-      </ul>
-
       <div class="callout success">
         <strong>O que eu aprendi com esse projeto:</strong> serverless não é apenas sobre economia (embora de $150/mês para $5/mês seja difícil de ignorar). É sobre construir sistemas que escalam para zero quando ninguém está usando e respondem em milissegundos quando precisam. O File Gateway era a solução "enterprise" para o problema. A combinação Lambda + S3 + Presigned URLs é a solução <strong>certa</strong>.
       </div>

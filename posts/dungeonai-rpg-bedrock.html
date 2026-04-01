@@ -83,11 +83,11 @@
 
       <p>O fluxo geral do DungeonAI &eacute; este:</p>
 
-      <pre><code>Jogador &rarr; Streamlit &rarr; Strands Agent &rarr; Amazon Bedrock
-                                                  |
-                          Claude 3.5 Haiku / Titan Image V2 / DynamoDB
-                                                  |
-                                               S3 Bucket</code></pre>
+      <pre><code><span style="color:#89b4fa">Jogador</span> <span style="color:#6c7086">&rarr;</span> <span style="color:#89b4fa">Streamlit</span> <span style="color:#6c7086">&rarr;</span> <span style="color:#89b4fa">Strands Agent</span> <span style="color:#6c7086">&rarr;</span> <span style="color:#f5a623">Amazon Bedrock</span>
+                                                  <span style="color:#6c7086">|</span>
+                          <span style="color:#f5a623">Claude 3.5 Haiku</span> <span style="color:#cdd6f4">/</span> <span style="color:#f5a623">Titan Image V2</span> <span style="color:#cdd6f4">/</span> <span style="color:#f5a623">DynamoDB</span>
+                                                  <span style="color:#6c7086">|</span>
+                                               <span style="color:#f5a623">S3 Bucket</span></code></pre>
 
       <p>A cada turno, o ciclo completo funciona assim:</p>
 
@@ -1214,24 +1214,6 @@ else:
           </tr>
         </tbody>
       </table>
-
-      <!-- ================================================================== -->
-      <!-- PR&Oacute;XIMOS PASSOS -->
-      <!-- ================================================================== -->
-
-      <h2>Pr&oacute;ximos Passos</h2>
-
-      <p>O DungeonAI hoje roda local. Esses s&atilde;o os pr&oacute;ximos passos que eu pretendo implementar:</p>
-
-      <ul>
-        <li><strong>Deploy serverless</strong> &mdash; migrar o backend para Lambda + API Gateway, com o frontend em Amplify ou CloudFront + S3</li>
-        <li><strong>Multiplayer</strong> &mdash; WebSockets via API Gateway para m&uacute;ltiplos jogadores na mesma caverna</li>
-        <li><strong>Save/Load com Cognito</strong> &mdash; autentica&ccedil;&atilde;o para cada jogador salvar e retomar sess&otilde;es</li>
-        <li><strong>Mais conte&uacute;do</strong> &mdash; novos biomas, NPCs com quest lines, sistema de crafting</li>
-        <li><strong>Upgrade de modelo para boss fights</strong> &mdash; usar Claude Sonnet em vez de Haiku para batalhas de boss, onde a narrativa precisa ser mais elaborada</li>
-      </ul>
-
-      <hr>
 
       <p>
         O c&oacute;digo completo est&aacute; no <a href="https://github.com/cloudbymcn/dungeonai" target="_blank">github.com/cloudbymcn/dungeonai</a>. Se tiver d&uacute;vidas ou sugest&otilde;es, abre uma issue no repo.
