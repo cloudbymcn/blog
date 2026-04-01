@@ -143,6 +143,10 @@ section{padding:6rem 2rem;position:relative}
 #contato .sec-title{background:linear-gradient(135deg,#e8eff5 0%,#c8d9e8 50%,var(--accent) 100%);background-size:200% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:titleGradient 6s ease-in-out infinite}
 .sec-desc{font-size:1rem;color:var(--ink2);max-width:550px;margin-bottom:3rem}
 
+/* Project counter badge */
+.proj-count{font-family:var(--f2);font-size:.5em;font-weight:700;background:var(--accent);color:#fff;padding:.15em .5em;border-radius:8px;vertical-align:middle;margin-left:.3em;-webkit-text-fill-color:#fff}
+.f-count{font-size:.7em;opacity:.6;margin-left:.25em}
+
 /* ═══ PROJETOS ═══ */
 #projetos{background:rgba(228,236,242,.6);backdrop-filter:blur(20px)}
 .proj-controls{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:2rem;flex-wrap:wrap}

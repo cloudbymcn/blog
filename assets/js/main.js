@@ -249,6 +249,14 @@ if (!isTouchDevice) document.querySelectorAll('.mag').forEach(btn => {
   });
 });
 
+// ═══ PROJECT COUNT ═══
+function updateProjectCount(visibleCount) {
+  const el = document.getElementById('projCount');
+  if (el) el.textContent = visibleCount;
+}
+// Init count on load
+updateProjectCount(document.querySelectorAll('.pj').length);
+
 // ═══ PROJECT FILTER — Improved micro-interactions (7) ═══
 document.querySelectorAll('.f-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -279,7 +287,8 @@ document.querySelectorAll('.f-btn').forEach(btn => {
       }
     });
 
-    // Show empty state if no visible cards
+    // Update count and empty state
+    updateProjectCount(visibleIndex);
     if (emptyState) {
       emptyState.style.display = visibleIndex === 0 ? 'block' : 'none';
     }
