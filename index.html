@@ -110,6 +110,46 @@
     </div>
 
     <div class="proj-grid" id="projGrid">
+      <article class="pj rv rv-up stagger tilt-card" data-cat="devops" data-date="2026-05-26">
+        <div class="card-glow"></div>
+        <div class="card-border-glow"></div>
+        <div class="pj-head"><span class="pj-cat">DevOps</span><span class="pj-date">26 Mai 2026</span></div>
+        <h3><a href="posts/sentinela-finops-bedrock.html">Analisador FinOps + Security AWS com Motor de Regras Determinístico</a></h3>
+        <p>Analisador semanal de conta AWS: Lambda Python + boto3 coletando Cost Explorer, EC2, IAM, S3, GuardDuty, CloudTrail, Compute Optimizer. Motor de regras determinístico em ~600 linhas gera findings priorizados por impacto financeiro e severidade de segurança.</p>
+        <div class="pj-stack"><span>Lambda Python</span><span>boto3</span><span>Cost Explorer</span><span>Compute Optimizer</span><span>DynamoDB</span><span>SAM</span></div>
+        <div class="pj-cta"><a href="posts/sentinela-finops-bedrock.html" data-i18n="read_case">Ler case study →</a></div>
+      </article>
+
+      <article class="pj rv rv-up stagger tilt-card" data-cat="cloudops" data-date="2026-05-26">
+        <div class="card-glow"></div>
+        <div class="card-border-glow"></div>
+        <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">26 Mai 2026</span></div>
+        <h3><a href="posts/stonetrack-pwa-inventario.html">PWA Serverless para Inventário Completo de Pátio de Mármore e Granito</a></h3>
+        <p>Sistema de inventário e localização de chapas para serraria: React PWA com bipagem offline-first via IndexedDB queue, 11 Lambdas Python especializadas, DynamoDB Streams sincronizando bipagens de volta no ERP Firebird. Substitui dois aplicativos PowerApps.</p>
+        <div class="pj-stack"><span>React PWA</span><span>Cognito</span><span>Lambda</span><span>DynamoDB Streams</span><span>Firebird</span><span>Terraform</span></div>
+        <div class="pj-cta"><a href="posts/stonetrack-pwa-inventario.html" data-i18n="read_case">Ler case study →</a></div>
+      </article>
+
+      <article class="pj rv rv-up stagger tilt-card" data-cat="cloudops" data-date="2026-05-26">
+        <div class="card-glow"></div>
+        <div class="card-border-glow"></div>
+        <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">26 Mai 2026</span></div>
+        <h3><a href="posts/serravans-frota-sst.html">SaaS de Gestão de Frota para Oficinas de Vans com OCR de Cupom Fiscal</a></h3>
+        <p>SaaS multi-tenant na AWS para oficinas mecânicas que prestam serviço de frota terceirizada de vans. Checklist diário do motorista, abastecimento com OCR via Amazon Textract, manutenção preventiva, dashboard por cliente. SST v3, Next.js 15, Cognito multi-tenant.</p>
+        <div class="pj-stack"><span>SST v3</span><span>Next.js 15</span><span>Textract</span><span>Cognito</span><span>DynamoDB</span><span>Location Service</span></div>
+        <div class="pj-cta"><a href="posts/serravans-frota-sst.html" data-i18n="read_case">Ler case study →</a></div>
+      </article>
+
+      <article class="pj rv rv-up stagger tilt-card" data-cat="devops" data-date="2026-05-26">
+        <div class="card-glow"></div>
+        <div class="card-border-glow"></div>
+        <div class="pj-head"><span class="pj-cat">DevOps</span><span class="pj-date">26 Mai 2026</span></div>
+        <h3><a href="posts/mailbox-cleaner-mrm.html">Aplicação para Limpeza Automática de Caixas Microsoft 365</a></h3>
+        <p>Ferramenta interna que monitora quota de caixas Microsoft 365 e dispara limpeza automática de e-mails antigos para Online Archive. Usa MRM Retention Policy + ManagedFolderAssistant (caminho oficial Microsoft) em vez de EWS bulk_move. FastAPI + Next.js + Exchange Online PS.</p>
+        <div class="pj-stack"><span>FastAPI</span><span>Microsoft Graph</span><span>Exchange Online PS</span><span>Next.js 16</span><span>MSAL</span><span>SQLite</span></div>
+        <div class="pj-cta"><a href="posts/mailbox-cleaner-mrm.html" data-i18n="read_case">Ler case study →</a></div>
+      </article>
+
       <article class="pj rv rv-up stagger tilt-card" data-cat="aiml" data-date="2026-03-31">
         <div class="card-glow"></div>
         <div class="card-border-glow"></div>
@@ -153,10 +193,10 @@
       <article class="pj rv rv-up stagger tilt-card" data-cat="cloudops" data-date="2026-03-13">
         <div class="card-glow"></div>
         <div class="card-border-glow"></div>
-        <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">13 Mar 2026</span></div>
-        <h3><a href="posts/gestao-midia-aws-serverless.html">Upload de 15s para 2s: Galeria Serverless que Funciona no Celular</a></h3>
-        <p>Construí uma galeria web completa onde o upload vai direto pro S3, sem passar por servidor. Login com Cognito, entrega por CDN, deploy com um comando.</p>
-        <div class="pj-stack"><span>S3</span><span>Lambda</span><span>API Gateway</span><span>Cognito</span><span>CloudFront</span><span>SAM</span></div>
+        <div class="pj-head"><span class="pj-cat">CloudOps</span><span class="pj-date">13 Mar 2026 · atualizado</span></div>
+        <h3><a href="posts/gestao-midia-aws-serverless.html">Portal Corporativo Serverless com 10 Aplicações Internas Integradas</a></h3>
+        <p>Portal interno da Vitória Stone em arquitetura serverless modular: Lambdas especializadas, Cognito com grupos por departamento, DynamoDB single-table, integrações com Firebird (ERP Athenas) e Microsoft Graph. Helpdesk, contracheque, Kaizen, on/offboarding, galeria — 10 aplicações independentes.</p>
+        <div class="pj-stack"><span>Lambda</span><span>Cognito</span><span>DynamoDB</span><span>API Gateway</span><span>CloudFront</span><span>SAM</span><span>MS Graph</span></div>
         <div class="pj-cta"><a href="posts/gestao-midia-aws-serverless.html" data-i18n="read_case">Ler case study →</a></div>
       </article>
 

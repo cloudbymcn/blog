@@ -2,8 +2,28 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://cloudbymcn.com/</loc>
-    <lastmod>2026-03-30</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.com/posts/sentinela-finops-bedrock.html</loc>
+    <lastmod>2026-05-26</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.com/posts/stonetrack-pwa-inventario.html</loc>
+    <lastmod>2026-05-26</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.com/posts/serravans-frota-sst.html</loc>
+    <lastmod>2026-05-26</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.com/posts/mailbox-cleaner-mrm.html</loc>
+    <lastmod>2026-05-26</lastmod>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://cloudbymcn.com/posts/dungeonai-rpg-bedrock.html</loc>
@@ -27,7 +47,7 @@
   </url>
   <url>
     <loc>https://cloudbymcn.com/posts/gestao-midia-aws-serverless.html</loc>
-    <lastmod>2026-03-13</lastmod>
+    <lastmod>2026-05-26</lastmod>
     <priority>0.8</priority>
   </url>
   <url>

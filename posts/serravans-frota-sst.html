@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SaaS de Gestão de Frota para Oficinas de Vans com OCR de Cupom Fiscal | Cloud by MCN</title>
+<meta name="description" content="SaaS multi-tenant na AWS para oficinas mec&acirc;nicas que prestam servi&ccedil;o de frota terceirizada de vans. Checklist di&aacute;rio do motorista, abastecimento com OCR de cupom fiscal via Amazon Textract, manuten&ccedil;&atilde;o preventiva, dashboard por cliente. SST v3, Next.js 15, Cognito multi-tenant.">
+<meta property="og:title" content="SaaS de Gestão de Frota para Oficinas de Vans com OCR de Cupom Fiscal">
+<meta property="og:description" content="SaaS multi-tenant na AWS para oficinas que gerenciam frota de vans. Checklist di&aacute;rio, abastecimento com OCR Textract, manuten&ccedil;&atilde;o preventiva. SST v3 + Next.js 15.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body class="post-page">
+
+<nav id="nav" class="scrolled">
+  <div class="nav-in">
+    <a href="../index.html" class="logo">
+      <img class="logo-img" src="../assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-r">
+      <div class="nav-links" id="navLinks">
+        <a href="../index.html#projetos">Projetos</a>
+        <a href="../index.html#sobre">Sobre</a>
+        <a href="../index.html#contato">Contato</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="post-main">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a><span>/</span>
+    <a href="../index.html#projetos">Projetos</a><span>/</span>
+    <span class="current">AWS &middot; SST &middot; Textract &middot; Bedrock &middot; Multi-tenant</span>
+  </div>
+
+  <article class="post-article">
+    <header class="post-header">
+      <div class="post-meta-bar">
+        <span class="post-date-tag">26 Mai 2026</span>
+        <span class="post-reading" id="readTime"></span>
+      </div>
+      <h1>SaaS de gest&atilde;o de frota para oficinas de vans com OCR de cupom fiscal</h1>
+      <p class="post-subtitle">SaaS multi-tenant na AWS para oficinas mec&acirc;nicas que prestam servi&ccedil;o de frota terceirizada de vans (Total Diesel como primeira cliente). Motorista faz checklist di&aacute;rio com 5 fotos, abastece e bate foto do cupom &mdash; Amazon Textract AnalyzeExpense l&ecirc; valor e litros automaticamente. PWA Next.js 15, IaC TypeScript com SST v3, DynamoDB single-table, isolamento por tenantId no JWT do Cognito.</p>
+    </header>
+
+    <div class="post-content">
+
+      <!-- ====== INTRO ====== -->
+      <h2>O contexto</h2>
+
+      <p>Esse projeto come&ccedil;ou de um problema bem do mundo real: oficinas mec&acirc;nicas que prestam servi&ccedil;o de frota terceirizada (uma sai e leva 7-10 vans de cliente, faz manuten&ccedil;&atilde;o, devolve) precisam de tr&ecirc;s coisas que planilha Excel n&atilde;o resolve:</p>
+
+      <ol>
+        <li><strong>Confer&ecirc;ncia di&aacute;ria</strong> de cada ve&iacute;culo (5 fotos + od&ocirc;metro + observa&ccedil;&otilde;es) feita por um motorista no celular, no p&aacute;tio.</li>
+        <li><strong>Abastecimento rastreado</strong>: cada vez que o ve&iacute;culo enche tanque, motorista bate foto do cupom fiscal. Sistema lendo cupom &eacute; <em>muito</em> melhor que motorista digitando valor a m&atilde;o.</li>
+        <li><strong>Manuten&ccedil;&atilde;o preventiva</strong>: avisar o dono da oficina ANTES do ve&iacute;culo precisar &mdash; "vai bater 30 dias ou 500km, est&aacute; na hora da revis&atilde;o".</li>
+      </ol>
+
+      <p>O nome do projeto &eacute; <strong>SerraVans</strong>. A primeira oficina usando &eacute; a Total Diesel.</p>
+
+      <div class="print">
+        <div class="t">Print: tela de login (motorista vs admin)</div>
+        <div class="d">Tela inicial com dois fluxos: admin login por email/senha, ou motorista escaneia QR code do celular do administrador para entrar. <code>assets/img/posts/serravans-login.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/serravans-login.png" alt="Tela de login SerraVans com email/senha e QR code para motorista">
+
+      <p>O ponto chave da arquitetura: <strong>multi-tenant desde dia 1</strong>. Uma instala&ccedil;&atilde;o da AWS Lambda, um Cognito User Pool, mas cada oficina v&ecirc; apenas a sua frota. Custo de adicionar um novo cliente: criar registro de tenant + convidar admin. Zero infra nova.</p>
+
+      <!-- ====== ARQUITETURA ====== -->
+      <h2>Arquitetura</h2>
+
+      <pre><code class="language-bash">  ┌─────────────────────────────────────┐
+  │  Next.js 15 PWA (apps/web)          │
+  │   • App Router                      │
+  │   • Tailwind + shadcn/ui            │
+  │   • Workbox PWA                     │
+  │   • Camera capture                  │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  SST Nextjs (CloudFront + Lambda)   │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  API Gateway HTTP v2                │
+  │   • throttling 50/s, burst 100      │
+  │   • CORS                            │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  Lambda (ANY /{proxy+})             │
+  │  apps/api/src/index.handler         │
+  │  19 m&oacute;dulos de rotas               │
+  └─┬─────┬─────┬─────┬─────┬───────────┘
+    ▼     ▼     ▼     ▼     ▼
+  Cognito  S3   DDB  Textract Bedrock
+                     Location Service
+
+  ┌─────────────────────────────────────┐
+  │  Cron: maintenance-check (13h UTC)  │
+  │  alerta antes do prazo              │
+  └─────────────────────────────────────┘</code></pre>
+
+      <h3>Stack</h3>
+
+      <table>
+        <thead><tr><th>Camada</th><th>Servi&ccedil;o</th></tr></thead>
+        <tbody>
+          <tr><td>Frontend</td><td>Next.js 15 (App Router) + Tailwind + shadcn/ui + PWA</td></tr>
+          <tr><td>Backend</td><td>AWS Lambda + API Gateway HTTP v2 (via SST v3)</td></tr>
+          <tr><td>Auth</td><td>Amazon Cognito (custom attrs: tenantId, role)</td></tr>
+          <tr><td>DB</td><td>DynamoDB single-table (2 GSIs)</td></tr>
+          <tr><td>Storage</td><td>S3 (lifecycle 30d STD_IA, 180d GLACIER_IR)</td></tr>
+          <tr><td>E-mail</td><td>Amazon SES</td></tr>
+          <tr><td>OCR</td><td>Amazon Textract (AnalyzeExpense + DetectDocumentText)</td></tr>
+          <tr><td>Geocoding</td><td>Amazon Location Service (Esri)</td></tr>
+          <tr><td>AI</td><td>Bedrock (Sonnet 4.5 / Haiku 4.5) pra resumos</td></tr>
+          <tr><td>IaC</td><td>SST v3 (Ion) sobre Pulumi/AWS provider</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ====== SST ====== -->
+      <h2>SST v3 (Ion): IaC em TypeScript</h2>
+
+      <p>Optei por SST sobre CDK ou Terraform porque o projeto j&aacute; tinha Next.js, ent&atilde;o o stack do dev era TypeScript de qualquer jeito. SST v3 (codenome "Ion") &eacute; uma reescrita sobre Pulumi com tooling muito superior &agrave; v2 (que era CDK puro).</p>
+
+      <details>
+<summary><strong>sst.config.ts</strong> &mdash; resources principais (clique para expandir)</summary>
+      <pre><code class="language-typescript">/// &lt;reference path="./.sst/platform/config.d.ts" /&gt;
+
+export default $config({
+  app(input) {
+    return {
+      name: "serravans",
+      removal: input?.stage === "prod" ? "retain" : "remove",
+      home: "aws",
+      providers: { aws: { region: "us-east-1" } },
+    };
+  },
+  async run() {
+    // ─── S3 bucket de fotos com lifecycle ──────────────────
+    const photosBucket = new sst.aws.Bucket("Photos", {
+      versioning: true,
+      cors: {
+        allowOrigins: ["*"],
+        allowMethods: ["GET", "PUT", "POST"],
+        allowHeaders: ["*"],
+        maxAge: "1 hour",
+      },
+      transform: {
+        bucket: (args) =&gt; {
+          args.lifecycleRules = [
+            {
+              id: "archive-old-photos",
+              enabled: true,
+              transitions: [
+                { days: 30, storageClass: "STANDARD_IA" },
+                { days: 180, storageClass: "GLACIER_IR" },
+              ],
+            },
+          ];
+        },
+      },
+    });
+
+    // ─── DynamoDB single-table com 2 GSIs ──────────────────
+    const table = new sst.aws.Dynamo("Data", {
+      fields: {
+        pk: "string", sk: "string",
+        gsi1pk: "string", gsi1sk: "string",
+        gsi2pk: "string", gsi2sk: "string",
+      },
+      primaryIndex: { hashKey: "pk", rangeKey: "sk" },
+      globalIndexes: {
+        gsi1: { hashKey: "gsi1pk", rangeKey: "gsi1sk" },
+        gsi2: { hashKey: "gsi2pk", rangeKey: "gsi2sk" },
+      },
+      transform: {
+        table: (args) =&gt; {
+          args.pointInTimeRecovery = { enabled: true };
+        },
+      },
+    });
+
+    // ─── Cognito com custom attributes ─────────────────────
+    const userPool = new sst.aws.CognitoUserPool("Users", {
+      usernames: ["email"],
+      transform: {
+        userPool: {
+          schemas: [
+            {
+              name: "tenantId",
+              attributeDataType: "String",
+              mutable: true,
+              stringAttributeConstraints: { minLength: "1", maxLength: "64" },
+            },
+            {
+              name: "role",
+              attributeDataType: "String",
+              mutable: true,
+              stringAttributeConstraints: { minLength: "1", maxLength: "16" },
+            },
+          ],
+          passwordPolicy: {
+            minimumLength: 10,
+            requireLowercase: true,
+            requireNumbers: true,
+            requireUppercase: true,
+          },
+        },
+      },
+    });
+
+    // ─── Location Service ──────────────────────────────────
+    const placeIndex = new aws.location.PlaceIndex("Places", {
+      indexName: `serravans-${$app.stage}-places`,
+      dataSource: "Esri",
+      dataSourceConfiguration: { intendedUse: "SingleUse" },
+    });
+
+    // ... continua com api, web, cron
+  },
+});</code></pre>
+</details>
+
+      <div class="callout success">
+        <strong>SST <code>link</code> elimina IAM boilerplate.</strong> Quando voc&ecirc; declara <code>link: [table, photosBucket]</code> na Lambda, o SST inject as permiss&otilde;es certas (least-privilege) e seta env vars com os nomes/ARNs. Voc&ecirc; n&atilde;o escreve uma policy IAM &agrave; m&atilde;o pra acessar resources do pr&oacute;prio stack.
+      </div>
+
+      <h3>Throttling no API Gateway</h3>
+
+      <p>API Gateway HTTP v2 j&aacute; tem throttle global, mas eu configurei expl&iacute;cito pra dar headroom:</p>
+
+      <details>
+<summary><strong>API config &mdash; throttling</strong> (clique para expandir)</summary>
+      <pre><code class="language-typescript">const api = new sst.aws.ApiGatewayV2("Api", {
+  cors: {
+    allowOrigins: ["*"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE"],
+    allowHeaders: ["*"],
+  },
+  transform: {
+    stage: {
+      defaultRouteSettings: {
+        throttlingRateLimit: 50,   // 50 req/s sustained
+        throttlingBurstLimit: 100, // 100 req em burst
+      },
+    },
+  },
+});
+
+api.route("ANY /{proxy+}", {
+  handler: "apps/api/src/index.handler",
+  link: [table, photosBucket],
+  environment: { /* ... */ },
+  permissions: [
+    { actions: ["ses:SendEmail"], resources: ["*"] },
+    { actions: ["textract:AnalyzeExpense", "textract:DetectDocumentText"], resources: ["*"] },
+    { actions: ["geo:SearchPlaceIndexForPosition"], resources: [placeIndex.indexArn] },
+    // ... Cognito admin actions, Bedrock invoke
+  ],
+});</code></pre>
+</details>
+
+      <p>50/s &eacute; suficiente at&eacute; ~30 oficinas simult&acirc;neas. Subir &eacute; trocar duas linhas.</p>
+
+      <!-- ====== MULTI-TENANT ====== -->
+      <h2>Multi-tenant: <code>tenantId</code> em tudo</h2>
+
+      <p>A pe&ccedil;a mais importante do design. O <code>tenantId</code> &eacute; um atributo custom do Cognito injetado no JWT. <strong>Toda</strong> consulta no DynamoDB tem ele como prefixo da PK, isolando os tenants por design.</p>
+
+      <details>
+<summary><strong>middleware de auth + tenant</strong> (clique para expandir)</summary>
+      <pre><code class="language-typescript">// apps/api/src/lib/auth.ts
+import { jwtVerify, createRemoteJWKSet } from "jose";
+
+const JWKS = createRemoteJWKSet(
+  new URL(`https://cognito-idp.us-east-1.amazonaws.com/${process.env.USER_POOL_ID}/.well-known/jwks.json`)
+);
+
+export interface UserContext {
+  userId: string;
+  email: string;
+  tenantId: string;
+  role: "admin" | "driver";
+}
+
+export async function authenticate(event: APIGatewayProxyEventV2): Promise&lt;UserContext&gt; {
+  const token = event.headers.authorization?.replace("Bearer ", "");
+  if (!token) throw new HttpError(401, "missing token");
+
+  const { payload } = await jwtVerify(token, JWKS, {
+    issuer: `https://cognito-idp.us-east-1.amazonaws.com/${process.env.USER_POOL_ID}`,
+    audience: process.env.USER_POOL_CLIENT_ID,
+  });
+
+  const tenantId = payload["custom:tenantId"] as string;
+  const role = payload["custom:role"] as string;
+  if (!tenantId) throw new HttpError(403, "user without tenant");
+
+  return {
+    userId: payload.sub!,
+    email: payload.email as string,
+    tenantId,
+    role: role as "admin" | "driver",
+  };
+}</code></pre>
+</details>
+
+      <h3>Padr&atilde;o de chave no DynamoDB</h3>
+
+      <pre><code class="language-bash">PK                              SK                          tipo
+─────────────────────────────────────────────────────────────────────
+TENANT#&lt;tenant-id&gt;              METADATA                    Tenant
+TENANT#&lt;tenant-id&gt;              CUSTOMER#&lt;customer-id&gt;     Cliente da oficina
+TENANT#&lt;tenant-id&gt;              VEHICLE#&lt;plate&gt;            Ve&iacute;culo
+TENANT#&lt;tenant-id&gt;              DRIVER#&lt;driver-id&gt;          Motorista
+TENANT#&lt;tenant-id&gt;              CHECKIN#&lt;yyyymmdd&gt;#&lt;id&gt;   Confer&ecirc;ncia di&aacute;ria
+TENANT#&lt;tenant-id&gt;              FUELING#&lt;timestamp&gt;        Abastecimento
+TENANT#&lt;tenant-id&gt;              MAINT#&lt;timestamp&gt;          Manuten&ccedil;&atilde;o
+TENANT#&lt;tenant-id&gt;              FINE#&lt;due-date&gt;            Multa
+TENANT#&lt;tenant-id&gt;              NOTE#&lt;vehicle&gt;#&lt;ts&gt;        Observa&ccedil;&atilde;o por ve&iacute;culo
+</code></pre>
+
+      <p>Como toda PK come&ccedil;a com <code>TENANT#</code>, queries do tenant batem na mesma partition, fica super-r&aacute;pido e barato.</p>
+
+      <h3>GSI1 e GSI2: respondendo perguntas inversas</h3>
+
+      <ul>
+        <li><strong>GSI1 (gsi1pk-gsi1sk)</strong>: invertido por entidade. Ex: ver tudo de uma <em>placa espec&iacute;fica</em> entre v&aacute;rios tenants &mdash; n&atilde;o vai acontecer no app de cliente, mas no admin global do SaaS sim.</li>
+        <li><strong>GSI2 (gsi2pk-gsi2sk)</strong>: ordenado por data global. Ex: "&uacute;ltimos abastecimentos de hoje em todos os tenants" pra debugging.</li>
+      </ul>
+
+      <!-- ====== TEXTRACT ====== -->
+      <h2>OCR de cupom fiscal: Amazon Textract</h2>
+
+      <p>Esse foi o "wow" do projeto. Motorista enche tanque, bate uma foto do cupom no balc&atilde;o do posto, sistema l&ecirc; <em>valor pago</em> e <em>litros</em> automaticamente. Tempo entre foto e form preenchido: ~3 segundos.</p>
+
+      <p>Usei o <code>AnalyzeExpense</code> do Textract, que &eacute; espec&iacute;fico pra cupons/notas:</p>
+
+      <details>
+<summary><strong>apps/api/src/routes/ocr.ts</strong> &mdash; OCR de cupom (clique para expandir)</summary>
+      <pre><code class="language-typescript">import { TextractClient, AnalyzeExpenseCommand } from "@aws-sdk/client-textract";
+
+const textract = new TextractClient({});
+
+interface CupomResult {
+  total: number | null;
+  litros: number | null;
+  data: string | null;
+  posto: string | null;
+  confidence: number;
+}
+
+export async function analyzeCupom(bucket: string, key: string): Promise&lt;CupomResult&gt; {
+  const resp = await textract.send(new AnalyzeExpenseCommand({
+    Document: {
+      S3Object: { Bucket: bucket, Name: key },
+    },
+  }));
+
+  const fields = resp.ExpenseDocuments?.[0]?.SummaryFields ?? [];
+  const lineItems = resp.ExpenseDocuments?.[0]?.LineItemGroups?.[0]?.LineItems ?? [];
+
+  // 1. Total pago: campo "TOTAL"
+  const totalField = fields.find((f) =&gt;
+    f.Type?.Text === "TOTAL" || f.Type?.Text === "AMOUNT_PAID"
+  );
+  const total = parseBrazilCurrency(totalField?.ValueDetection?.Text);
+
+  // 2. Litros: heur&iacute;stica nos line items (procura "L" ou "Litros")
+  let litros: number | null = null;
+  for (const item of lineItems) {
+    for (const f of item.LineItemExpenseFields ?? []) {
+      const txt = f.ValueDetection?.Text ?? "";
+      const match = txt.match(/(\d+[.,]?\d*)\s*L(itros)?$/i);
+      if (match) {
+        litros = parseFloat(match[1].replace(",", "."));
+        break;
+      }
+    }
+    if (litros) break;
+  }
+
+  // 3. Data: campo INVOICE_RECEIPT_DATE
+  const dataField = fields.find((f) =&gt; f.Type?.Text === "INVOICE_RECEIPT_DATE");
+  const data = dataField?.ValueDetection?.Text ?? null;
+
+  // 4. Nome do posto: VENDOR_NAME
+  const postoField = fields.find((f) =&gt; f.Type?.Text === "VENDOR_NAME");
+  const posto = postoField?.ValueDetection?.Text ?? null;
+
+  // 5. Confian&ccedil;a m&eacute;dia dos campos lidos
+  const conf = [totalField, dataField, postoField]
+    .map((f) =&gt; f?.ValueDetection?.Confidence ?? 0)
+    .filter((c) =&gt; c &gt; 0);
+  const confidence = conf.length ? conf.reduce((a, b) =&gt; a + b, 0) / conf.length : 0;
+
+  return { total, litros, data, posto, confidence };
+}
+
+function parseBrazilCurrency(s?: string): number | null {
+  if (!s) return null;
+  // "R$ 312,45" → 312.45
+  const clean = s.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(clean);
+  return isNaN(n) ? null : n;
+}</code></pre>
+</details>
+
+      <div class="callout info">
+        <strong>Por que <code>AnalyzeExpense</code> e n&atilde;o <code>DetectDocumentText</code> + regex?</strong> AnalyzeExpense j&aacute; tem o modelo treinado pra entender "TOTAL" / "VENDOR" / "DATE" mesmo em cupons brasileiros. Custa ~$0.01 por p&aacute;gina vs $0.0015 do DetectDocumentText, mas a qualidade do parse &eacute; muito superior. Para 200 cupons/m&ecirc;s, fica $2.
+      </div>
+
+      <h3>Fluxo completo: foto &rarr; OCR &rarr; form pr&eacute;-preenchido</h3>
+
+      <details>
+<summary><strong>fluxo completo</strong> (clique para expandir)</summary>
+      <pre><code class="language-typescript">// apps/api/src/routes/fuelings.ts (POST /fuelings/parse-receipt)
+
+export async function parseReceipt(event: APIGatewayProxyEventV2) {
+  const user = await authenticate(event);
+  const { uploadKey } = JSON.parse(event.body ?? "{}");
+
+  // Valida que o usu&aacute;rio dono do tenant subiu esse upload
+  if (!uploadKey.startsWith(`tenants/${user.tenantId}/uploads/`)) {
+    throw new HttpError(403, "upload alheio");
+  }
+
+  // 1. OCR via Textract
+  const cupom = await analyzeCupom(process.env.PHOTOS_BUCKET!, uploadKey);
+
+  // 2. Se confian&ccedil;a baixa, marca pra revis&atilde;o humana
+  const needsReview = cupom.confidence &lt; 80;
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      ...cupom,
+      needsReview,
+      pre_filled: !needsReview,
+    }),
+  };
+}</code></pre>
+</details>
+
+      <div class="callout warn">
+        <strong>Confian&ccedil;a &lt; 80%</strong> for&ccedil;a a UI a mostrar warning amarelo. Motorista v&ecirc; "confirme valores", deve digitar ou corrigir. Sem isso, OCR ruim virava abastecimento de R$ 0,00 ou 312 litros (em vez de 31,2).
+      </div>
+
+      <!-- ====== CHECKLIST ====== -->
+      <h2>Checklist di&aacute;rio: 5 fotos + od&ocirc;metro</h2>
+
+      <p>Quando o motorista entra no ve&iacute;culo de manh&atilde;, ele faz um <em>checklist</em> obrigat&oacute;rio antes de poder dirigir:</p>
+
+      <ol>
+        <li>Foto da frente</li>
+        <li>Foto da traseira</li>
+        <li>Foto da lateral direita</li>
+        <li>Foto da lateral esquerda</li>
+        <li>Foto do od&ocirc;metro (com leitura confirmada)</li>
+      </ol>
+
+      <p>Cada foto &eacute; uploaded via Presigned URL direto pro S3, sem passar pelo Lambda. O Lambda apenas <em>registra</em> o checkin no DynamoDB ap&oacute;s os 5 uploads.</p>
+
+      <details>
+<summary><strong>presigned upload sequence</strong> (clique para expandir)</summary>
+      <pre><code class="language-typescript">// POST /uploads/presign
+export async function presignUpload(event: APIGatewayProxyEventV2) {
+  const user = await authenticate(event);
+  const { kind, fileName, contentType } = JSON.parse(event.body ?? "{}");
+  // kind = "checkin" | "fueling" | "maintenance"
+
+  const key = `tenants/${user.tenantId}/uploads/${kind}/${randomUUID()}-${fileName}`;
+
+  const cmd = new PutObjectCommand({
+    Bucket: process.env.PHOTOS_BUCKET,
+    Key: key,
+    ContentType: contentType,
+    Metadata: {
+      uploaded_by: user.userId,
+      tenant: user.tenantId,
+    },
+  });
+
+  const url = await getSignedUrl(s3, cmd, { expiresIn: 300 });
+  return { statusCode: 200, body: JSON.stringify({ url, key }) };
+}</code></pre>
+</details>
+
+      <div class="callout danger">
+        <strong>Sempre prefixe upload key com <code>tenants/&lt;id&gt;/</code>.</strong> Esse &eacute; o gate principal de isolamento multi-tenant. Em qualquer rota que l&ecirc; do bucket, valido que a key come&ccedil;a com o tenant do usu&aacute;rio. Sem isso, um tenant maliciosamente bem informado conseguiria pedir Presigned URL pra ler upload de outro tenant.
+      </div>
+
+      <!-- ====== GEOLOCATION ====== -->
+      <h2>Geocoding com Amazon Location Service</h2>
+
+      <p>Quando motorista termina o expediente, marca "encerrar dia" e o sistema captura latitude/longitude do navegador. Eu uso Location Service pra transformar coordenada em <em>endere&ccedil;o leg&iacute;vel</em> (geocoding reverso), que vai no relat&oacute;rio.</p>
+
+      <details>
+<summary><strong>apps/api/src/lib/geo.ts</strong> &mdash; reverse geocoding (clique para expandir)</summary>
+      <pre><code class="language-typescript">import { LocationClient, SearchPlaceIndexForPositionCommand }
+  from "@aws-sdk/client-location";
+
+const loc = new LocationClient({});
+
+export async function reverseGeocode(lat: number, lng: number): Promise&lt;string&gt; {
+  const resp = await loc.send(new SearchPlaceIndexForPositionCommand({
+    IndexName: process.env.PLACE_INDEX_NAME,
+    Position: [lng, lat],     // [longitude, latitude]
+    MaxResults: 1,
+  }));
+
+  const place = resp.Results?.[0]?.Place;
+  if (!place) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+  // Monta endere&ccedil;o curto
+  const parts = [
+    place.AddressNumber && place.Street ? `${place.Street}, ${place.AddressNumber}` : place.Street,
+    place.Municipality,
+    place.Region,
+  ].filter(Boolean);
+
+  return parts.join(" &middot; ");
+}</code></pre>
+</details>
+
+      <div class="callout info">
+        <strong>Esri (data source) e <code>SingleUse</code>.</strong> O Place Index foi configurado com <code>intendedUse: "SingleUse"</code>, n&atilde;o "Storage". Diferen&ccedil;a de licen&ccedil;a: SingleUse pode ser usado em apps end-user de mapa interativo, mas <em>n&atilde;o</em> persistido. Eu n&atilde;o salvo a string do endere&ccedil;o &mdash; salvo apenas lat/lng e fa&ccedil;o reverse on-demand. Fica legal com o termo Esri.
+      </div>
+
+      <!-- ====== CRON ====== -->
+      <h2>Cron di&aacute;rio: alerta de manuten&ccedil;&atilde;o preventiva</h2>
+
+      <p>Toda manh&atilde; (10h BRT = 13h UTC), uma Lambda separada roda pra avisar admins sobre ve&iacute;culos chegando perto da manuten&ccedil;&atilde;o:</p>
+
+      <details>
+<summary><strong>sst.config.ts</strong> &mdash; cron (clique para expandir)</summary>
+      <pre><code class="language-typescript">new sst.aws.Cron("MaintenanceCheck", {
+  schedule: "cron(0 13 * * ? *)",   // 13h UTC todo dia
+  job: {
+    handler: "apps/api/src/alerts/maintenance-check.handler",
+    link: [table],
+    environment: {
+      TABLE_NAME: table.name,
+      SES_FROM: process.env.SES_FROM_EMAIL ?? "no-reply@example.com",
+    },
+    permissions: [{ actions: ["ses:SendEmail"], resources: ["*"] }],
+  },
+});</code></pre>
+</details>
+
+      <details>
+<summary><strong>maintenance-check.ts</strong> &mdash; l&oacute;gica do alerta (clique para expandir)</summary>
+      <pre><code class="language-typescript">// L&ecirc; todos os ve&iacute;culos de todos os tenants
+// Para cada um, calcula:
+//   - dias desde &uacute;ltima manuten&ccedil;&atilde;o
+//   - km percorridos desde &uacute;ltima manuten&ccedil;&atilde;o
+// Se atingiu 80% do limite (30 dias ou 500km), entra na lista de alerta.
+
+export async function handler() {
+  const allVehicles = await scanAllVehicles();   // single scan, ~hundreds
+
+  // Agrupa por tenant pra enviar 1 email por oficina
+  const alertsByTenant = new Map&lt;string, Vehicle[]&gt;();
+
+  for (const v of allVehicles) {
+    const lastMaint = await getLastMaintenance(v.tenantId, v.plate);
+    if (!lastMaint) continue;
+
+    const daysSince = (Date.now() - lastMaint.ts) / 86400000;
+    const kmSince = v.odometer - lastMaint.odometer;
+
+    if (daysSince &gt;= 24 || kmSince &gt;= 400) {  // 80% de 30d / 500km
+      if (!alertsByTenant.has(v.tenantId)) alertsByTenant.set(v.tenantId, []);
+      alertsByTenant.get(v.tenantId)!.push({
+        ...v,
+        daysSince: Math.floor(daysSince),
+        kmSince,
+      });
+    }
+  }
+
+  // Envia email pra cada tenant
+  for (const [tenantId, alerts] of alertsByTenant) {
+    const tenant = await getTenant(tenantId);
+    if (!tenant.alertEmail) continue;
+
+    await ses.send(new SendEmailCommand({
+      Source: process.env.SES_FROM,
+      Destination: { ToAddresses: [tenant.alertEmail] },
+      Message: {
+        Subject: { Data: `${alerts.length} ve&iacute;culo(s) precisam de manuten&ccedil;&atilde;o` },
+        Body: { Html: { Data: renderAlertHtml(alerts) } },
+      },
+    }));
+  }
+}</code></pre>
+</details>
+
+      <div class="print">
+        <div class="t">Print: dashboard admin com obser&ccedil;&otilde;es por ve&iacute;culo</div>
+        <div class="d">Tela de gest&atilde;o multi-cliente, observa&ccedil;&otilde;es pendentes por ve&iacute;culo, badges de mensagens novas. <code>assets/img/posts/serravans-obs.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/serravans-obs.png" alt="Tela admin com observa&ccedil;&otilde;es por ve&iacute;culo">
+
+      <div class="print">
+        <div class="t">Print: dashboard geral do admin</div>
+        <div class="d">KPIs globais (clientes, frota, checkins, litros, gasto combust&iacute;vel) + ranking de clientes por consumo. <code>assets/img/posts/serravans-dash.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/serravans-dash.png" alt="Dashboard com KPIs e ranking de clientes">
+
+      <!-- ====== BEDROCK ====== -->
+      <h2>Bedrock: resumo autom&aacute;tico de manuten&ccedil;&atilde;o</h2>
+
+      <p>Quando um motorista escreve uma observa&ccedil;&atilde;o no app ("freio fazendo barulho ao parar, principalmente em descida"), o admin v&ecirc; no painel. Mas s&atilde;o dezenas de observa&ccedil;&otilde;es por dia, e o admin precisa priorizar.</p>
+
+      <p>Adicionei um endpoint <code>POST /vehicle-notes/summarize</code> que usa Bedrock Haiku 4.5 pra gerar resumo executivo dos &uacute;ltimos N dias:</p>
+
+      <details>
+<summary><strong>summarize com tool use</strong> (clique para expandir)</summary>
+      <pre><code class="language-typescript">const SUMMARIZE_PROMPT = `Voc&ecirc; recebe observa&ccedil;&otilde;es de motoristas sobre ve&iacute;culos.
+Categorize cada observa&ccedil;&atilde;o em: critico | atencao | normal.
+Gere um resumo executivo apontando os 3 principais problemas que exigem
+a&ccedil;&atilde;o imediata. Linguagem direta, sem floreio.`;
+
+export async function summarizeNotes(notes: VehicleNote[]) {
+  const resp = await bedrock.send(new InvokeModelCommand({
+    modelId: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    body: JSON.stringify({
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 2000,
+      system: SUMMARIZE_PROMPT,
+      messages: [{
+        role: "user",
+        content: `Observa&ccedil;&otilde;es:\n\n${notes.map(n =&gt; `[${n.plate}] ${n.text}`).join("\n")}`,
+      }],
+      tools: [{
+        name: "save_summary",
+        input_schema: {
+          type: "object",
+          properties: {
+            critical_count: { type: "number" },
+            top_issues: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  plate: { type: "string" },
+                  problem: { type: "string" },
+                  recommended_action: { type: "string" },
+                },
+              },
+            },
+            summary: { type: "string" },
+          },
+          required: ["critical_count", "top_issues", "summary"],
+        },
+      }],
+      tool_choice: { type: "tool", name: "save_summary" },
+    }),
+  }));
+  // ... parsing
+}</code></pre>
+</details>
+
+      <div class="callout success">
+        <strong>Quando vale usar Bedrock vs s&oacute; classificar?</strong> Pra 5-10 observa&ccedil;&otilde;es/dia, o admin l&ecirc; tudo. Pra 50+, ele come&ccedil;a a pular &mdash; e justo a&iacute; perde o cr&iacute;tico. Resumir com LLM &eacute; barato ($0.005 por chamada) e devolve cog. carga gerencial.
+      </div>
+
+      <!-- ====== S3 LIFECYCLE ====== -->
+      <h2>S3 lifecycle: ~70% de economia em fotos antigas</h2>
+
+      <p>Cada checkin tem 5 fotos de ~3MB. Em 30 dias o bucket cresceu ~50GB. Defini lifecycle agressiva:</p>
+
+      <table>
+        <thead><tr><th>Idade</th><th>Storage class</th><th>Custo $/GB-m&ecirc;s</th></tr></thead>
+        <tbody>
+          <tr><td>0-30 dias</td><td>STANDARD</td><td>$0.023</td></tr>
+          <tr><td>30-180 dias</td><td>STANDARD_IA</td><td>$0.0125</td></tr>
+          <tr><td>180+ dias</td><td>GLACIER_IR</td><td>$0.004</td></tr>
+        </tbody>
+      </table>
+
+      <p>GLACIER_IR (Glacier Instant Retrieval) restaura em milissegundos &mdash; importante porque admin &agrave;s vezes precisa ver foto antiga sem espera. S&oacute; o storage &eacute; mais barato.</p>
+
+      <div class="callout warn">
+        <strong>Cuidado com versionamento + lifecycle.</strong> Habilitei versionamento no bucket. Sem lifecycle separada pras vers&otilde;es antigas, elas ficam em STANDARD pra sempre. Adicionei rule: <code>noncurrent_version_transition</code> 7 dias &rarr; GLACIER_IR, 30 dias &rarr; delete. Pra fotos de cupom fiscal isso n&atilde;o tem problema legal (n&atilde;o &eacute; documento fiscal nosso, &eacute; do posto).
+      </div>
+
+      <!-- ====== PROBLEMAS ====== -->
+      <h2>Problemas que tive em produ&ccedil;&atilde;o</h2>
+
+      <h3>1. Textract latency em foto grande</h3>
+
+      <p>Cupom fotografado em 4K (12MB) levava 8-12s no Textract. Comprimir no cliente antes de upload (canvas redimensionado para 1920px de largura) reduziu pra ~2s. Trade-off: 1% dos cupons ficavam ileg&iacute;veis. Para esses casos, motorista clica "tirar foto melhor".</p>
+
+      <h3>2. iOS PWA + Safari + Cognito refresh token</h3>
+
+      <p>iOS Safari deleta IndexedDB e cookies da PWA se "n&atilde;o usar por 7 dias". Motorista voltava da segunda passou semana, login expirava. Solu&ccedil;&atilde;o: persistir refreshToken em <code>navigator.credentials</code> (Credential Management API) quando dispon&iacute;vel. Funciona em Android; iOS ainda esquece. Aceitei o trade-off (login manual a cada 7 dias inativos &eacute; aceit&aacute;vel).</p>
+
+      <h3>3. Cognito Admin API throttle</h3>
+
+      <p>Convidar 20 motoristas de uma vez via <code>AdminCreateUser</code> batia em throttle (~5 req/s). Adicionei delay de 250ms entre chamadas. Pra batches maiores, considerar SQS pra enfileirar.</p>
+
+      <h3>4. Multi-tenant CORS no S3</h3>
+
+      <p>Bucket de fotos com <code>allowOrigins: ["*"]</code> &eacute; muito permissivo. Mudei pra lista expl&iacute;cita dos dom&iacute;nios dos tenants. Quando algu&eacute;m da Total Diesel subiu sob dom&iacute;nio pr&oacute;prio, tive que adicionar entrada. Solu&ccedil;&atilde;o longa: gerar CORS din&acirc;mico via Lambda@Edge baseado em tabela DynamoDB.</p>
+
+      <h3>5. Bedrock cross-region inference profile + LinkedIn API</h3>
+
+      <p>N&atilde;o relacionado, mas serviu de li&ccedil;&atilde;o: tentei chamar Bedrock de uma Lambda que estava com Reserved Concurrency = 1. Cold start + retry exponencial = 30s. Removi reserved concurrency, tudo normalizou.</p>
+
+      <!-- ====== METRICAS ====== -->
+      <h2>Resultados</h2>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value">~$12</span>
+          <span class="metric-label">Custo mensal AWS</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">3s</span>
+          <span class="metric-label">Foto cupom &rarr; form preenchido</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">19</span>
+          <span class="metric-label">M&oacute;dulos de rotas</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~92%</span>
+          <span class="metric-label">Acerto OCR Textract</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~70%</span>
+          <span class="metric-label">Economia S3 lifecycle</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">1</span>
+          <span class="metric-label">Lambda &amp; 1 deploy</span>
+        </div>
+      </div>
+
+      <!-- ====== CONCLUSÃO ====== -->
+      <h2>Conclus&atilde;o</h2>
+
+      <div class="callout success">
+        <strong>O que destrava esse stack pra produto comercial pequeno:</strong> SST v3 reduz IaC de centenas de linhas Terraform pra TypeScript leg&iacute;vel; Textract resolve OCR sem treinar modelo; DynamoDB single-table com 2 GSIs &eacute; suficiente pra 95% das queries; Cognito com custom attributes faz multi-tenant sem custo extra. Pra um time pequeno construindo SaaS B2B, vale demais.
+      </div>
+
+      <p>O pr&oacute;ximo passo &eacute; abrir como produto para outras oficinas. A multi-tenancia j&aacute; est&aacute; pronta &mdash; o que falta &eacute; landing page, billing (Stripe ou AWS Marketplace), e onboarding self-service. Cada nova oficina &eacute; <em>zero infra</em>, s&oacute; um registro novo na tabela.</p>
+
+      <p>Se voc&ecirc; est&aacute; pensando em construir SaaS pequeno na AWS sem time grande, esse modelo SST + Lambda + DynamoDB single-table + Cognito multi-tenant &eacute; o caminho mais barato pra chegar em produto vendi-vel.</p>
+
+    </div>
+
+    <footer class="post-footer">
+      <div class="post-author">
+        <div class="post-author-avatar">MCN</div>
+        <div>
+          <div class="post-author-name">Matheus N.</div>
+          <div class="post-author-role">Engenheiro de Infraestrutura Cloud</div>
+        </div>
+      </div>
+      <div class="post-share">
+        <span>Compartilhar:</span>
+        <a href="#" class="share-btn" title="LinkedIn">in</a>
+        <a href="#" class="share-btn" title="Twitter">X</a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer style="padding:2rem;text-align:center;color:var(--ink3);font-size:.8rem;border-top:1px solid var(--border)">
+  &copy; 2026 Cloud by MCN
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-hcl.min.js"></script>
+<script>
+const text = document.querySelector('.post-content').innerText;
+const words = text.split(/\s+/).length;
+const minutes = Math.ceil(words / 200);
+const el = document.getElementById('readTime');
+if (el) el.textContent = minutes + ' min de leitura';
+</script>
+</body>
+</html>

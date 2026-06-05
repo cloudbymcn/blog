@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aplicação para Limpeza Automática de Caixas Microsoft 365 com MRM Retention Policy | Cloud by MCN</title>
+<meta name="description" content="Ferramenta interna que monitora quota de caixas Microsoft 365 e dispara limpeza autom&aacute;tica de e-mails antigos para Online Archive. Usa MRM Retention Policy + ManagedFolderAssistant (caminho oficial Microsoft) em vez de EWS bulk_move (throttled). FastAPI + Next.js 16 + PowerShell subprocess com cert auth.">
+<meta property="og:title" content="Aplicação para Limpeza Automática de Caixas Microsoft 365 com MRM Retention Policy">
+<meta property="og:description" content="Ferramenta interna que monitora quota de caixas M365 e dispara limpeza autom&aacute;tica via MRM Retention Policy + ManagedFolderAssistant. FastAPI + Next.js + Exchange Online PS.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body class="post-page">
+
+<nav id="nav" class="scrolled">
+  <div class="nav-in">
+    <a href="../index.html" class="logo">
+      <img class="logo-img" src="../assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-r">
+      <div class="nav-links" id="navLinks">
+        <a href="../index.html#projetos">Projetos</a>
+        <a href="../index.html#sobre">Sobre</a>
+        <a href="../index.html#contato">Contato</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="post-main">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a><span>/</span>
+    <a href="../index.html#projetos">Projetos</a><span>/</span>
+    <span class="current">M365 &middot; Graph API &middot; PowerShell &middot; FastAPI</span>
+  </div>
+
+  <article class="post-article">
+    <header class="post-header">
+      <div class="post-meta-bar">
+        <span class="post-date-tag">26 Mai 2026</span>
+        <span class="post-reading" id="readTime"></span>
+      </div>
+      <h1>Aplica&ccedil;&atilde;o para limpeza autom&aacute;tica de caixas Microsoft 365</h1>
+      <p class="post-subtitle">Ferramenta interna que monitora quota de caixas Microsoft 365 e dispara limpeza autom&aacute;tica de e-mails antigos para o Online Archive. Usa MRM Retention Policy + ManagedFolderAssistant (caminho oficial recomendado pela Microsoft) em vez de EWS bulk_move &mdash; processa server-side sem rate limit. Backend FastAPI + Python, frontend Next.js 16, autentica&ccedil;&atilde;o por certificado no Exchange Online PowerShell.</p>
+    </header>
+
+    <div class="post-content">
+
+      <!-- ====== INTRO ====== -->
+      <h2>O problema das caixas cheias</h2>
+
+      <p>Microsoft 365 vende caixa de 2GB (Exchange Online Plan 1) ou 50GB (Plan 2). O que ningu&eacute;m fala &eacute; que <em>chegando perto do limite</em>, a caixa <strong>trava</strong> &mdash; nem envia, nem recebe. Usu&aacute;rio descobre na cara do cliente que perdeu uma negocia&ccedil;&atilde;o por isso.</p>
+
+      <p>Na empresa, sa&iacute;ram 11 mailboxes "no alerta" e 2 "cr&iacute;ticas" (&gt;90%). O caminho cl&aacute;ssico que toda equipe de TI tenta primeiro:</p>
+
+      <ol>
+        <li><strong>Outlook desktop manual</strong>: usu&aacute;rio abre, seleciona mil e-mails, arrasta pro Online Archive. Inviavel pra milhares de itens.</li>
+        <li><strong>EWS bulk_move via script</strong>: roda batches de PowerShell. Funciona, mas... Microsoft <em>throttles</em> EWS app em ~5 itens/segundo. <strong>13 horas pra 2000 itens.</strong></li>
+        <li><strong>Microsoft Graph <code>/messages/move</code></strong>: <em>n&atilde;o suporta moves pro Online Archive.</em> Retorna 404 "Item exists in archive mailbox".</li>
+      </ol>
+
+      <p>Depois de uma noite olhando documenta&ccedil;&atilde;o, achei o caminho oficial recomendado pela Microsoft pra esse cen&aacute;rio: <strong>MRM Retention Policy + Managed Folder Assistant</strong>. O servidor processa internamente, sem passar por API exposta &mdash; <em>sem rate limit do app</em>.</p>
+
+      <div class="callout success">
+        <strong>O resultado:</strong> caixa da Ana Marcal foi de 66k itens / 43.93GB pra 58k itens / 38GB em <strong>8 horas</strong> &mdash; e os 5.5GB que sobraram foram movidos pro Online Archive, n&atilde;o deletados. Mesmo resultado de 13h via EWS, em menos tempo e zero throttle.
+      </div>
+
+      <div class="print">
+        <div class="t">Print: ranking de mailboxes por uso</div>
+        <div class="d">Lista de caixas ordenadas por % de quota usado, com filtros e badges de criticidade (vermelho/amarelo/verde). <code>assets/img/posts/mailbox-ranking.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/mailbox-ranking.png" alt="Limpador de caixas com ranking de mailboxes por % uso">
+
+      <!-- ====== ARQUITETURA ====== -->
+      <h2>Arquitetura</h2>
+
+      <pre><code class="language-bash">  ┌───────────────────────────────────────┐
+  │  Next.js 16 UI (port 3100)            │
+  │   • Tailwind 4                        │
+  │   • Cards: Ranking, Caixa, Limpezas   │
+  └───────────────────┬───────────────────┘
+                      │ HTTP polling
+                      ▼
+  ┌───────────────────────────────────────┐
+  │  FastAPI Python 3.14 (port 8000)      │
+  │   • /mailboxes/ranking                │
+  │   • /mailboxes/{email}/retention      │
+  │   • /retention-jobs                   │
+  └─┬────────┬────────────┬─────────────┬─┘
+    ▼        ▼            ▼             ▼
+  sqlite  Graph    PowerShell      MSAL
+  (jobs)  Reports  subprocess     (Graph)
+                       │
+                       ▼
+              ┌────────────────────────┐
+              │ powershell.exe         │
+              │ Connect-ExchangeOnline │
+              │ -CertificateFilePath   │
+              │                        │
+              │ New-RetentionPolicyTag │
+              │ New-RetentionPolicy    │
+              │ Set-Mailbox            │
+              │ Start-MFA              │
+              └────────┬───────────────┘
+                       ▼
+              ┌────────────────────────┐
+              │ Microsoft Exchange     │
+              │ ManagedFolderAssistant │
+              │ (server-side, async,   │
+              │  no rate limit)        │
+              └────────────────────────┘</code></pre>
+
+      <h3>Stack</h3>
+
+      <table>
+        <thead><tr><th>Camada</th><th>Tecnologia</th></tr></thead>
+        <tbody>
+          <tr><td>Backend</td><td>Python 3.14 + FastAPI + sqlite (job persistence)</td></tr>
+          <tr><td>Frontend</td><td>Next.js 16 (App Router, Turbopack) + Tailwind 4</td></tr>
+          <tr><td>Auth Microsoft</td><td>App-only cert auth (Exchange PS) + client-secret (Graph)</td></tr>
+          <tr><td>Integra&ccedil;&atilde;o Exchange</td><td>subprocess <code>powershell.exe</code> &rarr; ExchangeOnlineManagement</td></tr>
+          <tr><td>M&eacute;tricas</td><td>Graph Reports API (<code>getMailboxUsageDetail</code>)</td></tr>
+          <tr><td>Stats real-time</td><td><code>Get-MailboxStatistics</code> PS direto</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ====== O CAMINHO ====== -->
+      <h2>O caminho oficial: MRM Retention Policy</h2>
+
+      <p>O que poucos artigos de blog explicam: <strong>retention policy + retention tag</strong> &eacute; o pr&oacute;prio mecanismo da Microsoft pra mover/deletar e-mails baseado em idade. Quando voc&ecirc; configura, o pr&oacute;prio servidor processa &mdash; n&atilde;o &eacute; sua app remotamente fazendo move.</p>
+
+      <p>Workflow:</p>
+
+      <ol>
+        <li><strong>Cria retention tag</strong> com a a&ccedil;&atilde;o <code>MoveToArchive</code> e idade m&iacute;nima (ex.: 24 meses).</li>
+        <li><strong>Cria retention policy</strong> que cont&eacute;m a tag.</li>
+        <li><strong>Aplica a policy</strong> na mailbox do usu&aacute;rio.</li>
+        <li><strong>Dispara o Managed Folder Assistant</strong> manualmente (sen&atilde;o ele s&oacute; roda no schedule da Microsoft, que &eacute; uma vez ao dia).</li>
+      </ol>
+
+      <p>O servidor faz o trabalho dele em background, no <em>seu</em> tempo (geralmente 1-24h dependendo de carga). Em troca: <strong>sem throttle</strong>. Voc&ecirc; n&atilde;o paga em rate limit porque n&atilde;o &eacute; a sua app que move &mdash; &eacute; o pr&oacute;prio Exchange.</p>
+
+      <details>
+<summary><strong>mrm_provider.py</strong> &mdash; o cora&ccedil;&atilde;o (clique para expandir)</summary>
+      <pre><code class="language-python">def _connect_block() -&gt; str:
+    """PS snippet que conecta no Exchange Online via cert auth."""
+    return f"""
+Import-Module ExchangeOnlineManagement -ErrorAction Stop
+$pwd = ConvertTo-SecureString -String '{settings.cert_password}' -Force -AsPlainText
+Connect-ExchangeOnline `
+  -AppId '{settings.client_id}' `
+  -CertificateFilePath '{settings.cert_path}' `
+  -CertificatePassword $pwd `
+  -Organization '{settings.exo_organization}' `
+  -ShowBanner:$false `
+  -CommandName New-RetentionPolicyTag,Set-RetentionPolicyTag,Get-RetentionPolicyTag,
+               New-RetentionPolicy,Set-RetentionPolicy,Get-RetentionPolicy,
+               Set-Mailbox,Get-Mailbox,Enable-Mailbox,
+               Start-ManagedFolderAssistant,
+               Get-MailboxFolderStatistics,Get-MailboxStatistics,
+               Get-OrganizationConfig,Set-OrganizationConfig
+"""
+
+
+def apply_retention(mailbox_email: str, months: int, scope: str = "all") -&gt; MRMResult:
+    """Cria/reusa tag + policy, aplica na mailbox, dispara MFA."""
+    tag_name = f"VS-Archive-{months}m"
+    policy_name = f"VS-MailboxCleaner-{months}m"
+    age_days = months * 30
+
+    script = f"""
+# 1. Garante o tag (idempotente)
+$tag = Get-RetentionPolicyTag -Identity '{tag_name}' -ErrorAction SilentlyContinue
+if (-not $tag) {{
+  New-RetentionPolicyTag -Name '{tag_name}' `
+    -Type All `
+    -RetentionAction MoveToArchive `
+    -AgeLimitForRetention {age_days} `
+    -RetentionEnabled $true | Out-Null
+}}
+
+# 2. Garante a policy ligada ao tag
+$policy = Get-RetentionPolicy -Identity '{policy_name}' -ErrorAction SilentlyContinue
+if (-not $policy) {{
+  New-RetentionPolicy -Name '{policy_name}' `
+    -RetentionPolicyTagLinks '{tag_name}' | Out-Null
+}} else {{
+  Set-RetentionPolicy -Identity '{policy_name}' `
+    -RetentionPolicyTagLinks '{tag_name}' | Out-Null
+}}
+
+# 3. Garante archive habilitado + auto-expand
+$mbx = Get-Mailbox -Identity '{mailbox_email}'
+if ($mbx.ArchiveStatus -ne 'Active') {{
+  Enable-Mailbox -Identity '{mailbox_email}' -Archive | Out-Null
+}}
+if (-not $mbx.AutoExpandingArchiveEnabled) {{
+  Enable-Mailbox -Identity '{mailbox_email}' -AutoExpandingArchive | Out-Null
+}}
+
+# 4. Aplica a policy e desabilita RetentionHold (importante!)
+Set-Mailbox -Identity '{mailbox_email}' `
+  -RetentionPolicy '{policy_name}' `
+  -RetentionHoldEnabled $false | Out-Null
+
+# 5. Dispara o Managed Folder Assistant
+Start-ManagedFolderAssistant -Identity '{mailbox_email}'
+"""
+
+    rc, stdout, stderr = _run_ps(script, timeout=300)
+    return MRMResult(
+        success=(rc == 0),
+        tag_name=tag_name,
+        policy_name=policy_name,
+        stdout=stdout,
+        stderr=stderr,
+    )</code></pre>
+</details>
+
+      <div class="callout danger">
+        <strong>Linha que custou 4 horas:</strong> <code>RetentionHoldEnabled $false</code>. Se a mailbox tem RetentionHold ativo (default em alguns t&iacute;tulos M365), o MFA n&atilde;o processa nada e voc&ecirc; n&atilde;o tem mensagem de erro. Documentei isso como bloqueio #1 da matriz.
+      </div>
+
+      <!-- ====== AUTH ====== -->
+      <h2>Auth: cert obrigat&oacute;rio pro Exchange PS</h2>
+
+      <p>Microsoft Graph aceita client-secret. <strong>Exchange Online PowerShell n&atilde;o aceita.</strong> S&oacute; aceita certificate-based app authentication. Esse foi o segundo "perdido". Gerar o cert na primeira vez:</p>
+
+      <details>
+<summary><strong>gerar self-signed cert + upload no App Reg</strong> (clique para expandir)</summary>
+      <pre><code class="language-powershell"># Em PowerShell admin
+$cert = New-SelfSignedCertificate `
+  -Subject "CN=MailboxCleaner-Service" `
+  -CertStoreLocation "Cert:\CurrentUser\My" `
+  -KeyExportPolicy Exportable `
+  -KeySpec Signature `
+  -KeyLength 2048 `
+  -KeyAlgorithm RSA `
+  -HashAlgorithm SHA256 `
+  -NotAfter (Get-Date).AddYears(2)
+
+$cert.Thumbprint  # cola em CERT_THUMBPRINT do .env
+
+# Exportar pra cer (vai pro App Registration no Entra)
+Export-Certificate -Cert $cert -FilePath ".\backend\cert.cer"
+
+# Exportar pra pfx (vai pro Python via cert_path + cert_password)
+$pwd = ConvertTo-SecureString -String "MinhaSenhaForte!" -Force -AsPlainText
+Export-PfxCertificate -Cert $cert -FilePath ".\backend\cert.pfx" -Password $pwd</code></pre>
+</details>
+
+      <p>No Entra (Azure AD), o App Registration precisa de:</p>
+
+      <ul>
+        <li><strong>Office 365 Exchange Online &rarr; Exchange.ManageAsApp</strong> (Application permission, com admin consent)</li>
+        <li><strong>Office 365 Exchange Online &rarr; full_access_as_app</strong> (s&oacute; se voc&ecirc; tamb&eacute;m usa EWS fallback)</li>
+        <li><strong>Microsoft Graph &rarr; Reports.Read.All</strong> (pro ranking via Graph Reports API)</li>
+        <li><strong>Microsoft Graph &rarr; User.Read.All</strong> (display name nos rankings)</li>
+        <li><strong>Role Exchange Administrator</strong> atribu&iacute;da ao service principal (pra rodar <code>Set-Mailbox</code>, retention, etc.)</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Atribuir Exchange Administrator ao app, n&atilde;o ao usu&aacute;rio.</strong> Esse passo &eacute; em "Roles and administrators" do Entra, n&atilde;o em "API permissions". Pesquise pelo <em>nome do service principal do app</em> e atribua. Sem isso, <code>Set-Mailbox</code> retorna "user is not authorized" mesmo com permission API correta.
+      </div>
+
+      <!-- ====== JOB STORE ====== -->
+      <h2>Job store em sqlite: simples e durabilidade local</h2>
+
+      <p>Cada limpeza vira um <em>job</em> persistido em sqlite local. O job guarda:</p>
+
+      <ul>
+        <li><strong>Baseline</strong>: contagem/tamanho da caixa <em>antes</em> do apply.</li>
+        <li><strong>Status</strong>: pending, running, completed, error.</li>
+        <li><strong>Polling result</strong>: a cada 15 minutos, atualiza <code>current_count</code> e <code>current_size</code>.</li>
+      </ul>
+
+      <details>
+<summary><strong>retention_jobs.py</strong> &mdash; modelo sqlite (clique para expandir)</summary>
+      <pre><code class="language-python">CREATE_SQL = """
+CREATE TABLE IF NOT EXISTS retention_jobs (
+    id TEXT PRIMARY KEY,
+    mailbox_email TEXT NOT NULL,
+    months INTEGER NOT NULL,
+    scope TEXT NOT NULL,
+    status TEXT NOT NULL,         -- pending | running | completed | error
+    baseline_count INTEGER,
+    baseline_size_bytes INTEGER,
+    baseline_archive_size_bytes INTEGER,
+    current_count INTEGER,
+    current_size_bytes INTEGER,
+    current_archive_size_bytes INTEGER,
+    last_poll_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    tag_name TEXT,
+    policy_name TEXT,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON retention_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_mailbox ON retention_jobs(mailbox_email);
+"""
+
+
+def create_job(mailbox: str, months: int, scope: str) -&gt; str:
+    job_id = str(uuid.uuid4())
+    baseline = capture_baseline(mailbox)
+    with conn() as c:
+        c.execute("""
+            INSERT INTO retention_jobs
+              (id, mailbox_email, months, scope, status,
+               baseline_count, baseline_size_bytes, baseline_archive_size_bytes)
+            VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
+        """, (job_id, mailbox, months, scope,
+              baseline.count, baseline.size_bytes, baseline.archive_size_bytes))
+    return job_id</code></pre>
+</details>
+
+      <h3>Background poller a cada 15 minutos</h3>
+
+      <p>Uma thread rodando em background atualiza os jobs pendentes:</p>
+
+      <details>
+<summary><strong>retention_poller.py</strong> &mdash; loop de polling (clique para expandir)</summary>
+      <pre><code class="language-python">import time
+import threading
+from .retention_jobs import list_pending, update_job
+from ..providers.mrm_provider import get_mailbox_stats
+
+POLL_INTERVAL = 15 * 60  # 15 minutos
+COMPLETION_DELTA_THRESHOLD = 100  # &lt; 100 itens novos em 30min &rarr; conclu&iacute;do
+
+
+def _poller_loop():
+    while True:
+        try:
+            jobs = list_pending()
+            for j in jobs:
+                stats = get_mailbox_stats(j.mailbox_email)
+                delta_count = j.baseline_count - stats.count
+                archive_delta = stats.archive_size_bytes - j.baseline_archive_size_bytes
+
+                # Crit&eacute;rio de "completed":
+                # archive cresceu E mailbox primary parou de cair
+                if archive_delta &gt; 0 and abs(stats.count - (j.current_count or j.baseline_count)) &lt; COMPLETION_DELTA_THRESHOLD:
+                    # Marcar como completed se ficou est&aacute;vel por 30 min
+                    if j.stable_since and (time.time() - j.stable_since) &gt; 1800:
+                        update_job(j.id, status="completed",
+                                   completed_at=datetime.utcnow())
+                        continue
+
+                update_job(
+                    j.id,
+                    current_count=stats.count,
+                    current_size_bytes=stats.size_bytes,
+                    current_archive_size_bytes=stats.archive_size_bytes,
+                    last_poll_at=datetime.utcnow(),
+                )
+        except Exception as e:
+            logger.exception("poller failed")
+        time.sleep(POLL_INTERVAL)
+
+
+def start_poller():
+    t = threading.Thread(target=_poller_loop, daemon=True)
+    t.start()</code></pre>
+</details>
+
+      <div class="print">
+        <div class="t">Print: job MRM em andamento (a enviar)</div>
+        <div class="d">Card de uma limpeza ativa mostrando delta itens/bytes em tempo real, hora de in&iacute;cio, status do MFA. <code>assets/img/posts/mailbox-job.png</code> &mdash; envio pendente.</div>
+      </div>
+
+      <!-- ====== RANKING ====== -->
+      <h2>Ranking de mailboxes: Graph Reports API</h2>
+
+      <p>O ranking inicial (pra TI saber quais mailboxes atacar) vem da Microsoft Graph Reports API:</p>
+
+      <details>
+<summary><strong>graph_reports.py</strong> &mdash; getMailboxUsageDetail (clique para expandir)</summary>
+      <pre><code class="language-python">import requests
+import csv
+from io import StringIO
+from typing import Literal
+
+PERIOD = Literal["D7", "D30", "D90", "D180"]
+
+
+def fetch_mailbox_usage(period: PERIOD = "D7", token: str = None) -&gt; list[dict]:
+    """
+    Retorna ranking de mailboxes por % de uso da quota.
+    Graph Reports API devolve CSV diretamente.
+    """
+    url = f"https://graph.microsoft.com/v1.0/reports/getMailboxUsageDetail(period='{period}')"
+    resp = requests.get(url, headers={"Authorization": f"Bearer {token}"})
+    resp.raise_for_status()
+
+    # CSV com headers: Report Refresh Date, User Principal Name, Storage Used (Byte),
+    #                  Issue Warning Quota (Byte), Prohibit Send Quota (Byte), ...
+    reader = csv.DictReader(StringIO(resp.text))
+    rows = []
+    for row in reader:
+        used = int(row["Storage Used (Byte)"])
+        quota = int(row["Prohibit Send Quota (Byte)"])
+        rows.append({
+            "upn": row["User Principal Name"],
+            "used_bytes": used,
+            "quota_bytes": quota,
+            "percent": (used / quota * 100) if quota else 0,
+            "item_count": int(row["Item Count"]),
+            "last_activity": row["Last Activity Date"],
+        })
+
+    return sorted(rows, key=lambda r: r["percent"], reverse=True)</code></pre>
+</details>
+
+      <div class="callout info">
+        <strong>Graph Reports atualiza 1x/dia (00:00 UTC).</strong> N&atilde;o &eacute; real-time. Mailbox de novo usu&aacute;rio s&oacute; aparece no ranking dois dias depois. Pra real-time durante uma limpeza ativa, uso <code>Get-MailboxStatistics</code> direto via PowerShell.
+      </div>
+
+      <h3>"Exibir nomes ocultos" do Microsoft Admin Center</h3>
+
+      <p>Detalhe que custou tempo: por padr&atilde;o, M365 Admin Center tem configura&ccedil;&atilde;o "Exibir nomes ocultos = OFF" em <em>Configura&ccedil;&otilde;es da Organiza&ccedil;&atilde;o &rarr; Relat&oacute;rios</em>. Isso faz a Graph Reports retornar UPN hasheado (<code>EBC0CB6FA63CB6D2C3D...</code>) em vez de email real. <strong>Ligar essa configura&ccedil;&atilde;o</strong> &eacute; o primeiro passo, sen&atilde;o o ranking fica inutilis&aacute;vel.</p>
+
+      <!-- ====== MATRIZ ====== -->
+      <h2>Matriz de bloqueios: quando MFA n&atilde;o move</h2>
+
+      <p>Depois de v&aacute;rios casos onde apliquei retention policy e <em>nada acontecia</em>, montei essa matriz de verifica&ccedil;&atilde;o. Cada bloqueio tem o comando PS pra checar:</p>
+
+      <table>
+        <thead><tr><th>#</th><th>Bloqueio</th><th>Como checar</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><code>RetentionHoldEnabled=True</code></td><td><code>Get-Mailbox X</code> &mdash; backend for&ccedil;a False no apply</td></tr>
+          <tr><td>2</td><td><code>LitigationHoldEnabled=True</code></td><td>bloqueio compliance, requer a&ccedil;&atilde;o separada</td></tr>
+          <tr><td>3</td><td><code>InPlaceHolds</code> n&atilde;o vazio</td><td>idem</td></tr>
+          <tr><td>4</td><td><code>ComplianceTagHoldApplied=True</code></td><td>tag de compliance, requer a&ccedil;&atilde;o separada</td></tr>
+          <tr><td>5</td><td><code>ArchiveStatus != Active</code></td><td>backend habilita auto via <code>Enable-Mailbox -Archive</code></td></tr>
+          <tr><td>6</td><td>Tag <code>RetentionEnabled=False</code></td><td><code>Get-RetentionPolicyTag</code></td></tr>
+          <tr><td>7</td><td>Policy n&atilde;o atribu&iacute;da</td><td><code>Get-Mailbox</code> field <code>RetentionPolicy</code></td></tr>
+          <tr><td>8</td><td>Tag n&atilde;o est&aacute; na policy</td><td><code>Get-RetentionPolicy</code> field <code>RetentionPolicyTagLinks</code></td></tr>
+          <tr><td>9</td><td>Archive cheio + AutoExpand off</td><td><code>Get-MailboxStatistics -Archive</code> + <code>Get-OrganizationConfig</code></td></tr>
+          <tr><td>10</td><td>Mailbox n&atilde;o &eacute; UserMailbox</td><td><code>Get-Mailbox</code> field <code>RecipientTypeDetails</code></td></tr>
+          <tr><td>11</td><td>ELC tenant disabled</td><td><code>Get-OrganizationConfig</code> field <code>ElcProcessingDisabled</code></td></tr>
+          <tr><td>12</td><td>Licen&ccedil;a errada</td><td>sem ExchangeOnlineArchiving ou Plan 2</td></tr>
+        </tbody>
+      </table>
+
+      <p>Backend force (1) e (9) automaticamente. Os outros precisam de a&ccedil;&atilde;o manual com aprova&ccedil;&atilde;o do time legal/compliance.</p>
+
+      <!-- ====== TIMING ====== -->
+      <h2>Quanto tempo o MFA leva?</h2>
+
+      <p>Microsoft <em>documenta</em> "at&eacute; 7 dias". Observado em produ&ccedil;&atilde;o:</p>
+
+      <ul>
+        <li><strong>Apply &rarr; MFA come&ccedil;ar a agir</strong>: 16-22 horas.</li>
+        <li><strong>MFA processando</strong>: ~700-800 itens/hora em archive moves cross-mailbox.</li>
+        <li><strong>Item count primary cai imediatamente</strong> quando MFA processa.</li>
+        <li><strong>Tamanho liberado de quota</strong>: at&eacute; 14 dias depois (Recoverable Items dumpster ret&eacute;m items deletados antes de purgar fisicamente).</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>"O usu&aacute;rio reclamou que sumiu 5GB mas a quota n&atilde;o caiu."</strong> Isso &eacute; o dumpster. Os e-mails J&aacute; foram pro archive, mas o slot que ocupavam no primary ainda est&aacute; "reserved" por 14 dias (Recoverable Items). Quando purgar fisicamente, quota cai. Documentei isso na UI pra n&atilde;o ter expectativa errada.
+      </div>
+
+      <!-- ====== PROBLEMAS ====== -->
+      <h2>Problemas que tive no caminho</h2>
+
+      <h3>1. EWS bulk_move com 50 itens/batch + 8 threads = throttle storm</h3>
+
+      <p>Vers&atilde;o anterior do projeto era 100% EWS bulk_move. Tentei "fa&ccedil;o batch maior + mais threads" pra acelerar. Resultado: Microsoft come&ccedil;ou a retornar <code>ErrorTimeoutExpired</code> + <code>ErrorServerBusy</code>. Reduzi pra batch 20 + 2 threads + FaultTolerance retry. A&iacute; descobri MRM e abandonei EWS pra cleanup em volume. EWS s&oacute; sobrou pra moves manuais individuais.</p>
+
+      <h3>2. <code>.onmicrosoft.com</code> obrigat&oacute;rio em <code>Connect-ExchangeOnline -Organization</code></h3>
+
+      <p>Tenant tem dois nomes: o <em>verified domain</em> (ex.: <code>vitoriastone.com</code>) e o <em>onmicrosoft</em> (ex.: <code>vitoriastoneltda.onmicrosoft.com</code>). <code>Connect-ExchangeOnline</code> EXIGE o segundo, n&atilde;o aceita o primeiro. Demorei pra descobrir &mdash; o erro &eacute; gen&eacute;rico ("organization not found").</p>
+
+      <details>
+<summary><strong>script pra descobrir o .onmicrosoft.com</strong> (clique para expandir)</summary>
+      <pre><code class="language-python">def get_onmicrosoft_domain(token: str) -&gt; str:
+    """Busca o dominio .onmicrosoft.com do tenant via Graph."""
+    resp = requests.get(
+        "https://graph.microsoft.com/v1.0/domains",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    for d in resp.json()["value"]:
+        if d["id"].endswith(".onmicrosoft.com"):
+            return d["id"]
+    raise RuntimeError("nenhum dominio .onmicrosoft.com encontrado")</code></pre>
+</details>
+
+      <h3>3. PT-BR locale no PowerShell quebra parsing num&eacute;rico</h3>
+
+      <p><code>Get-MailboxFolderStatistics</code> em servidor com locale pt-BR retorna <code>"FolderSize: 1.234 GB (1.234.567.890 bytes)"</code> &mdash; pontos como separadores de milhar. Meu regex parsing inicial dava cast errado. Solu&ccedil;&atilde;o:</p>
+
+      <details>
+<summary><strong>parser de tamanho com PT-BR awareness</strong> (clique para expandir)</summary>
+      <pre><code class="language-python">import re
+
+def parse_bytes(s: str) -&gt; int:
+    """
+    Converte 'FolderSize: 1.234 GB (1.234.567.890 bytes)' em int.
+    Funciona em locale pt-BR (ponto = milhar) e en-US (v&iacute;rgula = milhar).
+    """
+    m = re.search(r"\(([\d.,]+)\s*bytes?\)", s)
+    if not m:
+        return 0
+    digits = re.sub(r"[,.]", "", m.group(1))
+    return int(digits)</code></pre>
+</details>
+
+      <h3>4. <code>Enable-OrganizationCustomization</code> &eacute; one-shot e obrigat&oacute;rio</h3>
+
+      <p>Em tenant <em>novo</em>, antes de qualquer <code>Set-OrganizationConfig</code>, voc&ecirc; tem que rodar <code>Enable-OrganizationCustomization</code> uma vez. Tenant antigo j&aacute; tem habilitado. Se voc&ecirc; n&atilde;o roda em tenant novo, qualquer Set falha com mensagem confusa. Backend roda isso na primeira execu&ccedil;&atilde;o.</p>
+
+      <h3>5. Microsoft Graph n&atilde;o suporta Online Archive moves</h3>
+
+      <p>Tentei a abordagem moderna primeiro: Graph API. Endpoint <code>/users/{id}/messages/{id}/move</code> com <code>destinationId=archiveinbox</code> retorna 404 com mensagem "Item exists in archive mailbox". A documenta&ccedil;&atilde;o n&atilde;o avisa que m&eacute;todo n&atilde;o suporta cross-mailbox (primary &rarr; archive &eacute; cross-mailbox no modelo Exchange). Voltei pra EWS pra moves individuais, MRM pra bulk.</p>
+
+      <!-- ====== METRICAS ====== -->
+      <h2>Resultados</h2>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value">8h</span>
+          <span class="metric-label">Limpeza 66k itens</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">5.5GB</span>
+          <span class="metric-label">Movido pro Archive</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">0</span>
+          <span class="metric-label">Throttle (vs EWS)</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~700/h</span>
+          <span class="metric-label">Itens processados (MFA)</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">12</span>
+          <span class="metric-label">Bloqueios mapeados</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~0min</span>
+          <span class="metric-label">Toque do TI por execu&ccedil;&atilde;o</span>
+        </div>
+      </div>
+
+      <h3>Antes vs Depois</h3>
+
+      <table>
+        <thead><tr><th>M&eacute;trica</th><th>EWS bulk_move</th><th>MRM Retention Policy</th></tr></thead>
+        <tbody>
+          <tr><td>Tempo pra 2k itens</td><td>~13h</td><td>~3h (MFA processa em paralelo)</td></tr>
+          <tr><td>Throttle</td><td>Sim, agressivo</td><td>Zero</td></tr>
+          <tr><td>Toque manual do TI</td><td>Monitorar script noites</td><td>Apenas apply &rarr; UI mostra delta</td></tr>
+          <tr><td>Cross-mailbox to Archive</td><td>Funciona devagar</td><td>Funciona r&aacute;pido</td></tr>
+          <tr><td>Suporte Microsoft</td><td>EWS &eacute; deprecating</td><td>Caminho oficial recomendado</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ====== ROADMAP ====== -->
+      <h2>O que vem pela frente</h2>
+
+      <ul>
+        <li><strong>Auth admin na UI</strong>: hoje sem auth, s&oacute; localhost. Adicionar Cognito ou Entra SSO.</li>
+        <li><strong>Batch apply</strong>: limpar v&aacute;rias mailboxes de uma vez.</li>
+        <li><strong>Notifica&ccedil;&atilde;o quando job conclui</strong> via Telegram/Slack.</li>
+        <li><strong>Deploy</strong>: migrar de localhost pra container/Azure App Service.</li>
+        <li><strong>M&eacute;tricas Prometheus</strong>: expor stats das limpezas em formato scrape-able.</li>
+      </ul>
+
+      <!-- ====== CONCLUSÃO ====== -->
+      <h2>Conclus&atilde;o</h2>
+
+      <div class="callout success">
+        <strong>A li&ccedil;&atilde;o:</strong> quando uma API parece imposs&iacute;vel de escalar (EWS com throttle de 5 items/s), provavelmente existe um caminho oficial diferente que voc&ecirc; n&atilde;o conhece. MRM Retention Policy &eacute; o que a pr&oacute;pria Microsoft usa internamente pra cleanup &mdash; e &eacute; expos&iacute;vel via PowerShell. <em>Sempre vale ler o que o vendor recomenda antes de brigar com a API errada.</em>
+      </div>
+
+      <p>Esse projeto n&atilde;o &eacute; AWS, mas a li&ccedil;&atilde;o de engenharia &eacute; universal: troque "como eu fa&ccedil;o A funcionar mais r&aacute;pido?" por "qual o caminho oficial pra esse problema?". Geralmente o segundo caminho existe, &eacute; menos sexy (PowerShell em vez de Graph), mas resolve 10x melhor.</p>
+
+      <p>Se voc&ecirc; tem caixas M365 cheias na sua empresa, esse padr&atilde;o &eacute; o caminho. Implementa&ccedil;&atilde;o cabe em ~600 linhas Python + scripts PS. App Registration leva 20 minutos. ROI: zero ticket de "minha caixa travou" depois de implementado.</p>
+
+    </div>
+
+    <footer class="post-footer">
+      <div class="post-author">
+        <div class="post-author-avatar">MCN</div>
+        <div>
+          <div class="post-author-name">Matheus N.</div>
+          <div class="post-author-role">Engenheiro de Infraestrutura Cloud</div>
+        </div>
+      </div>
+      <div class="post-share">
+        <span>Compartilhar:</span>
+        <a href="#" class="share-btn" title="LinkedIn">in</a>
+        <a href="#" class="share-btn" title="Twitter">X</a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer style="padding:2rem;text-align:center;color:var(--ink3);font-size:.8rem;border-top:1px solid var(--border)">
+  &copy; 2026 Cloud by MCN
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-powershell.min.js"></script>
+<script>
+const text = document.querySelector('.post-content').innerText;
+const words = text.split(/\s+/).length;
+const minutes = Math.ceil(words / 200);
+const el = document.getElementById('readTime');
+if (el) el.textContent = minutes + ' min de leitura';
+</script>
+</body>
+</html>

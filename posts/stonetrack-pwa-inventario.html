@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PWA Serverless para Inventário Completo de Pátio de Mármore e Granito | Cloud by MCN</title>
+<meta name="description" content="PWA serverless para invent&aacute;rio e localiza&ccedil;&atilde;o de chapas no p&aacute;tio: bipagem offline-first com IndexedDB queue, 11 Lambdas Python especializadas, DynamoDB Streams sincronizando com ERP Firebird. Substitui dois aplicativos PowerApps (InventariaAI + LocalizaAI).">
+<meta property="og:title" content="PWA Serverless para Inventário Completo de Pátio de Mármore e Granito">
+<meta property="og:description" content="PWA serverless para invent&aacute;rio de chapas: bipagem offline-first, 11 Lambdas Python, DynamoDB Streams sincronizando com ERP Firebird.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body class="post-page">
+
+<nav id="nav" class="scrolled">
+  <div class="nav-in">
+    <a href="../index.html" class="logo">
+      <img class="logo-img" src="../assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-r">
+      <div class="nav-links" id="navLinks">
+        <a href="../index.html#projetos">Projetos</a>
+        <a href="../index.html#sobre">Sobre</a>
+        <a href="../index.html#contato">Contato</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="post-main">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a><span>/</span>
+    <a href="../index.html#projetos">Projetos</a><span>/</span>
+    <span class="current">AWS &middot; Lambda &middot; DynamoDB Streams &middot; PWA &middot; Terraform</span>
+  </div>
+
+  <article class="post-article">
+    <header class="post-header">
+      <div class="post-meta-bar">
+        <span class="post-date-tag">26 Mai 2026</span>
+        <span class="post-reading" id="readTime"></span>
+      </div>
+      <h1>PWA serverless para invent&aacute;rio completo de p&aacute;tio de m&aacute;rmore e granito</h1>
+      <p class="post-subtitle">Sistema de invent&aacute;rio e localiza&ccedil;&atilde;o de chapas para serraria de granito: React PWA com bipagem offline-first via IndexedDB queue, 11 Lambdas Python especializadas, DynamoDB Streams sincronizando bipagens de volta no ERP Firebird. Substitui dois aplicativos PowerApps (InventariaAI + LocalizaAI) com arquitetura nativa AWS.</p>
+    </header>
+
+    <div class="post-content">
+
+      <!-- ====== INTRO ====== -->
+      <h2>O problema dos dois PowerApps</h2>
+
+      <p>A empresa tinha dois aplicativos PowerApps em produ&ccedil;&atilde;o, cada um resolvendo metade de um mesmo problema:</p>
+
+      <ul>
+        <li><strong>InventariaAI</strong>: bipagem de chapas durante o invent&aacute;rio anual. Operador escaneia QR ou digita c&oacute;digo, sistema marca como "conferido" no ERP.</li>
+        <li><strong>LocalizaAI</strong>: invent&aacute;rio cont&iacute;nuo. Quando uma chapa mudava de p&aacute;tio/cavalete, alguem precisava registrar a movimenta&ccedil;&atilde;o.</li>
+      </ul>
+
+      <p>Os dois apps tinham o mesmo conjunto de problemas:</p>
+
+      <ol>
+        <li><strong>Sem offline.</strong> O p&aacute;tio das pedras &eacute; uma serraria enorme com WiFi instavel. Cair internet no meio de bipar 200 chapas significava perder bipagens, ou bipar tudo de novo.</li>
+        <li><strong>Lat&ecirc;ncia ruim.</strong> Cada bipagem fazia uma chamada s&iacute;ncrona pro Dataverse, que falava com o ERP via connector custom. Tempo m&eacute;dio entre "bip" e "confirmado": 2-4 segundos. Pra bipar 200 chapas, 10-15 minutos &uacute;teis perdidos.</li>
+        <li><strong>Licen&ccedil;a.</strong> 25 usu&aacute;rios &times; PowerApps Per User = ~R$ 1.500/m&ecirc;s.</li>
+        <li><strong>UI lenta de iterar.</strong> Editor PowerApps n&atilde;o tem version control, n&atilde;o tem diff, mudar um campo &eacute; clicar em 8 abas.</li>
+      </ol>
+
+      <p>Decidi reescrever as duas em uma s&oacute; PWA serverless. O nome novo: <strong>StoneTrack</strong>.</p>
+
+      <div class="print">
+        <div class="t">Print: tela principal de bipagem (Scan Turbo)</div>
+        <div class="d">Bipagem em modo r&aacute;pido: operador digita estiva, n&uacute;mero, e os bot&otilde;es de cor permitem identifica&ccedil;&atilde;o visual da chapa quando o c&oacute;digo n&atilde;o est&aacute; leg&iacute;vel. <code>assets/img/posts/stonetrack-bipar.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/stonetrack-bipar.png" alt="Tela de bipagem StoneTrack com keypad e seletor de cor">
+
+      <!-- ====== ARQUITETURA ====== -->
+      <h2>Arquitetura</h2>
+
+      <pre><code class="language-bash">  ┌─────────────────────────────────────┐
+  │  React PWA (Vite + Tailwind)        │
+  │   • IndexedDB (offline queue)       │
+  │   • Workbox service worker          │
+  │   • 7 telas                         │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  CloudFront + S3                    │
+  │   • OAC                             │
+  │   • SPA fallback (404 → index.html) │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  API Gateway REST                   │
+  │   • Cognito User Pool authorizer    │
+  │   • CORS habilitado                 │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  11 Lambdas Python 3.12             │
+  │   scan | snapshot | block_loader    │
+  │   barcode_lookup | progress | rank  │
+  │   reconcile | export | location     │
+  │   firebird_sync | admin             │
+  └──────┬────────────────┬─────────────┘
+         ▼                ▼
+  ┌─────────────┐   ┌──────────────────────┐
+  │ DynamoDB    │   │ Cognito User Pool    │
+  │  4 tabelas  │   │  + grupos            │
+  │  + GSIs     │   └──────────────────────┘
+  │  + Streams  │
+  └──────┬──────┘
+         │ Streams INSERT trigger
+         ▼
+  ┌─────────────────────────────────────┐
+  │  Lambda firebird_sync               │
+  │  (VPC, driver fdb)                  │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  EC2 Firebird 5.0 (ERP Athenas)     │
+  │  UPDATE TABBLOCOCHAPAS              │
+  └─────────────────────────────────────┘</code></pre>
+
+      <h3>Stack</h3>
+
+      <table>
+        <thead><tr><th>Camada</th><th>Tecnologia</th></tr></thead>
+        <tbody>
+          <tr><td>Frontend</td><td>React 18 + Vite + Tailwind + PWA (Workbox)</td></tr>
+          <tr><td>Auth</td><td>AWS Cognito User Pools + grupos</td></tr>
+          <tr><td>API</td><td>API Gateway REST + Lambda Python 3.12 (ARM64)</td></tr>
+          <tr><td>Banco</td><td>DynamoDB (4 tabelas) + Firebird (ERP, EC2)</td></tr>
+          <tr><td>CDN</td><td>CloudFront + S3 com OAC</td></tr>
+          <tr><td>IaC</td><td>Terraform (m&oacute;dulos por camada)</td></tr>
+          <tr><td>Observabilidade</td><td>CloudWatch + X-Ray + SNS pra alarms</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ====== DYNAMODB ====== -->
+      <h2>DynamoDB: 4 tabelas e os GSIs que importam</h2>
+
+      <p>Modelei evitando o single-table extremo. O motivo: as quatro entidades t&ecirc;m vidas independentes, e o time t&eacute;cnico que vai dar manuten&ccedil;&atilde;o vai entender melhor 4 tabelas claras do que uma com 12 prefixos.</p>
+
+      <table>
+        <thead>
+          <tr><th>Tabela</th><th>PK</th><th>SK</th><th>GSIs</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>stonetrack-chapas</code></td><td>CHAPA_ID</td><td>&mdash;</td><td>ref_vs-index, filial-localizacao-index, barcode-index</td></tr>
+          <tr><td><code>stonetrack-inventory-events</code></td><td>INVENTORY_ID</td><td>CHAPA_ID</td><td>scanned_by-index</td></tr>
+          <tr><td><code>stonetrack-snapshots</code></td><td>INVENTORY_ID</td><td>CHAPA_ID</td><td>&mdash;</td></tr>
+          <tr><td><code>stonetrack-move-history</code></td><td>CHAPA_ID</td><td>TIMESTAMP</td><td>&mdash;</td></tr>
+        </tbody>
+      </table>
+
+      <p>Os GSIs respondem a perguntas operacionais espec&iacute;ficas:</p>
+
+      <ul>
+        <li><strong>ref_vs-index</strong>: "me d&aacute; todas as chapas do bloco BL-58731" (refer&ecirc;ncia &eacute; mais usada que CHAPA_ID).</li>
+        <li><strong>filial-localizacao-index</strong>: "me lista o invent&aacute;rio do p&aacute;tio G3 da filial matriz".</li>
+        <li><strong>barcode-index</strong>: lookup quando o operador escaneia c&oacute;digo de barras (n&atilde;o &eacute; CHAPA_ID).</li>
+        <li><strong>scanned_by-index</strong>: pra ranking de produtividade.</li>
+      </ul>
+
+      <details>
+<summary><strong>Terraform &mdash; tabela inventory-events com Stream</strong> (clique para expandir)</summary>
+      <pre><code class="language-hcl">resource "aws_dynamodb_table" "inventory_events" {
+  name         = "stonetrack-inventory-events"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "INVENTORY_ID"
+  range_key    = "CHAPA_ID"
+
+  attribute { name = "INVENTORY_ID"; type = "S" }
+  attribute { name = "CHAPA_ID";     type = "S" }
+  attribute { name = "scanned_by";   type = "S" }
+  attribute { name = "scanned_at";   type = "S" }
+
+  global_secondary_index {
+    name            = "scanned_by-index"
+    hash_key        = "scanned_by"
+    range_key       = "scanned_at"
+    projection_type = "ALL"
+  }
+
+  # ★ Stream pra disparar firebird_sync
+  stream_enabled   = true
+  stream_view_type = "NEW_IMAGE"
+
+  point_in_time_recovery { enabled = true }
+}</code></pre>
+</details>
+
+      <!-- ====== SCAN OFFLINE ====== -->
+      <h2>Offline-first: IndexedDB + flush em batch</h2>
+
+      <p>O n&uacute;cleo do app. Quando o operador bipa, a chapa <em>vai pro IndexedDB</em> antes de qualquer chamada de rede. Se a rede est&aacute; boa, o flush acontece imediatamente. Se cair, fica pendente at&eacute; voltar.</p>
+
+      <details>
+<summary><strong>frontend/src/lib/offlineQueue.js</strong> &mdash; fila no IndexedDB (clique para expandir)</summary>
+      <pre><code class="language-javascript">import { openDB } from "idb";
+import { postScanBatch } from "./api";
+
+const DB_NAME = "stonetrack";
+const STORE = "scan_queue";
+
+function getDb() {
+  return openDB(DB_NAME, 1, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE)) {
+        db.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+      }
+    },
+  });
+}
+
+/** Grava bipagem na fila offline. */
+export async function enqueue(scan) {
+  const db = await getDb();
+  await db.add(STORE, { ...scan, status: "pending", ts: Date.now() });
+}
+
+const BATCH_SIZE = 50;
+
+/** Tenta enviar pendentes em batches de 50. */
+export async function flush(inventoryId) {
+  const db = await getDb();
+  const all = await db.getAll(STORE);
+  const pending = all.filter((s) =&gt; s.status === "pending");
+  if (!pending.length) return { sent: 0 };
+
+  let totalSent = 0;
+
+  // Chunks de 50 (limite da API Gateway payload + Lambda timeout)
+  for (let i = 0; i &lt; pending.length; i += BATCH_SIZE) {
+    const chunk = pending.slice(i, i + BATCH_SIZE);
+    const scans = chunk.map((s) =&gt; ({
+      chapa_id: s.chapa_id,
+      estiva: s.estiva,
+      filial: s.filial,
+    }));
+
+    try {
+      const resp = await postScanBatch(inventoryId, scans);
+      // Marca cada um como sent ou error baseado no retorno
+      for (let k = 0; k &lt; chunk.length; k++) {
+        const result = resp.results[k];
+        await db.put(STORE, {
+          ...chunk[k],
+          status: result.status === "ok" ? "sent" : "error",
+          detail: result.detail,
+        });
+      }
+      totalSent += resp.results.filter((r) =&gt; r.status === "ok").length;
+    } catch (err) {
+      // Falha no batch inteiro: deixa pendente, tenta no pr&oacute;ximo flush
+      console.error("flush batch failed:", err);
+      break;
+    }
+  }
+
+  return { sent: totalSent };
+}</code></pre>
+</details>
+
+      <p>A UI mostra contador de pendentes no canto da tela. Cair internet &eacute; um detalhe vis&iacute;vel, n&atilde;o uma falha cr&iacute;tica.</p>
+
+      <h3>Lambda scan: batch otimizado</h3>
+
+      <p>Do lado do servidor, o handler de batch escreve no DynamoDB <em>tamb&eacute;m</em> em batch (<code>batch_writer</code>), e enriquece os dados com <code>batch_get_item</code> em pacotes de 100:</p>
+
+      <details>
+<summary><strong>lambda/scan/handler.py</strong> &mdash; batch_scan (clique para expandir)</summary>
+      <pre><code class="language-python">def handle_batch_scan(body, user_id, user_name):
+    """POST /scan/batch &mdash; offline sync batch (otimizado com batch_get)."""
+    inventory_id = body["inventory_id"]
+    scans = body["scans"]
+    now = datetime.now(timezone.utc).isoformat()
+
+    # 1. Enriquecer chapas via batch_get (resource API, at&eacute; 100 keys por chamada)
+    chapa_ids = list({s["chapa_id"] for s in scans})
+    chapas_map = {}
+    for i in range(0, len(chapa_ids), 100):
+        batch_keys = [{"CHAPA_ID": cid} for cid in chapa_ids[i:i+100]]
+        resp = dynamodb.batch_get_item(
+            RequestItems={chapas_table.name: {"Keys": batch_keys}}
+        )
+        for item in resp.get("Responses", {}).get(chapas_table.name, []):
+            chapas_map[item["CHAPA_ID"]] = item
+
+    # 2. Write events em batch (batch_writer agrupa de 25 em 25)
+    results = []
+    with events_table.batch_writer() as batch:
+        for scan in scans:
+            chapa_id = scan["chapa_id"]
+            chapa = chapas_map.get(chapa_id)
+            if not chapa:
+                results.append({"chapa_id": chapa_id, "status": "error",
+                                "detail": {"error": "n&atilde;o encontrada"}})
+                continue
+            try:
+                batch.put_item(Item={
+                    "INVENTORY_ID": inventory_id,
+                    "CHAPA_ID": chapa_id,
+                    "ref_vs": chapa.get("ref_vs", ""),
+                    "scanned_by": user_id,
+                    "scanned_by_name": user_name,
+                    "scanned_at": now,
+                    "estiva_encontrada": scan["estiva"],
+                    "filial": scan["filial"],
+                    "material": chapa.get("material", ""),
+                    "synced_to_firebird": False,
+                })
+                results.append({"chapa_id": chapa_id, "status": "ok"})
+            except Exception as e:
+                results.append({"chapa_id": chapa_id, "status": "error",
+                                "detail": {"error": str(e)}})
+    return response(200, {"results": results})</code></pre>
+</details>
+
+      <div class="callout info">
+        <strong>Sem <code>batch_writer</code>, escrever 50 itens custa 50 PutItem.</strong> Com <code>batch_writer</code>, custa 2 BatchWriteItem (DynamoDB aceita 25 por batch). Lat&ecirc;ncia cai de ~2.5s pra ~200ms.
+      </div>
+
+      <h3>Conditional write contra duplicado</h3>
+
+      <p>No bipagem individual (<code>POST /scan</code>), uso <code>ConditionExpression</code> pra impedir duplicada:</p>
+
+      <details>
+<summary><strong>scan single &mdash; condicional</strong> (clique para expandir)</summary>
+      <pre><code class="language-python">try:
+    events_table.put_item(
+        Item={...},
+        ConditionExpression="attribute_not_exists(INVENTORY_ID) AND attribute_not_exists(CHAPA_ID)",
+    )
+except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
+    return response(409, {"error": "Chapa j&aacute; bipada neste invent&aacute;rio", "chapa_id": chapa_id})</code></pre>
+</details>
+
+      <p>No batch eu n&atilde;o uso condicional &mdash; <code>batch_writer</code> n&atilde;o aceita <code>ConditionExpression</code>. Aceito o overwrite porque o offline pode reenviar uma bipagem v&aacute;rias vezes, mas o item &eacute; idempotente (mesma chapa, mesmo inventory, sobrescreve com mesmo conte&uacute;do).</p>
+
+      <!-- ====== STREAMS ====== -->
+      <h2>DynamoDB Streams: sync de volta no Firebird</h2>
+
+      <p>O sistema legado (ERP Athenas, Firebird) precisa enxergar as bipagens em real time. N&atilde;o d&aacute; pra trocar o ERP, mas d&aacute; pra escrever de volta. Solu&ccedil;&atilde;o: DynamoDB Streams &rarr; Lambda dentro da VPC &rarr; UPDATE Firebird.</p>
+
+      <details>
+<summary><strong>lambda/firebird_sync/handler.py</strong> &mdash; conex&atilde;o Firebird (clique para expandir)</summary>
+      <pre><code class="language-python">import json
+import os
+import boto3
+import fdb   # driver Firebird
+
+SYNC_ENABLED = os.environ.get("SYNC_ENABLED", "false").lower() == "true"
+FIREBIRD_SECRET_ARN = os.environ.get("FIREBIRD_SECRET_ARN", "")
+
+_fb_creds = None
+
+def get_firebird_creds():
+    """Busca credenciais Firebird do Secrets Manager (cache m&oacute;dulo)."""
+    global _fb_creds
+    if _fb_creds:
+        return _fb_creds
+    client = boto3.client("secretsmanager")
+    resp = client.get_secret_value(SecretId=FIREBIRD_SECRET_ARN)
+    _fb_creds = json.loads(resp["SecretString"])
+    return _fb_creds
+
+
+def get_firebird_conn():
+    creds = get_firebird_creds()
+    return fdb.connect(
+        host=creds["host"],
+        port=int(creds.get("port", 3050)),
+        database=creds["database"],
+        user=creds["username"],
+        password=creds["password"],
+        charset="UTF8",
+    )
+
+
+UPDATE_SQL = """
+    UPDATE TABBLOCOCHAPAS
+    SET CONFERIDO = 1,
+        DATAHORACONFERENCIA = ?,
+        USUARIOCONFERENCIA = ?,
+        CODIGOLOCALIZACAO = ?
+    WHERE CODIGOBLOCO = ?
+      AND CODIGO = ?
+"""
+
+
+def lambda_handler(event, context):
+    """DynamoDB Streams &rarr; Firebird sync."""
+    if not SYNC_ENABLED:
+        print("SYNC_ENABLED=false, skipping")
+        return {"processed": 0, "skipped": len(event["Records"])}
+
+    processed = 0
+    conn = None
+    try:
+        for record in event["Records"]:
+            if record["eventName"] != "INSERT":
+                continue
+            new_image = record["dynamodb"]["NewImage"]
+            # Deserializar do formato Stream...
+            chapa_id = new_image["CHAPA_ID"]["S"]
+            scanned_at = new_image["scanned_at"]["S"]
+            scanned_by = new_image["scanned_by_name"]["S"]
+            estiva = new_image["estiva_encontrada"]["S"]
+
+            # Conex&atilde;o lazy
+            if conn is None:
+                conn = get_firebird_conn()
+
+            cur = conn.cursor()
+            cur.execute(UPDATE_SQL, (scanned_at, scanned_by, estiva, *chapa_id.split("-")))
+            conn.commit()
+            processed += 1
+    finally:
+        if conn:
+            conn.close()
+    return {"processed": processed}</code></pre>
+</details>
+
+      <h3>VPC, driver fdb e cold start</h3>
+
+      <p>Essa Lambda <em>tem</em> que rodar dentro da VPC (a EC2 Firebird est&aacute; em subnet privada). VPC Lambda paga o pre&ccedil;o de ~500ms de cold start na primeira chamada (ENI Hyperplane). Para sync de bipagem, isso n&atilde;o &eacute; problema cr&iacute;tico, pois &eacute; ass&iacute;ncrono (Stream).</p>
+
+      <p>O driver <code>fdb</code> tem uma depend&ecirc;ncia bin&aacute;ria nativa: <code>libfbclient.so</code>. Empacotei como <strong>Lambda Layer</strong>:</p>
+
+      <details>
+<summary><strong>build da layer fdb</strong> (clique para expandir)</summary>
+      <pre><code class="language-bash">#!/bin/bash
+# Compila fdb + libfbclient pra Amazon Linux 2 (ARM64)
+docker run --rm -v "$PWD:/work" --platform linux/arm64 \
+  public.ecr.aws/lambda/python:3.12 \
+  /bin/bash -c "
+    yum install -y firebird-libfbclient gcc python3-devel
+    pip install fdb -t /work/python/lib/python3.12/site-packages/
+    cp /usr/lib64/libfbclient.so* /work/python/lib/
+  "
+
+# Empacota
+cd python && zip -r ../fdb-layer-arm64.zip . && cd ..
+aws lambda publish-layer-version \
+  --layer-name fdb-layer \
+  --compatible-architectures arm64 \
+  --compatible-runtimes python3.12 \
+  --zip-file fileb://fdb-layer-arm64.zip</code></pre>
+</details>
+
+      <h3>Feature flag SYNC_ENABLED=false</h3>
+
+      <div class="callout danger">
+        <strong>Por que SYNC_ENABLED=false por default?</strong> Esse era o tipo de Lambda perigoso: errar uma vez escrevia coisa errada no ERP. Durante desenvolvimento, o sync ficou desligado e eu validava a Lambda lendo CloudWatch Logs, n&atilde;o escrevendo no Firebird. S&oacute; depois de 2 semanas com o evento simulado em produ&ccedil;&atilde;o sem escrita &eacute; que liguei <code>SYNC_ENABLED=true</code>. Toda integra&ccedil;&atilde;o que escreve em sistema legado deveria ter esse switch.
+      </div>
+
+      <!-- ====== COGNITO ====== -->
+      <h2>Cognito: auth + filial + grupo</h2>
+
+      <p>Cada usu&aacute;rio pertence a uma filial (atributo custom <code>custom:filial</code>) e a um grupo (<code>operador</code> ou <code>gestores</code>). Os handlers Lambda checam isso direto do JWT:</p>
+
+      <details>
+<summary><strong>auth via JWT claims</strong> (clique para expandir)</summary>
+      <pre><code class="language-python">def get_user_context(event):
+    """Extrai claims do token Cognito (j&aacute; validado pelo authorizer)."""
+    claims = event["requestContext"]["authorizer"]["claims"]
+    return {
+        "user_id": claims["sub"],
+        "user_name": claims.get("name") or claims["cognito:username"],
+        "email": claims["email"],
+        "filial": claims.get("custom:filial", ""),
+        "groups": claims.get("cognito:groups", "").split(","),
+    }
+
+
+def require_gestor(event):
+    """Helper: aborta se n&atilde;o &eacute; gestor."""
+    ctx = get_user_context(event)
+    if "gestores" not in ctx["groups"]:
+        return None, response(403, {"error": "Apenas gestores"})
+    return ctx, None</code></pre>
+</details>
+
+      <div class="callout info">
+        <strong>Por que filial no token e n&atilde;o no DynamoDB?</strong> Cada query de bipagem precisa filtrar por filial pra n&atilde;o vazar dados entre unidades. Se a filial estiver em DynamoDB, &eacute; um GetItem extra a cada request. No JWT, &eacute; gratuito. Custo: trocar filial exige re-login.
+      </div>
+
+      <!-- ====== EXPORT ====== -->
+      <h2>Export Excel/PDF: presigned S3</h2>
+
+      <p>Gestores precisam de relat&oacute;rios. Excel via <code>openpyxl</code>, PDF via <code>reportlab</code> &mdash; ambos como Layer separada (binarios pesados, ~30MB). O export n&atilde;o devolve o arquivo direto na resposta da API &mdash; isso quebraria limite de payload da API Gateway (6MB).</p>
+
+      <details>
+<summary><strong>fluxo de export com presigned URL</strong> (clique para expandir)</summary>
+      <pre><code class="language-python">import boto3
+from openpyxl import Workbook
+import io
+import uuid
+
+s3 = boto3.client("s3")
+EXPORTS_BUCKET = os.environ["EXPORTS_BUCKET"]
+
+def lambda_handler(event, context):
+    inventory_id = event["pathParameters"]["id"]
+    format = event["queryStringParameters"].get("format", "xlsx")
+
+    # 1. Gera o arquivo em mem&oacute;ria
+    if format == "xlsx":
+        buf = generate_excel(inventory_id)
+        ct = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ext = "xlsx"
+    else:
+        buf = generate_pdf(inventory_id)
+        ct = "application/pdf"
+        ext = "pdf"
+
+    # 2. Sobe pro S3 com TTL curto via lifecycle
+    key = f"exports/{uuid.uuid4()}.{ext}"
+    s3.put_object(
+        Bucket=EXPORTS_BUCKET,
+        Key=key,
+        Body=buf.getvalue(),
+        ContentType=ct,
+        ContentDisposition=f'attachment; filename="inventario-{inventory_id}.{ext}"',
+    )
+
+    # 3. Devolve presigned URL de download (10 min)
+    url = s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": EXPORTS_BUCKET, "Key": key},
+        ExpiresIn=600,
+    )
+    return response(200, {"url": url, "filename": f"inventario-{inventory_id}.{ext}"})</code></pre>
+</details>
+
+      <p>O bucket de exports tem <em>lifecycle rule</em>: arquivos s&atilde;o deletados depois de 24h. Sem isso, o bucket vira lixeira eterna.</p>
+
+      <!-- ====== RECONCILIAÇÃO ====== -->
+      <h2>Reconcilia&ccedil;&atilde;o: o diff visual</h2>
+
+      <p>No final de cada invent&aacute;rio, o gestor precisa saber: o que estava esperado (snapshot ERP no in&iacute;cio), o que foi bipado (eventos), o que est&aacute; faltando. Eu fa&ccedil;o esse diff em uma Lambda dedicada:</p>
+
+      <details>
+<summary><strong>lambda/reconcile/handler.py</strong> &mdash; diff snapshot vs eventos (clique para expandir)</summary>
+      <pre><code class="language-python">def reconcile(inventory_id):
+    """
+    Compara snapshot (expectativa) vs events (realidade).
+    Retorna 4 grupos: corretas, movidas, n&atilde;o encontradas, novas.
+    """
+    snapshot = query_all(snapshots_table, "INVENTORY_ID", inventory_id)
+    events = query_all(events_table, "INVENTORY_ID", inventory_id)
+
+    snap_map = {s["CHAPA_ID"]: s for s in snapshot}
+    ev_map = {e["CHAPA_ID"]: e for e in events}
+
+    corretas = []     # estava no snap E foi bipada na mesma estiva
+    movidas = []      # estava no snap E foi bipada em estiva diferente
+    nao_encontradas = []  # estava no snap, n&atilde;o foi bipada
+    novas = []        # n&atilde;o estava no snap, foi bipada
+
+    for chapa_id, snap in snap_map.items():
+        ev = ev_map.get(chapa_id)
+        if not ev:
+            nao_encontradas.append(snap)
+        elif ev["estiva_encontrada"] == snap.get("estiva_esperada"):
+            corretas.append(ev)
+        else:
+            movidas.append({**ev, "estiva_esperada": snap.get("estiva_esperada")})
+
+    for chapa_id, ev in ev_map.items():
+        if chapa_id not in snap_map:
+            novas.append(ev)
+
+    return {
+        "corretas": corretas,
+        "movidas": movidas,
+        "nao_encontradas": nao_encontradas,
+        "novas": novas,
+    }</code></pre>
+</details>
+
+      <p>O frontend renderiza isso como 4 abas coloridas, cada uma com a lista exportavel. Em invent&aacute;rio cl&aacute;ssico, esse passo levava dias e era feito em Excel. Agora &eacute; um GET de ~3 segundos.</p>
+
+      <!-- ====== TERRAFORM ====== -->
+      <h2>Terraform: m&oacute;dulos por camada</h2>
+
+      <p>Optei por Terraform em vez de SAM porque o projeto tem mais pe&ccedil;as do que SAM cobre bem (Lambda + API Gateway + DynamoDB + Cognito + CloudFront + SES + Secrets Manager + Locations Service). M&oacute;dulos:</p>
+
+      <pre><code class="language-bash">infra/
+├── main.tf                # root module
+├── variables.tf
+├── outputs.tf
+├── terraform.tfvars.example
+├── backend.tf.example     # state remoto S3 + lock DynamoDB
+└── modules/
+    ├── dynamodb/          # 4 tabelas + GSIs + streams
+    ├── cognito/           # user pool + grupos
+    ├── api-gateway/       # REST API + CORS + authorizer
+    ├── lambda/            # 11 fun&ccedil;&otilde;es + IAM + layer
+    │   ├── src/           # handlers Python
+    │   └── layers/        # fdb + openpyxl + reportlab
+    ├── s3/                # PWA bucket + exports bucket
+    ├── cloudfront/        # distribution + OAC
+    ├── ses/               # email templates
+    └── monitoring/        # alarms + dashboard + SNS</code></pre>
+
+      <div class="callout success">
+        <strong>State remoto desde dia 1.</strong> S3 backend com DynamoDB lock pra evitar dois <code>terraform apply</code> simultaneos. Se um deploy quebra, ningu&eacute;m mais consegue rodar at&eacute; o lock expirar. Salva a vida quando v&aacute;rios devs/CI batem ao mesmo tempo.
+      </div>
+
+      <!-- ====== FRONTEND PWA ====== -->
+      <h2>Frontend: PWA com Workbox</h2>
+
+      <p>Sete telas. Cada uma resolve uma persona:</p>
+
+      <table>
+        <thead><tr><th>Tela</th><th>Acesso</th><th>Funcionalidade</th></tr></thead>
+        <tbody>
+          <tr><td>Login</td><td>Todos</td><td>Auth Cognito + sele&ccedil;&atilde;o de filial</td></tr>
+          <tr><td>Scan Turbo</td><td>Todos</td><td>3 modos: r&aacute;pido (grid), scanner (c&acirc;mera), cores (fallback)</td></tr>
+          <tr><td>Localizar</td><td>Todos</td><td>Busca chapa + mover + hist&oacute;rico de movimenta&ccedil;&atilde;o</td></tr>
+          <tr><td>Ranking</td><td>Todos</td><td>Top operadores + 7 badges + auto-refresh 30s</td></tr>
+          <tr><td>Dashboard</td><td>Gestores</td><td>Iniciar invent&aacute;rio + progresso + export Excel/PDF</td></tr>
+          <tr><td>Reconcilia&ccedil;&atilde;o</td><td>Gestores</td><td>Diff visual: corretas, movidas, n&atilde;o encontradas, novas</td></tr>
+          <tr><td>Admin</td><td>Gestores</td><td>Criar/editar/desativar usu&aacute;rios, reset senha</td></tr>
+        </tbody>
+      </table>
+
+      <div class="print">
+        <div class="t">Print: Ranking de operadores (a enviar)</div>
+        <div class="d">Top operadores com 7 badges, auto-refresh 30s. <code>assets/img/posts/stonetrack-ranking.png</code> &mdash; envio pendente.</div>
+      </div>
+
+      <div class="print">
+        <div class="t">Print: Dashboard + Reconcilia&ccedil;&atilde;o (a enviar)</div>
+        <div class="d">Tela do gestor com progresso do invent&aacute;rio em tempo real, diff de reconcilia&ccedil;&atilde;o. <code>assets/img/posts/stonetrack-dash.png</code> &mdash; envio pendente.</div>
+      </div>
+
+      <h3>Workbox config</h3>
+
+      <details>
+<summary><strong>vite.config.ts</strong> &mdash; PWA + Workbox (clique para expandir)</summary>
+      <pre><code class="language-javascript">import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
+
+export default defineConfig({
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.svg", "robots.txt"],
+      manifest: {
+        name: "StoneTrack",
+        short_name: "StoneTrack",
+        theme_color: "#0f1c2e",
+        background_color: "#fff",
+        display: "standalone",
+        icons: [
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+        ],
+      },
+      workbox: {
+        runtimeCaching: [
+          {
+            // API: NetworkFirst com fallback de cache (5min)
+            urlPattern: ({ url }) =&gt; url.pathname.startsWith("/api"),
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "api-cache",
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 100, maxAgeSeconds: 300 },
+            },
+          },
+          {
+            // Assets: CacheFirst com hash
+            urlPattern: /\.(?:js|css|woff2)$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "assets-cache",
+              expiration: { maxEntries: 60, maxAgeSeconds: 7 * 24 * 60 * 60 },
+            },
+          },
+        ],
+      },
+    }),
+  ],
+});</code></pre>
+</details>
+
+      <!-- ====== SCAN MODES ====== -->
+      <h2>Tr&ecirc;s modos de scan, um cen&aacute;rio real</h2>
+
+      <p>A primeira vers&atilde;o tinha s&oacute; "scanner de c&acirc;mera" pra ler QR code. Em campo, descobri que:</p>
+
+      <ol>
+        <li>QR sujo de p&oacute; de pedra n&atilde;o l&ecirc;.</li>
+        <li>Chapa em p&eacute; com sol direto fica espelhada, c&acirc;mera n&atilde;o foca.</li>
+        <li>Operador com luva n&atilde;o consegue manter c&acirc;mera firme.</li>
+      </ol>
+
+      <p>Solu&ccedil;&atilde;o: tr&ecirc;s modos co-existindo, o operador escolhe:</p>
+
+      <ul>
+        <li><strong>Modo R&aacute;pido</strong>: keypad grande de n&uacute;meros + bot&otilde;es de cor (vermelho/verde/azul/amarelo/...). Operador "digita" estiva + n&uacute;mero. &Eacute; o mais usado.</li>
+        <li><strong>Modo Scanner</strong>: c&acirc;mera lendo barcode/QR. Usado quando o c&oacute;digo est&aacute; leg&iacute;vel.</li>
+        <li><strong>Modo Cores</strong>: fallback total. Quando QR e n&uacute;mero ileg&iacute;veis, operador clica em cores que descrevem a chapa (cor do p&oacute;, marca&ccedil;&atilde;o no canto, etc). Match &eacute; por similaridade no DynamoDB.</li>
+      </ul>
+
+      <div class="callout warn">
+        <strong>Sempre desenhe pro <em>pior</em> cen&aacute;rio.</strong> Eu desenhei pro melhor (QR + WiFi bom + operador focado) e o app quebrou no primeiro invent&aacute;rio. Quando voltei pro design, troquei a pergunta: "como funciona com operador cansado, celular barato, internet ruim, c&oacute;digo sujo?". A&iacute; o modo R&aacute;pido + offline-first ficou &oacute;bvio.
+      </div>
+
+      <!-- ====== OBSERVABILIDADE ====== -->
+      <h2>Observabilidade: CloudWatch + X-Ray + SNS</h2>
+
+      <p>11 Lambdas, multi-tabela, multi-stream &mdash; debugging vira pesadelo sem trace distribu&iacute;do. Habilitei X-Ray em todas as Lambdas:</p>
+
+      <details>
+<summary><strong>X-Ray ativo + correla&ccedil;&atilde;o de traces</strong> (clique para expandir)</summary>
+      <pre><code class="language-hcl">resource "aws_lambda_function" "scan" {
+  function_name = "stonetrack-scan"
+  # ... outras configs
+
+  tracing_config {
+    mode = "Active"
+  }
+
+  environment {
+    variables = {
+      AWS_LAMBDA_EXEC_WRAPPER = "/opt/otel-instrument"  # se usar OTel
+    }
+  }
+}</code></pre>
+</details>
+
+      <p>O ganho: quando uma bipagem demora, eu vejo a trace inteira no X-Ray &mdash; quanto tempo na Lambda, quanto no DynamoDB GetItem, quanto no PutItem, quanto na resposta. Sem isso, eu chutaria onde o gargalo est&aacute;.</p>
+
+      <p>Alarms CloudWatch &rarr; SNS &rarr; Telegram bot:</p>
+
+      <ul>
+        <li>Lambda <code>scan</code> com error rate &gt; 5% em 5 min</li>
+        <li>Lambda <code>firebird_sync</code> com qualquer erro (sync &eacute; cr&iacute;tico)</li>
+        <li>DynamoDB throttle em qualquer tabela</li>
+        <li>API Gateway 5XX rate &gt; 1%</li>
+      </ul>
+
+      <!-- ====== PROBLEMAS ====== -->
+      <h2>Problemas que tive em produ&ccedil;&atilde;o</h2>
+
+      <h3>1. Firebird charset UTF8 vs ANSI</h3>
+
+      <p>O Firebird Athenas estava configurado com charset <code>WIN1252</code>. Meu driver tentava UTF-8 e dava erro silencioso em texto com acentos (nome com "&ccedil;" virava lixo). Mudei pra <code>WIN1252</code> na conex&atilde;o e fiz <code>str.encode("cp1252")</code> nos campos de texto antes do UPDATE.</p>
+
+      <h3>2. Cognito email com link expira em 7 dias</h3>
+
+      <p>Convite de novo operador (admin envia email do Cognito) tinha link de "definir senha" v&aacute;lido por 7 dias. Em invent&aacute;rio de fim de ano, eu cadastrava em novembro pra trabalhar em janeiro &mdash; link expirava. Aumentei o <code>TemporaryPasswordValidityDays</code> pra 30.</p>
+
+      <h3>3. iOS Safari + IndexedDB</h3>
+
+      <p>iOS deleta IndexedDB de PWA se o usu&aacute;rio "n&atilde;o abre por 7 dias". Operador que volta de f&eacute;rias perdia toda a fila offline. Mitiga&ccedil;&atilde;o: sync ANTES de qualquer ac&ccedil;&atilde;o nova (na entrada da tela Scan, flush autom&aacute;tico). Se a fila sumir, ele perde max as bipagens do &uacute;ltimo flush, n&atilde;o tudo.</p>
+
+      <h3>4. PWA install n&atilde;o aparecia em Android Chrome 14</h3>
+
+      <p>Faltava o <code>start_url</code> com <code>?utm_source=pwa</code> no manifest, faltava o icone 512&times;512 marcado como <code>any maskable</code>, e faltava service worker registrado <em>antes</em> do beforeinstallprompt event. Corrigir os tr&ecirc;s detalhes destravou o "Install App".</p>
+
+      <h3>5. API Gateway CORS preflight cacheou OPTIONS errado</h3>
+
+      <p>Inicialmente <code>OPTIONS</code> retornava <code>Access-Control-Max-Age: 86400</code> sem o header <code>Authorization</code>. Browser cacheou e novos requests com Authorization eram bloqueados. Mudei o handler do OPTIONS pra retornar o pre-flight correto e baixei MaxAge pra 300s durante debug, depois subi de volta.</p>
+
+      <!-- ====== METRICAS ====== -->
+      <h2>Resultados</h2>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value">~$3</span>
+          <span class="metric-label">Custo mensal AWS</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">R$ 1.5k</span>
+          <span class="metric-label">Economizado em licen&ccedil;as PowerApps</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">11</span>
+          <span class="metric-label">Lambdas</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">4</span>
+          <span class="metric-label">Tabelas DynamoDB</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~80ms</span>
+          <span class="metric-label">Bipagem warm</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">100%</span>
+          <span class="metric-label">Offline funcional</span>
+        </div>
+      </div>
+
+      <h3>Antes vs Depois</h3>
+
+      <table>
+        <thead><tr><th>M&eacute;trica</th><th>PowerApps</th><th>StoneTrack</th></tr></thead>
+        <tbody>
+          <tr><td>Custo mensal</td><td>R$ 1.5k (licen&ccedil;as) + Dataverse</td><td>~R$ 15 (AWS)</td></tr>
+          <tr><td>Lat&ecirc;ncia bip&aacute; &rarr; confirmado</td><td>2-4s</td><td>80ms warm, instant&acirc;neo offline</td></tr>
+          <tr><td>Resili&ecirc;ncia a queda de WiFi</td><td>Falha + perda de dados</td><td>Fila local + flush autom&aacute;tico</td></tr>
+          <tr><td>Tempo invent&aacute;rio anual completo</td><td>~3 dias</td><td>~1 dia (sem rebipagem por queda)</td></tr>
+          <tr><td>Tempo p&aacute; mudar a UI</td><td>Horas no editor PowerApps</td><td>Minutos (Vite + Tailwind hot reload)</td></tr>
+          <tr><td>Trace/debug</td><td>Praticamente impossivel</td><td>CloudWatch + X-Ray</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ====== CONCLUSÃO ====== -->
+      <h2>Conclus&atilde;o</h2>
+
+      <div class="callout success">
+        <strong>A li&ccedil;&atilde;o:</strong> low-code (PowerApps, Retool, Bubble) &eacute; bom pra prot&oacute;tipo. Em produ&ccedil;&atilde;o real com requisitos reais (offline, multi-perfil, integra&ccedil;&atilde;o profunda com legacy), o custo de manuten&ccedil;&atilde;o vira mais alto que custom code. Em 2 meses StoneTrack pagou todo o investimento em licen&ccedil;a PowerApps que a empresa j&aacute; tinha desembolsado.
+      </div>
+
+      <p>Pra quem est&aacute; pensando em algo parecido (substituir PowerApps/Retool em opera&ccedil;&atilde;o que precisa de offline e legacy integration): o stack PWA + Lambda + DynamoDB Streams resolve a maior parte. As pegadas s&atilde;o no detalhe operacional (charset Firebird, c&aacute;mera no campo, iOS Safari quirks). Vale construir.</p>
+
+      <p>Pr&oacute;ximos passos: migrar o Firebird sync de fdb Python pra um adapter mais robusto, talvez Java + JDBC, pra reduzir dependencias bin&aacute;rias. E adicionar telemetria ao frontend (Sentry ou OpenTelemetry) pra catch erros do browser que n&atilde;o aparecem no CloudWatch.</p>
+
+    </div>
+
+    <footer class="post-footer">
+      <div class="post-author">
+        <div class="post-author-avatar">MCN</div>
+        <div>
+          <div class="post-author-name">Matheus N.</div>
+          <div class="post-author-role">Engenheiro de Infraestrutura Cloud</div>
+        </div>
+      </div>
+      <div class="post-share">
+        <span>Compartilhar:</span>
+        <a href="#" class="share-btn" title="LinkedIn">in</a>
+        <a href="#" class="share-btn" title="Twitter">X</a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer style="padding:2rem;text-align:center;color:var(--ink3);font-size:.8rem;border-top:1px solid var(--border)">
+  &copy; 2026 Cloud by MCN
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script>
+const text = document.querySelector('.post-content').innerText;
+const words = text.split(/\s+/).length;
+const minutes = Math.ceil(words / 200);
+const el = document.getElementById('readTime');
+if (el) el.textContent = minutes + ' min de leitura';
+</script>
+</body>
+</html>

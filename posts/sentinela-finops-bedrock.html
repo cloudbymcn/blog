@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analisador FinOps + Security AWS com Motor de Regras Determinístico | Cloud by MCN</title>
+<meta name="description" content="Analisador semanal de conta AWS com Lambda Python + boto3 + motor de regras determin&iacute;stico (~600 linhas). Coleta Cost Explorer, IAM, EC2, S3, GuardDuty, Compute Optimizer, gera findings priorizados por impacto financeiro e severidade de seguran&ccedil;a.">
+<meta property="og:title" content="Analisador FinOps + Security AWS com Motor de Regras Determinístico">
+<meta property="og:description" content="Analisador semanal de conta AWS com motor de regras determin&iacute;stico. boto3 coleta, regras priorizam, DynamoDB persiste, frontend est&aacute;tico exibe.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23232F3E'/%3E%3Cpath d='M16 4L6 10L16 16L26 10L16 4Z' fill='%23FF9900'/%3E%3Cpath d='M6 18L16 24L26 18' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3Cpath d='M6 14L16 20L26 14' stroke='%23FF9900' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body class="post-page">
+
+<nav id="nav" class="scrolled">
+  <div class="nav-in">
+    <a href="../index.html" class="logo">
+      <img class="logo-img" src="../assets/img/logo-mcn.png" alt="Cloud by MCN">
+    </a>
+    <div class="nav-r">
+      <div class="nav-links" id="navLinks">
+        <a href="../index.html#projetos">Projetos</a>
+        <a href="../index.html#sobre">Sobre</a>
+        <a href="../index.html#contato">Contato</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="post-main">
+  <div class="breadcrumbs">
+    <a href="../index.html">Home</a><span>/</span>
+    <a href="../index.html#projetos">Projetos</a><span>/</span>
+    <span class="current">AWS &middot; FinOps &middot; Security &middot; Compute Optimizer</span>
+  </div>
+
+  <article class="post-article">
+    <header class="post-header">
+      <div class="post-meta-bar">
+        <span class="post-date-tag">26 Mai 2026</span>
+        <span class="post-reading" id="readTime"></span>
+      </div>
+      <h1>Analisador FinOps + Security AWS com motor de regras determin&iacute;stico</h1>
+      <p class="post-subtitle">Lambda Python que coleta a conta AWS toda sexta via boto3 (Cost Explorer, EC2, IAM, S3, GuardDuty, CloudTrail, Compute Optimizer) e aplica um motor de regras determin&iacute;stico em ~600 linhas para gerar findings priorizados por impacto financeiro e severidade de seguran&ccedil;a. Sem LLM, sem licen&ccedil;a, sem consultoria.</p>
+    </header>
+
+    <div class="post-content">
+
+      <!-- ====== INTRO ====== -->
+      <h2>O contexto: FinOps + Security pra conta sem time dedicado</h2>
+
+      <p>Conta AWS de pequena/m&eacute;dia empresa tem o cl&aacute;ssico problema: <strong>ningu&eacute;m faz FinOps</strong>. EBS &oacute;rf&atilde;os ficam ligados por meses, CloudFront cobra metade da fatura por defaults erradas, snapshots antigos acumulam, pol&iacute;ticas IAM ficam permissivas pra "n&atilde;o quebrar nada". Pagar Trusted Advisor Business+ ($100/m&ecirc;s) ou consultor FinOps ($2-5k/m&ecirc;s) n&atilde;o paga pra uma conta de $1-3k de fatura.</p>
+
+      <p>Constru&iacute; o <strong>Sentinela</strong>: Lambda que coleta a conta inteira toda sexta-feira, gera findings priorizados (cost + security), persiste no DynamoDB, mostra num frontend est&aacute;tico.</p>
+
+      <p>A primeira vers&atilde;o usava <strong>Bedrock Claude Haiku 4.5</strong> pra gerar os findings a partir do JSON de coleta. Funcionava. Trinta dias depois substitu&iacute; por <strong>motor de regras determin&iacute;stico</strong>. Esse post &eacute; sobre essa decis&atilde;o.</p>
+
+      <div class="print">
+        <div class="t">Print: dashboard de tend&ecirc;ncia de custo</div>
+        <div class="d">Vis&atilde;o macro do gasto mensal por servi&ccedil;o, com proje&ccedil;&atilde;o do m&ecirc;s atual e classifica&ccedil;&atilde;o (est&aacute;vel/crescendo/encolhendo) vs m&eacute;dia 3 meses. <code>assets/img/posts/sentinela-trend.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/sentinela-trend.png" alt="Dashboard Sentinela com tend&ecirc;ncia de custo mensal">
+
+      <!-- ====== ARQUITETURA ====== -->
+      <h2>Arquitetura</h2>
+
+      <pre><code class="language-bash">                ┌───────────────────────────────────────┐
+                │  EventBridge Schedule                 │
+                │  cron(0 11 ? * FRI *)  (8h BRT sexta) │
+                └─────────────────┬─────────────────────┘
+                                  ▼
+                  ┌──────────────────────────────┐
+                  │ Lambda: scheduler.py         │
+                  │ (Python 3.12, ARM64, 1GB)    │
+                  │  • boto3 coleta paralela     │
+                  │  • lib.findings (rules-v1)   │
+                  │  • DynamoDB write            │
+                  └────────────┬─────────────────┘
+                               ▼
+                  ┌────────────────────────────┐
+                  │ DynamoDB on-demand         │
+                  │ (single-table, TTL 365d)   │
+                  └────────────┬───────────────┘
+                               ▲
+                               │
+                  ┌────────────┴──────────────┐
+                  │ Lambda: api.py (Mangum)   │
+                  │ (FastAPI + ARM64)         │
+                  │  • /api/reports           │
+                  │  • /api/reports/latest    │
+                  │  • token X-Admin-Token    │
+                  └────────────┬──────────────┘
+                               ▲
+                               │
+                  ┌────────────┴──────────────┐
+                  │ API Gateway HTTP v2       │
+                  └────────────┬──────────────┘
+                               ▲
+                               │
+                  ┌────────────┴──────────────┐
+                  │ CloudFront                │
+                  │  • /api/* → API GW        │
+                  │  • /* → S3 (OAC)          │
+                  └────────────┬──────────────┘
+                               ▲
+                               │
+                  ┌────────────┴──────────────┐
+                  │ Frontend (S3)             │
+                  │ HTML/CSS/JS puro          │
+                  └───────────────────────────┘</code></pre>
+
+      <h3>Stack</h3>
+
+      <table>
+        <thead>
+          <tr><th>Camada</th><th>Servi&ccedil;o</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Frontend</td><td>HTML/CSS/JS est&aacute;tico em S3 + CloudFront</td></tr>
+          <tr><td>API</td><td>API Gateway HTTP v2 &rarr; Lambda (FastAPI + Mangum)</td></tr>
+          <tr><td>An&aacute;lise</td><td>Lambda Python 3.12 ARM64 &mdash; <strong>motor de regras determin&iacute;stico</strong></td></tr>
+          <tr><td>Coleta</td><td>boto3 (Cost Explorer, EC2, IAM, S3, GuardDuty, CloudTrail, Compute Optimizer)</td></tr>
+          <tr><td>Banco</td><td>DynamoDB on-demand (single-table)</td></tr>
+          <tr><td>Auth</td><td>Token via header <code>X-Admin-Token</code> (SSM SecureString)</td></tr>
+          <tr><td>Cron</td><td>EventBridge sexta 11h UTC (8h BRT)</td></tr>
+          <tr><td>DNS / TLS</td><td>Cloudflare CNAME &rarr; CloudFront + ACM</td></tr>
+          <tr><td>IaC</td><td>AWS SAM (CloudFormation YAML)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <strong>Por que ARM64?</strong> Lambda em Graviton2 custa 20% menos que x86 e &eacute; mais r&aacute;pido pra workloads Python (I/O-bound). Para boto3 + processamento puro, &eacute; pegada gratuita.
+      </div>
+
+      <!-- ====== POR QUE SAIR DO LLM ====== -->
+      <h2>Por que substitu&iacute; o LLM por regras</h2>
+
+      <p>A primeira vers&atilde;o do Sentinela usava Claude Haiku 4.5 com tool use pra gerar findings. Trinta dias depois (4 execu&ccedil;&otilde;es semanais), levantei o que estava bom e o que n&atilde;o:</p>
+
+      <table>
+        <thead>
+          <tr><th>Aspecto</th><th>LLM (Bedrock Haiku)</th><th>Motor de regras</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Reprodutibilidade</strong></td><td>Mesmo input gerava findings diferentes</td><td>Mesmo input = mesmo output, sempre</td></tr>
+          <tr><td><strong>Debug</strong></td><td>"Por que esse finding apareceu?" = ler 50KB de JSON + prompt</td><td>"Por que esse finding apareceu?" = grep no arquivo de regras</td></tr>
+          <tr><td><strong>Custo</strong></td><td>~$0.04 por execu&ccedil;&atilde;o (~$0.70/m&ecirc;s)</td><td>$0 (Lambda free tier)</td></tr>
+          <tr><td><strong>Lat&ecirc;ncia</strong></td><td>~12s pra processar (Bedrock + JSON parse)</td><td>~2s</td></tr>
+          <tr><td><strong>Falhas operacionais</strong></td><td>~5% throttling no Bedrock, JSON parse errors ocasionais</td><td>Zero (s&oacute; depende de boto3)</td></tr>
+          <tr><td><strong>Calibra&ccedil;&atilde;o</strong></td><td>Mudar prompt = re-test todo</td><td>Mudar threshold = uma linha</td></tr>
+          <tr><td><strong>Cobertura de casos novos</strong></td><td>LLM <em>tenta</em> extrapolar</td><td>S&oacute; o que voc&ecirc; codifica</td></tr>
+          <tr><td><strong>Severidade</strong></td><td>Vari&aacute;vel ("alto" &agrave;s vezes era "m&eacute;dio")</td><td>Fixa por regra</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout success">
+        <strong>O ponto-chave:</strong> pro caso de uso "analisar conta AWS pequena toda semana", os dados s&atilde;o estruturados (vol EBS &eacute; ou n&atilde;o &eacute; idle, SG &eacute; ou n&atilde;o &eacute; aberto pro mundo, Cost Explorer trend &eacute; ou n&atilde;o &eacute; &gt; 50%). Quando o input &eacute; estruturado e a sa&iacute;da desejada &eacute; estruturada, motor de regras vence LLM. LLM brilha em texto livre, n&atilde;o em <em>"essa regra disparou? quanto custa?"</em>.
+      </div>
+
+      <h3>Quando LLM venceria</h3>
+
+      <p>Pra ser justo, LLM &eacute; melhor quando:</p>
+
+      <ul>
+        <li>Os dados t&ecirc;m alta variabilidade textual (logs, tickets, descri&ccedil;&otilde;es livres).</li>
+        <li>O dom&iacute;nio muda r&aacute;pido (servi&ccedil;os AWS novos quase mensais &mdash; um LLM <em>tenta</em> extrapolar; regra precisa de PR pra cobrir o servi&ccedil;o novo).</li>
+        <li>Voc&ecirc; quer linguagem natural na sa&iacute;da (resumo executivo, parecer).</li>
+      </ul>
+
+      <p>No Sentinela, dois desses caem: dados s&atilde;o boto3 estruturado, sa&iacute;da &eacute; lista de findings com schema r&iacute;gido. Servi&ccedil;os AWS novos: sim, isso &eacute; o &uacute;nico ponto onde LLM ganharia &mdash; mas o trade-off (5% throttle, JSON parse err, $0.04/run) n&atilde;o paga.</p>
+
+      <!-- ====== COLETA ====== -->
+      <h2>Etapa 1: Coleta paralela com boto3</h2>
+
+      <p>O scheduler roda toda sexta. Primeira coisa que faz &eacute; coletar a conta inteira em paralelo via <code>ThreadPoolExecutor</code>:</p>
+
+      <details>
+<summary><strong>aws_collector.py</strong> &mdash; coleta paralela (clique para expandir)</summary>
+      <pre><code class="language-python">import boto3
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
+
+ce = boto3.client("ce")
+ec2 = boto3.client("ec2")
+iam = boto3.client("iam")
+s3 = boto3.client("s3")
+guardduty = boto3.client("guardduty")
+cloudtrail = boto3.client("cloudtrail")
+compute_optimizer = boto3.client("compute-optimizer")
+
+
+def collect_cost_explorer():
+    """Custo dos &uacute;ltimos 90 dias por servi&ccedil;o + tend&ecirc;ncia."""
+    today = datetime.utcnow().date()
+    start = today - timedelta(days=90)
+    resp = ce.get_cost_and_usage(
+        TimePeriod={"Start": start.isoformat(), "End": today.isoformat()},
+        Granularity="MONTHLY",
+        Metrics=["UnblendedCost"],
+        GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
+    )
+    return resp["ResultsByTime"]
+
+
+def collect_idle_ebs():
+    """Volumes EBS sem anexa&ccedil;&atilde;o (custam e n&atilde;o servem)."""
+    paginator = ec2.get_paginator("describe_volumes")
+    idle = []
+    for page in paginator.paginate(Filters=[{"Name": "status", "Values": ["available"]}]):
+        for v in page["Volumes"]:
+            monthly_cost = _ebs_monthly_cost(v)
+            idle.append({
+                "id": v["VolumeId"],
+                "size": v["Size"],
+                "type": v["VolumeType"],
+                "ageDays": (datetime.utcnow() - v["CreateTime"].replace(tzinfo=None)).days,
+                "monthlyCostUsd": monthly_cost,
+                "cliRemove": f"aws ec2 delete-volume --volume-id {v['VolumeId']} --region {v['AvailabilityZone'][:-1]}",
+            })
+    return idle
+
+
+def collect_security():
+    """SG abertos, IAM sem MFA, S3 sem PAB, GuardDuty/CloudTrail status."""
+    return {
+        "s3Buckets": _collect_s3_security(),
+        "usersWithoutMfa": _collect_iam_no_mfa(),
+        "openSecurityGroups": _collect_open_sgs(),
+        "guardduty": _collect_guardduty_status(),
+        "cloudtrail": _collect_cloudtrail_status(),
+    }
+
+
+def collect_optimizer_snapshot():
+    """Compute Optimizer recommendations (gratuito, j&aacute; processado pela AWS)."""
+    return {
+        "recommendations": {
+            "ec2": _list_ec2_recommendations(),
+            "ebs": _list_ebs_recommendations(),
+            "lambda": _list_lambda_recommendations(),
+        }
+    }
+
+
+def collect_all():
+    """Roda todas as coletas em paralelo."""
+    collectors = {
+        "finops": collect_cost_explorer,
+        "security": collect_security,
+        "anomalies": collect_cost_anomalies,
+        "accountId": lambda: boto3.client("sts").get_caller_identity()["Account"],
+    }
+    results = {}
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(fn): name for name, fn in collectors.items()}
+        for fut in as_completed(futures):
+            name = futures[fut]
+            try:
+                results[name] = fut.result()
+            except Exception as e:
+                results[name] = {"error": str(e)}
+    return results</code></pre>
+</details>
+
+      <div class="callout success">
+        <strong>Paraleliza&ccedil;&atilde;o &eacute; gratuita.</strong> Coletar Cost Explorer + EBS + IAM + S3 + GuardDuty + CloudTrail + Compute Optimizer sequencial leva ~25s. Em paralelo, ~5s. Lambda cobra por dura&ccedil;&atilde;o &mdash; cada segundo poupado &eacute; dinheiro de volta.
+      </div>
+
+      <h3>Compute Optimizer: an&aacute;lise gratuita da AWS</h3>
+
+      <p>A AWS <em>j&aacute; tem</em> um servi&ccedil;o que recomenda rightsizing: <strong>Compute Optimizer</strong>. Gratuito. Pouca gente sabe que pode habilitar com um clique e consumir via API. Eu apenas leio as recomenda&ccedil;&otilde;es prontas:</p>
+
+      <details>
+<summary><strong>Compute Optimizer via boto3</strong> (clique para expandir)</summary>
+      <pre><code class="language-python">def _list_ec2_recommendations():
+    """Compute Optimizer EC2 rightsizing recommendations."""
+    paginator = compute_optimizer.get_paginator("get_ec2_instance_recommendations")
+    out = []
+    for page in paginator.paginate():
+        for r in page["instanceRecommendations"]:
+            if r["finding"] not in ("Overprovisioned", "Underprovisioned"):
+                continue
+            best = max(r["recommendationOptions"], key=lambda o: o.get("rank", 0) * -1)
+            savings = best.get("estimatedMonthlySavings", {}).get("value", 0)
+            if savings &lt; 5:
+                continue
+            out.append({
+                "resourceArn": r["instanceArn"],
+                "current": r["currentInstanceType"],
+                "recommended": best["instanceType"],
+                "finding": r["finding"],
+                "estimatedSavingsUsd": savings,
+            })
+    return out</code></pre>
+</details>
+
+      <!-- ====== MOTOR DE REGRAS ====== -->
+      <h2>Etapa 2: Motor de regras determin&iacute;stico</h2>
+
+      <p>Aqui &eacute; o que substituiu o Bedrock. Um arquivo <code>findings.py</code> com ~600 linhas Python, organizado por dom&iacute;nio: security, finops, summary, combined.</p>
+
+      <h3>Severidade fixa por regra</h3>
+
+      <details>
+<summary><strong>helpers de severidade</strong> (clique para expandir)</summary>
+      <pre><code class="language-python">SENSITIVE_PORTS = {22, 3389, 1433, 3306, 5432, 6379, 27017, 9200, 11211}
+SEV_WEIGHT = {"critical": 10, "high": 5, "medium": 2, "low": 1}
+SEV_COST_PROXY = {"critical": 1000, "high": 500, "medium": 100, "low": 10}
+
+
+def _sev_for_idle_cost(monthly: float) -&gt; str:
+    if monthly &gt;= 30: return "high"
+    if monthly &gt;= 10: return "medium"
+    return "low"
+
+
+def _sev_for_sg(port, from_port, to_port) -&gt; str:
+    # Range completo aberto = cr&iacute;tico
+    if port is None and (from_port == 0 and to_port == 65535):
+        return "critical"
+    # Portas sens&iacute;veis (SSH, RDP, DBs) = cr&iacute;tico
+    if port in SENSITIVE_PORTS:
+        return "critical"
+    # HTTP/HTTPS = m&eacute;dio (provavelmente intencional)
+    if port in (80, 443):
+        return "medium"
+    # Outras portas custom = high (suspeito)
+    return "high"</code></pre>
+</details>
+
+      <h3>Findings de seguran&ccedil;a</h3>
+
+      <details>
+<summary><strong>findings.py</strong> &mdash; build_security (clique para expandir)</summary>
+      <pre><code class="language-python">def build_security(collected: dict) -&gt; dict:
+    sec = collected.get("security") or {}
+    findings, iam_issues, exposed = [], [], []
+
+    # S3 p&uacute;blicos
+    for b in sec.get("s3Buckets", []):
+        if b.get("publicAccessBlockDisabled"):
+            findings.append({
+                "title": f"Bucket S3 {b['name']} sem Public Access Block",
+                "severity": "critical",
+                "description": "Bucket sem PAB ativo. Objetos podem ser servidos publicamente.",
+                "affectedResources": [f"arn:aws:s3:::{b['name']}"],
+                "remediation": [
+                    f"aws s3api put-public-access-block --bucket {b['name']} "
+                    "--public-access-block-configuration "
+                    "BlockPublicAcls=true,IgnorePublicAcls=true,"
+                    "BlockPublicPolicy=true,RestrictPublicBuckets=true",
+                    "Auditar objetos atualmente acess&iacute;veis publicamente.",
+                ],
+            })
+
+    # SGs abertos
+    for sg in sec.get("openSecurityGroups", []):
+        sev = _sev_for_sg(sg.get("fromPort"), sg.get("fromPort"), sg.get("toPort"))
+        findings.append({
+            "title": f"SG {sg.get('sgName') or sg['sgId']} aberto 0.0.0.0/0",
+            "severity": sev,
+            "remediation": [
+                f"aws ec2 revoke-security-group-ingress --group-id {sg['sgId']} "
+                f"--protocol {sg.get('protocol', 'tcp')} --port {sg['fromPort']} --cidr 0.0.0.0/0",
+                "Substituir por CIDR espec&iacute;fico da rede corporativa ou VPN.",
+            ],
+            # ... outros campos
+        })
+
+    # GuardDuty
+    if not (sec.get("guardduty") or {}).get("enabled"):
+        findings.append({
+            "title": "GuardDuty desabilitado",
+            "severity": "high",
+            "description": "Sem detec&ccedil;&atilde;o de comportamento malicioso.",
+            "remediation": ["aws guardduty create-detector --enable"],
+        })
+
+    # CloudTrail
+    trails = (sec.get("cloudtrail") or {}).get("trails", [])
+    if not trails:
+        findings.append({
+            "title": "CloudTrail ausente",
+            "severity": "critical",
+            "description": "Sem auditoria de chamadas API.",
+            "remediation": [
+                "aws cloudtrail create-trail --name org-audit "
+                "--s3-bucket-name &lt;audit-bucket&gt; --is-multi-region-trail",
+            ],
+        })
+    elif not any(t.get("isMultiRegion") for t in trails):
+        findings.append({
+            "title": "CloudTrail sem multi-region",
+            "severity": "high",
+            "remediation": [f"aws cloudtrail update-trail --name {trails[0]['name']} --is-multi-region-trail"],
+        })
+
+    return {"criticalFindings": findings, "iamIssues": iam_issues, "exposedServices": exposed}</code></pre>
+</details>
+
+      <h3>Findings de FinOps</h3>
+
+      <details>
+<summary><strong>findings.py</strong> &mdash; build_finops (clique para expandir)</summary>
+      <pre><code class="language-python">def build_finops(idle: dict, trend_data: dict, optimizer: dict | None) -&gt; dict:
+    quick_wins, anomalies = [], []
+
+    # EBS &oacute;rf&atilde;os (um item por volume)
+    for v in idle.get("ebs", []):
+        savings = v.get("monthlyCostUsd", 0)
+        quick_wins.append({
+            "title": f"Volume EBS {v['id']} ({v['type']}/{v['size']}GB) &oacute;rf&atilde;o h&aacute; {v['ageDays']}d",
+            "estimatedMonthlySavings": savings,
+            "severity": _sev_for_idle_cost(savings),
+            "effort": "low",
+            "steps": [v["cliRemove"], "Confirme que volume n&atilde;o tem snapshots em uso."],
+            "affectedResources": [v["id"]],
+        })
+
+    # EIPs n&atilde;o associados (agrupados)
+    eips = idle.get("eips", [])
+    if eips:
+        total = round(sum(e.get("monthlyCostUsd", 0) for e in eips), 2)
+        quick_wins.append({
+            "title": f"{len(eips)} Elastic IPs sem associa&ccedil;&atilde;o",
+            "estimatedMonthlySavings": total,
+            "severity": _sev_for_idle_cost(total),
+            "steps": [e["cliRemove"] for e in eips],
+        })
+
+    # NAT Gateways ociosos
+    for n in idle.get("natGateways", []):
+        if not n.get("idle"):
+            continue
+        quick_wins.append({
+            "title": f"NAT Gateway {n['id']} sem tr&aacute;fego em 7d",
+            "estimatedMonthlySavings": n.get("monthlyCostUsd", 0),
+            "severity": "high",
+        })
+
+    # Compute Optimizer recommendations
+    if optimizer:
+        for cat in ("ec2", "ebs", "lambda"):
+            for r in (optimizer.get("recommendations") or {}).get(cat, []):
+                quick_wins.append({
+                    "title": f"Rightsize {cat.upper()}: {r['current']} &rarr; {r['recommended']}",
+                    "estimatedMonthlySavings": r["estimatedSavingsUsd"],
+                    "severity": _sev_for_idle_cost(r["estimatedSavingsUsd"]),
+                })
+
+    # Cost Explorer anomalies (ML do pr&oacute;prio CE, n&atilde;o nosso)
+    for a in (trend_data.get("anomalies") or []):
+        impact = a.get("totalImpactUsd", 0)
+        if impact &lt; 10: continue
+        anomalies.append({
+            "description": a.get("rootCauses") or f"Anomalia em {a['service']}",
+            "service": a["service"],
+            "impactUsd": impact,
+        })
+
+    # Crescimento explosivo 3-mes (&gt;50%)
+    for s in (trend_data.get("byService") or []):
+        t3 = s.get("trend3moPct")
+        if t3 is None or t3 &lt; 0.5: continue
+        if s.get("current", 0) &lt; 50: continue
+        anomalies.append({
+            "description": f"{s['service']} cresceu {round(t3 * 100, 1)}% em 3 meses",
+            "service": s["service"],
+            "impactUsd": round(s.get("delta", 0), 2),
+        })
+
+    quick_wins.sort(key=lambda q: q.get("estimatedMonthlySavings", 0), reverse=True)
+    anomalies.sort(key=lambda a: a.get("impactUsd", 0), reverse=True)
+
+    return {"quickWins": quick_wins[:20], "anomalies": anomalies[:10]}</code></pre>
+</details>
+
+      <div class="callout info">
+        <strong>Cost Explorer Anomaly Detection.</strong> AWS j&aacute; tem ML rodando em cima do gasto da sua conta &mdash; gratuito. <code>ce.get_anomalies()</code> retorna anomalias detectadas pela AWS. Eu n&atilde;o preciso fazer detec&ccedil;&atilde;o de outliers no Cost; j&aacute; vem pronto.
+      </div>
+
+      <h3>Scores reprodut&iacute;veis</h3>
+
+      <details>
+<summary><strong>findings.py</strong> &mdash; security_score e finops_score (clique para expandir)</summary>
+      <pre><code class="language-python">def _security_score(sec: dict) -&gt; int:
+    score = 100
+    weights = {"critical": 25, "high": 15, "medium": 5, "low": 1}
+    for f in sec.get("criticalFindings", []):
+        score -= weights.get(f.get("severity", "medium"), 5)
+    score -= 5 * len(sec.get("iamIssues", []))
+    return max(0, min(100, score))
+
+
+def _finops_score(curr_cost: float, idle_total: float) -&gt; int:
+    if curr_cost &lt;= 0: return 100
+    waste_ratio = min(0.6, idle_total / curr_cost)
+    return max(0, min(100, round(100 * (1 - waste_ratio))))</code></pre>
+</details>
+
+      <div class="callout success">
+        <strong>Reproduz&iacute;vel = baseline confi&aacute;vel.</strong> Como o motor &eacute; determin&iacute;stico, o score de uma semana pra outra <em>significa algo</em>. Se score subiu, alguma coisa melhorou. Se desceu, piorou. Com LLM, dois runs do mesmo input podiam dar scores diferentes &mdash; ru&iacute;do que mascarava sinal.
+      </div>
+
+      <!-- ====== PRIORITY MATRIX ====== -->
+      <h2>Priority matrix: combinando security + cost</h2>
+
+      <p>Findings de seguran&ccedil;a n&atilde;o t&ecirc;m valor monet&aacute;rio direto. Findings de custo n&atilde;o t&ecirc;m risco de seguran&ccedil;a. Como priorizar uma lista &uacute;nica?</p>
+
+      <p>Usei score combinado: <strong>severidade &times; (impacto financeiro OR proxy de severidade)</strong>.</p>
+
+      <details>
+<summary><strong>findings.py</strong> &mdash; build_combined (clique para expandir)</summary>
+      <pre><code class="language-python">def build_combined(sec: dict, fin: dict) -&gt; dict:
+    items = []
+
+    # Findings de security: score = SEV_WEIGHT * SEV_COST_PROXY
+    # (cr&iacute;tico vale 10 &times; 1000 = 10000; high = 5 &times; 500 = 2500; ...)
+    for f in sec.get("criticalFindings", []):
+        sev = f.get("severity", "medium")
+        score = SEV_WEIGHT[sev] * SEV_COST_PROXY[sev]
+        items.append({
+            "title": f["title"],
+            "costImpactUsd": 0,
+            "securityRisk": sev,
+            "recommendation": (f.get("remediation") or ["&mdash;"])[0],
+            "_score": score,
+        })
+
+    # Quick wins (cost): score = SEV_WEIGHT * savings
+    for q in fin.get("quickWins", []):
+        savings = q.get("estimatedMonthlySavings", 0)
+        sev = q.get("severity") or _sev_for_idle_cost(savings)
+        score = SEV_WEIGHT[sev] * savings
+        items.append({
+            "title": q["title"],
+            "costImpactUsd": savings,
+            "securityRisk": "low",
+            "recommendation": (q.get("steps") or ["&mdash;"])[0],
+            "_score": score,
+        })
+
+    items.sort(key=lambda x: x["_score"], reverse=True)
+    for it in items: it.pop("_score", None)
+    return {"priorityMatrix": items[:8]}</code></pre>
+</details>
+
+      <div class="callout warn">
+        <strong>SEV_COST_PROXY &eacute; opini&atilde;o, n&atilde;o ci&ecirc;ncia.</strong> "Quanto vale (em USD/m&ecirc;s equivalente) um finding de seguran&ccedil;a cr&iacute;tico?" N&atilde;o tem resposta certa. Escolhi 1000/500/100/10 baseado em "quanto vale uma hora minha pra arrumar isso versus quanto vale uma viola&ccedil;&atilde;o evitada". Ajust&aacute;vel em uma linha &mdash; outro benef&iacute;cio do motor de regras.
+      </div>
+
+      <!-- ====== FRONTEND ====== -->
+      <h2>Frontend est&aacute;tico</h2>
+
+      <p>O frontend &eacute; um SPA m&iacute;nimo em <code>web/</code> (HTML + CSS + JS puro, sem framework). Subido ao S3 com <code>aws s3 sync</code>, servido por CloudFront com OAC.</p>
+
+      <div class="print">
+        <div class="t">Print: lista de findings com estimativa de economia</div>
+        <div class="d">Cada quick win mostra economia mensal estimada (gerada pelo motor de regras) + esfor&ccedil;o + comandos AWS CLI prontos. Cores indicam severidade. <code>assets/img/posts/sentinela-findings.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/sentinela-findings.png" alt="Lista de findings com economia mensal estimada">
+
+      <!-- ====== AUTH ====== -->
+      <h2>Auth: token simples em SSM, sem Cognito</h2>
+
+      <p>Single-tenant single-user (eu). Configurar Cognito seria overkill. Token est&aacute;tico em SSM SecureString resolve:</p>
+
+      <details>
+<summary><strong>auth.py</strong> &mdash; valida&ccedil;&atilde;o de token (clique para expandir)</summary>
+      <pre><code class="language-python">import boto3
+import os
+import hmac
+import time
+
+ssm = boto3.client("ssm")
+SSM_NAME = os.environ["ADMIN_TOKEN_SSM_NAME"]
+_cache = {"value": None, "ts": 0}
+
+
+def get_admin_token() -&gt; str:
+    now = time.time()
+    if _cache["value"] and (now - _cache["ts"]) &lt; 300:
+        return _cache["value"]
+    resp = ssm.get_parameter(Name=SSM_NAME, WithDecryption=True)
+    _cache["value"] = resp["Parameter"]["Value"]
+    _cache["ts"] = now
+    return _cache["value"]
+
+
+def verify(header_value: str) -&gt; bool:
+    if not header_value:
+        return False
+    expected = get_admin_token()
+    # Compara&ccedil;&atilde;o constante-time pra evitar timing attack
+    return hmac.compare_digest(expected, header_value)</code></pre>
+</details>
+
+      <div class="callout warn">
+        <strong>Sempre <code>hmac.compare_digest</code> ao comparar segredos.</strong> O <code>==</code> em Python sai cedo no primeiro byte diferente. Atacante consegue medir essa diferen&ccedil;a de microssegundos e reconstruir o token byte a byte. <code>compare_digest</code> roda em tempo constante.
+      </div>
+
+      <!-- ====== IAM ====== -->
+      <h2>IAM: leitura ampla + write m&iacute;nimo</h2>
+
+      <p>O role da Lambda <code>scheduler.py</code> precisa <em>ler</em> a conta inteira mas s&oacute; pode escrever na pr&oacute;pria tabela:</p>
+
+      <details>
+<summary><strong>template.yaml</strong> &mdash; role do scheduler (clique para expandir)</summary>
+      <pre><code class="language-yaml">  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+        - arn:aws:iam::aws:policy/ReadOnlyAccess     # leitura ampla
+        - arn:aws:iam::aws:policy/SecurityAudit      # checks de seguran&ccedil;a
+      Policies:
+        - PolicyName: app-writes
+          PolicyDocument:
+            Statement:
+              # Apenas a tabela do pr&oacute;prio projeto
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:Query]
+                Resource: !GetAtt ReportsTable.Arn
+              # SSM apenas o token desse projeto
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:*:*:parameter/sentinela/*"</code></pre>
+</details>
+
+      <div class="callout success">
+        <strong>Por que <code>ReadOnlyAccess</code> + <code>SecurityAudit</code>?</strong> AWS j&aacute; mant&eacute;m essas duas managed policies. Cada lan&ccedil;amento de servi&ccedil;o novo, a policy ganha as a&ccedil;&otilde;es de leitura automaticamente. Se eu listasse a&ccedil;&otilde;es individuais, ia ficar obsoleto em 6 meses.
+      </div>
+
+      <!-- ====== DYNAMODB ====== -->
+      <h2>DynamoDB: single-table com TTL</h2>
+
+      <details>
+<summary><strong>schema da ReportsTable</strong> (clique para expandir)</summary>
+      <pre><code class="language-yaml">  ReportsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Stage}-reports"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk    # REPORT#YYYY-MM-DD
+          AttributeType: S
+        - AttributeName: sk    # raw | analysis
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true</code></pre>
+</details>
+
+      <p>Cada execu&ccedil;&atilde;o cria duas linhas: <code>sk=raw</code> (dados crus da coleta, pra debug futuro) e <code>sk=analysis</code> (relat&oacute;rio gerado pelo motor de regras). TTL de 365 dias.</p>
+
+      <!-- ====== CUSTO ====== -->
+      <h2>Custo mensal: praticamente zero</h2>
+
+      <p>Sem Bedrock, o custo despencou pra n&iacute;vel free tier. Real medido em produ&ccedil;&atilde;o:</p>
+
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Custo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Lambda ARM64 (free tier)</td><td>$0.00</td></tr>
+          <tr><td>API Gateway HTTP (~3k requests/m&ecirc;s)</td><td>$0.00</td></tr>
+          <tr><td>DynamoDB on-demand</td><td>$0.05</td></tr>
+          <tr><td>S3 + CloudFront (free tier 1&ordm; ano)</td><td>$0.03</td></tr>
+          <tr><td>CloudWatch Logs (reten&ccedil;&atilde;o 7 dias)</td><td>$0.50</td></tr>
+          <tr><td>Cost Explorer API (~20 calls/m&ecirc;s)</td><td>$0.20</td></tr>
+          <tr><td>Compute Optimizer</td><td>$0.00 (free)</td></tr>
+          <tr><td>GuardDuty API reads</td><td>$0.00</td></tr>
+          <tr><td>CloudTrail API reads</td><td>$0.00</td></tr>
+          <tr><td><strong>Total real</strong></td><td><strong>~$0.80/m&ecirc;s</strong></td></tr>
+        </tbody>
+      </table>
+
+      <p>Vers&atilde;o com Bedrock custava ~$1.70/m&ecirc;s &mdash; tirar o LLM economizou ~50%. Mais relevante que o valor absoluto &eacute; o sinal: <strong>n&atilde;o pagar nada pra rodar an&aacute;lise de FinOps</strong>.</p>
+
+      <div class="cost-comparison">
+        <div class="cost-bar">
+          <span class="cost-label">Trusted Advisor Business+</span>
+          <div class="cost-track"><div class="cost-fill old">$100/m&ecirc;s</div></div>
+        </div>
+        <div class="cost-bar">
+          <span class="cost-label">Sentinela (com Bedrock)</span>
+          <div class="cost-track"><div class="cost-fill new" style="width:1.7%">$1.70/m&ecirc;s</div></div>
+        </div>
+        <div class="cost-bar">
+          <span class="cost-label">Sentinela (motor regras)</span>
+          <div class="cost-track"><div class="cost-fill new" style="width:0.8%">$0.80/m&ecirc;s</div></div>
+        </div>
+      </div>
+
+      <div class="callout danger">
+        <strong>Cost Explorer cobra $0.01 por API call.</strong> Parece nada, mas se voc&ecirc; chama 100 vezes em testes locais ajustando l&oacute;gica, j&aacute; gastou $1. Cacheei a resposta no DynamoDB com TTL de 24h durante desenvolvimento.
+      </div>
+
+      <!-- ====== RESULTADOS ====== -->
+      <h2>Resultados reais em produ&ccedil;&atilde;o</h2>
+
+      <p>Tr&ecirc;s meses de uso na conta da Vit&oacute;ria Stone. Findings que o Sentinela encontrou (e que eu n&atilde;o tinha visto sozinho):</p>
+
+      <ul>
+        <li><strong>2 vol EBS &oacute;rf&atilde;os</strong> de uma EC2 antiga deletada h&aacute; 4 meses. $3.60/m&ecirc;s economizado.</li>
+        <li><strong>CloudFront sem compress&atilde;o</strong> em distribui&ccedil;&atilde;o legacy. Reduziu egress em ~30%, $18.50/m&ecirc;s.</li>
+        <li><strong>OpenSearch overprovisioned</strong>: cluster com 5% CPU m&eacute;dia em 14 dias (via Compute Optimizer). Downsize sugerido r6g.large &rarr; r6g.medium, $72/m&ecirc;s.</li>
+        <li><strong>Snapshot RDS antigos</strong> de 8 meses, ningu&eacute;m pra restaurar. $14/m&ecirc;s.</li>
+        <li><strong>3 access keys IAM</strong> n&atilde;o usadas h&aacute; mais de 1 ano. Risco de seguran&ccedil;a.</li>
+        <li><strong>NAT Gateway com tr&aacute;fego an&ocirc;malo</strong> de uma Lambda chamando S3 sem VPC endpoint. $42/m&ecirc;s.</li>
+        <li><strong>Bucket S3 sem Public Access Block</strong> de um POC esquecido. Severity crit&iacute;ca.</li>
+      </ul>
+
+      <p>Total economizado em 90 dias: <strong>~$450</strong>. Custo do Sentinela no per&iacute;odo: <strong>~$2.50</strong>. ROI <strong>180x</strong>.</p>
+
+      <!-- ====== PROBLEMAS ====== -->
+      <h2>Problemas que tive no caminho</h2>
+
+      <h3>1. Compute Optimizer leva 12h pra processar uma conta nova</h3>
+
+      <p>Habilitei Compute Optimizer e na primeira execu&ccedil;&atilde;o ele retornou lista vazia. Achei que estava quebrado. Documenta&ccedil;&atilde;o (escondida) diz: "an&aacute;lise inicial leva at&eacute; 24h depois do opt-in". Esperei, voltei, funcionou.</p>
+
+      <h3>2. Cost Explorer tem delay de 24h</h3>
+
+      <p>Se rodava o scheduler &agrave;s 8h BRT (11h UTC), os dados de "ontem" estavam incompletos no Cost Explorer. Mudei pra puxar apenas at&eacute; <em>antes de ontem</em> e sumiu o erro.</p>
+
+      <h3>3. boto3 sem retry exponencial em Cost Explorer</h3>
+
+      <p>Cost Explorer tem rate limit de 5 req/s. Em paralelo com 8 threads, ocasionalmente ultrapassava. Config retry expl&iacute;cito:</p>
+
+      <details>
+<summary><strong>boto3 retry config</strong> (clique para expandir)</summary>
+      <pre><code class="language-python">from botocore.config import Config
+
+config = Config(
+    retries={"max_attempts": 5, "mode": "adaptive"},  # backoff + jitter
+    connect_timeout=10,
+    read_timeout=60,
+)
+ce = boto3.client("ce", config=config)</code></pre>
+</details>
+
+      <h3>4. <code>publicAccessBlockDisabled</code> &eacute; false-positive em buckets velhos</h3>
+
+      <p>Bucket criado antes de 2023 n&atilde;o tem PAB default. <code>get_public_access_block</code> retorna <code>NoSuchPublicAccessBlockConfiguration</code>. Eu inicialmente interpretava como "PAB desabilitado" sem checar se o bucket tinha ACL/policy permissivo. Resultado: 50 findings cr&iacute;ticos falsos. Adicionei verifica&ccedil;&atilde;o cruzada com <code>get_bucket_acl</code> e <code>get_bucket_policy</code>.</p>
+
+      <h3>5. Frontend cacheado demais</h3>
+
+      <p>CloudFront cacheava <code>app.js</code> com TTL de 24h. Quando atualizava o frontend, ningu&eacute;m via mudan&ccedil;a. Solu&ccedil;&atilde;o: hash do arquivo na URL (<code>app.js?v=abc123</code>) atualizado via build script + invalidation no CloudFront apenas do HTML.</p>
+
+      <!-- ====== MÉTRICAS ====== -->
+      <h2>Resultado consolidado</h2>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value">~$0.80</span>
+          <span class="metric-label">Custo mensal AWS</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~180x</span>
+          <span class="metric-label">ROI em 90 dias</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~5s</span>
+          <span class="metric-label">Tempo de coleta</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~2s</span>
+          <span class="metric-label">Tempo motor regras</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">100%</span>
+          <span class="metric-label">Reprodutibilidade</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">1x/sem</span>
+          <span class="metric-label">Frequ&ecirc;ncia</span>
+        </div>
+      </div>
+
+      <!-- ====== CONCLUSÃO ====== -->
+      <h2>Conclus&atilde;o</h2>
+
+      <div class="callout success">
+        <strong>A li&ccedil;&atilde;o:</strong> "use AI pra tudo" virou default de mercado, mas pra muitos casos de uso engenharia tradicional ainda vence. Pro Sentinela, motor de regras &eacute; superior em <em>cinco eixos</em>: custo, reprodutibilidade, velocidade, debug, calibra&ccedil;&atilde;o. LLM perdeu por um motivo s&oacute;: cobertura de servi&ccedil;os novos &mdash; e isso resolvo com PR mensal.
+      </div>
+
+      <p>Se voc&ecirc; tem uma conta AWS sem FinOps formal, construir algo nesse modelo &eacute; fim-de-semana de trabalho e paga o pr&oacute;prio custo no primeiro finding s&eacute;rio. O c&oacute;digo todo cabe em ~1000 linhas Python + ~300 linhas HTML/JS. SAM template tem ~250 linhas YAML.</p>
+
+      <p>Sobre quando usar LLM &mdash; mantenho a vis&atilde;o: dom&iacute;nio textual livre, sa&iacute;da em linguagem natural, problema com alta variabilidade. Pra "esse recurso est&aacute; ocioso? quanto custa? como remover?", regra fixa &eacute; melhor.</p>
+
+      <p>O pr&oacute;ximo passo natural &eacute; multi-conta (Organizations + assumeRole cross-account). Hoje &eacute; single-account. Em struct AWS Organizations com 5+ contas, fica ainda mais &uacute;til.</p>
+
+    </div>
+
+    <footer class="post-footer">
+      <div class="post-author">
+        <div class="post-author-avatar">MCN</div>
+        <div>
+          <div class="post-author-name">Matheus N.</div>
+          <div class="post-author-role">Engenheiro de Infraestrutura Cloud</div>
+        </div>
+      </div>
+      <div class="post-share">
+        <span>Compartilhar:</span>
+        <a href="#" class="share-btn" title="LinkedIn">in</a>
+        <a href="#" class="share-btn" title="Twitter">X</a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer style="padding:2rem;text-align:center;color:var(--ink3);font-size:.8rem;border-top:1px solid var(--border)">
+  &copy; 2026 Cloud by MCN
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script>
+const text = document.querySelector('.post-content').innerText;
+const words = text.split(/\s+/).length;
+const minutes = Math.ceil(words / 200);
+const el = document.getElementById('readTime');
+if (el) el.textContent = minutes + ' min de leitura';
+</script>
+</body>
+</html>

@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Como construí uma galeria serverless na AWS: do File Gateway ao S3 com Lambda, Cognito e CloudFront | Cloud by MCN</title>
-<meta name="description" content="Tutorial completo — do zero ao deploy — para gestão de mídia corporativa com S3, Lambda, Presigned URLs, CloudFront e Cognito. Arquitetura serverless real em produção.">
-<meta property="og:title" content="Como construí uma galeria serverless na AWS: do File Gateway ao S3 com Lambda, Cognito e CloudFront">
-<meta property="og:description" content="Tutorial completo — do zero ao deploy — para gestão de mídia corporativa com S3, Lambda, Presigned URLs, CloudFront e Cognito. Arquitetura serverless real em produção.">
+<title>Portal Corporativo Serverless com 10 Aplicações Internas Integradas | Cloud by MCN</title>
+<meta name="description" content="Portal corporativo serverless na AWS com 10 aplicações internas: helpdesk, holerite via Firebird, Kaizen, on/offboarding, galeria de mídia. Lambdas especializadas, Cognito por grupo, DynamoDB single-table, integrações com Microsoft Graph e ERP Athenas.">
+<meta property="og:title" content="Portal Corporativo Serverless com 10 Aplicações Internas Integradas">
+<meta property="og:description" content="Portal corporativo serverless com 10 aplicações internas: helpdesk, holerite via Firebird, Kaizen, on/offboarding, galeria. Lambdas especializadas + Cognito + DynamoDB.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -36,252 +36,582 @@
   <div class="breadcrumbs">
     <a href="../index.html">Home</a><span>/</span>
     <a href="../index.html#projetos">Projetos</a><span>/</span>
-    <span class="current">AWS &middot; S3 &middot; Lambda &middot; Serverless &middot; SAM</span>
+    <span class="current">AWS &middot; Lambda &middot; Cognito &middot; DynamoDB &middot; SAM</span>
   </div>
 
   <article class="post-article">
     <header class="post-header">
       <div class="post-meta-bar">
-        <span class="post-date-tag">13 Mar 2026</span>
+        <span class="post-date-tag">13 Mar 2026 &middot; atualizado em 26 Mai 2026</span>
         <span class="post-reading" id="readTime"></span>
       </div>
-      <h1>Como construí uma galeria serverless na AWS: do File Gateway ao S3 com Lambda, Cognito e CloudFront</h1>
-      <p class="post-subtitle">Tutorial completo &mdash; do zero ao deploy &mdash; para gestão de mídia corporativa</p>
+      <h1>Portal corporativo serverless com 10 aplica&ccedil;&otilde;es internas integradas</h1>
+      <p class="post-subtitle">Portal interno da Vit&oacute;ria Stone em arquitetura serverless modular: Lambdas especializadas, Cognito com grupos por departamento, DynamoDB single-table, integra&ccedil;&otilde;es com Firebird (ERP Athenas) e Microsoft Graph. Helpdesk, contracheque, Kaizen, on/offboarding, galeria de m&iacute;dia &mdash; 10 aplica&ccedil;&otilde;es independentes compartilhando a mesma infra.</p>
     </header>
 
     <div class="post-content">
 
       <!-- ====== INTRODUÇÃO ====== -->
-      <h2>Introdução e Contexto</h2>
+      <h2>De onde isso veio</h2>
 
-      <p>Eu trabalhava numa empresa do setor de mármores e granitos. O fluxo de trabalho diário envolvia fotografar e filmar blocos de pedra na serraria &mdash; cada bloco recebia um código (ex.: <code>BL-4021</code>) e precisava de registros visuais para controle de qualidade, vendas e rastreabilidade.</p>
+      <p>Em mar&ccedil;o de 2026 escrevi a primeira vers&atilde;o deste post. Era sobre uma galeria serverless para substituir o <strong>AWS Storage Gateway (File Gateway)</strong> que a empresa usava para fotografar blocos de m&aacute;rmore e granito. A solu&ccedil;&atilde;o ficou pronta em duas semanas: <em>S3 + Lambda + Cognito + Presigned URLs</em>, custo $5/m&ecirc;s contra os $150/m&ecirc;s da EC2 do File Gateway.</p>
 
-      <p>Antes dessa solução, a empresa usava o <strong>AWS Storage Gateway (File Gateway)</strong>. A ideia era boa: montar um share SMB no servidor local e sincronizar automaticamente com o S3. Na prática, porém, a realidade era outra:</p>
+      <p>Eu n&atilde;o sabia, mas aquela galeria seria s&oacute; o primeiro app. Quando a TI percebeu que dava pra subir uma p&aacute;gina nova em horas em vez de semanas (porque toda a infra j&aacute; estava de p&eacute;), come&ccedil;aram a pedir: "<em>consegue fazer um helpdesk pra gente parar de receber chamado por WhatsApp?</em>", "<em>consegue puxar holerite do Athenas direto pra o RH n&atilde;o atender ningu&eacute;m no balc&atilde;o?</em>", "<em>e um portal de ideias estilo Kaizen?</em>".</p>
 
-      <ul>
-        <li><strong>Latência brutal:</strong> uploads de vídeos de 50-100 MB levavam 15 a 30 segundos pelo SMB, quando não travavam.</li>
-        <li><strong>Operadores desistiam:</strong> como o processo era lento e pouco intuitivo, a equipe de campo começou a mandar fotos pelo WhatsApp &mdash; sem organização, sem metadados, sem rastreabilidade.</li>
-        <li><strong>Custo desnecessário:</strong> o File Gateway exigia uma VM EC2 dedicada (mínimo <code>m5.xlarge</code>) rodando 24/7, mesmo quando ninguém estava fazendo upload.</li>
-        <li><strong>Sem controle de acesso granular:</strong> qualquer pessoa com acesso ao share podia apagar arquivos de qualquer bloco.</li>
-      </ul>
+      <p>Dois meses depois, a "galeria" virou um <strong>portal corporativo com 10 aplica&ccedil;&otilde;es</strong>, rodando em uma &uacute;nica Lambda Node.js, com Cognito gerenciando grupos por departamento, DynamoDB armazenando audit log + chamados + ideias, e Microsoft Graph + Firebird ligados em cima.</p>
+
+      <div class="print">
+        <div class="t">Print: tela inicial do portal</div>
+        <div class="d">Grid de aplica&ccedil;&otilde;es no portal interno (`portal.vitoriastone.com`). Cada card &eacute; uma view independente, mostrada de acordo com o grupo Cognito do usu&aacute;rio. Imagem em <code>assets/img/posts/fg-portal.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/fg-portal.png" alt="Tela inicial do portal corporativo com grid de aplica&ccedil;&otilde;es">
+
+      <p>Este post &eacute; sobre essa evolu&ccedil;&atilde;o: o que mantive da arquitetura inicial, o que mudou pra suportar 10 apps em vez de 1, e os trade-offs t&eacute;cnicos de servir <strong>um monolito serverless</strong> em vez de microservi&ccedil;os.</p>
 
       <div class="callout info">
-        <strong>Meu objetivo era claro:</strong> construir uma interface web que qualquer operador pudesse abrir no celular, selecionar o bloco, tirar fotos ou gravar vídeos, e ter tudo organizado automaticamente no S3 &mdash; rápido, seguro e sem servidor permanente.
+        <strong>Por que monolito Lambda?</strong> Cada app novo &eacute; um <em>arquivo</em> de view + uma se&ccedil;&atilde;o no router. N&atilde;o &eacute; um novo stack, novo pipeline, novo CloudFront, novo Cognito. Iterar &eacute; r&aacute;pido. A Lambda principal hoje tem ~2500 linhas e 80+ endpoints. Reescrever pra microservi&ccedil;os custaria meses e n&atilde;o resolveria nenhum problema real.
       </div>
 
-      <p>A solução final é 100% serverless: <strong>Lambda</strong> serve a interface e gera URLs de upload, <strong>S3</strong> recebe os arquivos direto do navegador via <strong>Presigned URLs</strong>, <strong>Cognito</strong> cuida da autenticação, <strong>DynamoDB</strong> mantém um log de auditoria, e <strong>CloudFront</strong> entrega tudo com baixa latência. Custo mensal em produção: menos de $5 para ~2.000 uploads/mês.</p>
+      <!-- ====== O QUE O PORTAL FAZ ====== -->
+      <h2>O que o portal faz hoje</h2>
+
+      <p>S&atilde;o dez aplica&ccedil;&otilde;es ativas. Cada uma resolve um problema concreto que antes era manual ou rodava em planilha/email/WhatsApp:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>App</th>
+            <th>Problema que resolve</th>
+            <th>Quem usa</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>VStudio</strong></td>
+            <td>Cataloga&ccedil;&atilde;o visual de blocos e cavaletes (galeria com editor, muting de v&iacute;deo, CloseUp, espelho compartilh&aacute;vel)</td>
+            <td>Produ&ccedil;&atilde;o + Comercial</td>
+          </tr>
+          <tr>
+            <td><strong>Contracheque</strong></td>
+            <td>Holerite mensal puxado direto do Firebird/Athenas. Ningu&eacute;m mais procura o RH no balc&atilde;o.</td>
+            <td>Todos colaboradores</td>
+          </tr>
+          <tr>
+            <td><strong>On/Offboarding</strong></td>
+            <td>Cadastro automatizado de entrada/sa&iacute;da: cria Cognito, AD, M365, libera grupos.</td>
+            <td>RH + TI</td>
+          </tr>
+          <tr>
+            <td><strong>Abrir Chamado</strong></td>
+            <td>Helpdesk interno (TI/impressora/rede). Antes era WhatsApp, agora ticket rastreado.</td>
+            <td>Todos colaboradores</td>
+          </tr>
+          <tr>
+            <td><strong>Ideias / Kaizen</strong></td>
+            <td>Portal de sugest&otilde;es. Qualquer colaborador prop&otilde;e melhoria, vota, acompanha status.</td>
+            <td>Todos colaboradores</td>
+          </tr>
+          <tr>
+            <td><strong>Mural</strong></td>
+            <td>Avisos, calend&aacute;rio, anivers&aacute;rios, card&aacute;pio do refeit&oacute;rio.</td>
+            <td>Todos colaboradores</td>
+          </tr>
+          <tr>
+            <td><strong>Mudan&ccedil;a de Carteira</strong></td>
+            <td>Realoca&ccedil;&atilde;o de clientes entre vendedores por pa&iacute;s/prov&iacute;ncia/cidade.</td>
+            <td>Comercial</td>
+          </tr>
+          <tr>
+            <td><strong>StoneTrack</strong></td>
+            <td>Invent&aacute;rio em tempo real de chapas no p&aacute;tio (PWA separado, integrado por iframe).</td>
+            <td>Produ&ccedil;&atilde;o</td>
+          </tr>
+          <tr>
+            <td><strong>Ova&ccedil;&atilde;o</strong></td>
+            <td>Documenta&ccedil;&atilde;o de exporta&ccedil;&atilde;o organizada por ano/bloco. Vem do SharePoint via Microsoft Graph.</td>
+            <td>Comercial + Logistica</td>
+          </tr>
+          <tr>
+            <td><strong>Admin</strong></td>
+            <td>Audit log, gest&atilde;o de usu&aacute;rios, lixeira global, grupos Cognito.</td>
+            <td>TI</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Cada app &eacute; uma <em>view</em> independente em <code>src/views/*.html</code>: HTML + CSS + JS vanilla, servido inline pela Lambda. Sem build step, sem framework. O motivo &eacute; pragm&aacute;tico: <strong>eu sou um time de uma pessoa</strong> e qualquer cadeia de build (Webpack, Vite, Next) vira d&iacute;vida t&eacute;cnica na pr&oacute;xima vez que preciso atualizar. HTML est&aacute;tico nunca quebra.</p>
 
       <!-- ====== ARQUITETURA ====== -->
       <h2>Arquitetura</h2>
 
-      <div class="print">
-        <div class="t">Diagrama de Arquitetura</div>
-        <div class="d">Fluxo completo: navegador do operador &rarr; CloudFront &rarr; API Gateway &rarr; Lambda &rarr; serviços AWS</div>
+      <p>O desenho macro est&aacute; abaixo. A novidade em rela&ccedil;&atilde;o &agrave; vers&atilde;o original do post (que era s&oacute; galeria) &eacute; que agora temos <strong>tr&ecirc;s Lambdas</strong>, <strong>cinco tabelas DynamoDB</strong>, <strong>dois dom&iacute;nios CloudFront</strong> e <strong>integra&ccedil;&otilde;es externas</strong> com Firebird (Athenas ERP) e Microsoft Graph (OneDrive/SharePoint).</p>
+
+      <pre><code class="language-bash">                ┌────────────────────────────────────────────────┐
+                │  Cloudflare DNS (proxy desligado)              │
+                │  portal.vitoriastone.com   studio.vitoriastone.com │
+                └───────────────────┬────────────────────────────┘
+                                    ▼
+                ┌────────────────────────────────────────────────┐
+                │  CloudFront Distribution                       │
+                │   • behaviors: /api/* → Lambda                 │
+                │   • behaviors: /assets/* → S3 (OAC)            │
+                │   • URL rewrite (Function): / → /granito       │
+                └───────────────────┬────────────────────────────┘
+                                    ▼
+                ┌────────────────────────────────────────────────┐
+                │  API Gateway (REST API)                        │
+                │   • Cognito Authorizer (JWT)                   │
+                │   • BinaryMediaTypes: */*                      │
+                └───────┬────────────────────┬───────────────────┘
+                        ▼                    ▼
+        ┌───────────────────────┐   ┌──────────────────────┐
+        │ Lambda: manager       │   │ Lambda: mute-video   │
+        │ (Node.js 20, 80+ rts) │──▶│ (async invoke,       │
+        │                       │   │  HEVC→H264 + mute)   │
+        └─┬─────┬─────┬──────┬──┘   └──────────────────────┘
+          ▼     ▼     ▼      ▼
+       Cognito  S3   Dynamo  SSM    ┌──────────────────────┐
+       UserPool      5 tabs Params  │ Lambda: relatorio    │
+                                    │ (EventBridge cron    │
+                                    │  18h BRT, SES email) │
+                                    └──────────────────────┘
+                        │
+                ┌───────┴────────────┐
+                ▼                    ▼
+        ┌──────────────┐    ┌──────────────────┐
+        │ MS Graph API │    │ Firebird (EC2)   │
+        │ (OneDrive,   │    │ Athenas ERP      │
+        │  SharePoint) │    │ contracheque     │
+        └──────────────┘    └──────────────────┘</code></pre>
+
+      <h3>Stack</h3>
+
+      <table>
+        <thead>
+          <tr><th>Camada</th><th>Servi&ccedil;o</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Compute</td><td>AWS Lambda (Node.js 20.x, 3 fun&ccedil;&otilde;es)</td></tr>
+          <tr><td>API</td><td>API Gateway REST + Cognito User Pool authorizer</td></tr>
+          <tr><td>Auth</td><td>Cognito User Pool (IdToken 1h + Refresh silencioso)</td></tr>
+          <tr><td>Storage</td><td>S3 com Transfer Acceleration</td></tr>
+          <tr><td>Banco</td><td>DynamoDB (5 tabelas, on-demand) + Firebird via EC2 (apenas contracheque)</td></tr>
+          <tr><td>CDN</td><td>CloudFront com URL rewrite (CF Function) + ACM cert</td></tr>
+          <tr><td>Email</td><td>Amazon SES + Microsoft Graph (fallback)</td></tr>
+          <tr><td>Secrets</td><td>SSM Parameter Store (SecureString, KMS aws/ssm)</td></tr>
+          <tr><td>Cron</td><td>EventBridge (relat&oacute;rio di&aacute;rio 18h BRT)</td></tr>
+          <tr><td>IaC</td><td>AWS SAM (CloudFormation YAML)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout info">
+        <strong>Por que SAM e n&atilde;o CDK/Terraform?</strong> SAM &eacute; YAML puro, lan&ccedil;a CloudFormation, e n&atilde;o exige stack de build. Pra um portal serverless mantido por uma pessoa, &eacute; o equil&iacute;brio certo entre verbosidade (mais que CDK) e simplicidade (n&atilde;o tem state remoto pra gerenciar como Terraform).
       </div>
 
-      <pre><code class="language-bash">┌─────────────────────────────────────────────────────────────────┐
-│                      NAVEGADOR (celular/PC)                     │
-│                                                                 │
-│  1. Login (Cognito)                                             │
-│  2. Seleciona bloco → pede Presigned URL                        │
-│  3. Faz PUT direto no S3 (sem passar pela Lambda!)              │
-│  4. Notifica Lambda que o upload terminou                       │
-└──────────┬──────────────────────────────────┬───────────────────┘
-           │ HTTPS                            │ HTTPS (PUT direto)
-           ▼                                  ▼
-┌─────────────────────┐            ┌─────────────────────┐
-│     CloudFront      │            │     Amazon S3       │
-│  (CDN + behaviors)  │            │  (bucket de mídia)  │
-└──────────┬──────────┘            └─────────────────────┘
-           │                                  ▲
-           ▼                                  │ Presigned URL
-┌─────────────────────┐                       │
-│   API Gateway       │                       │
-│   (HTTP API)        │                       │
-└──────────┬──────────┘                       │
-           │                                  │
-           ▼                                  │
-┌─────────────────────────────────────────────┴───────────────────┐
-│                        AWS Lambda                               │
-│                                                                 │
-│  - Serve o frontend (HTML/CSS/JS)                               │
-│  - Gera Presigned URLs (PutObject)                              │
-│  - CRUD de usuários (Cognito)                                   │
-│  - Registra auditoria (DynamoDB)                                │
-│  - Lê configurações (SSM Parameter Store)                       │
-└──────────┬──────────┬──────────┬──────────┬─────────────────────┘
-           │          │          │          │
-           ▼          ▼          ▼          ▼
-      ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
-      │DynamoDB│ │Cognito │ │  SSM   │ │  SES   │
-      │(audit) │ │(users) │ │(config)│ │(email) │
-      └────────┘ └────────┘ └────────┘ └────────┘</code></pre>
+      <!-- ====== COGNITO E GRUPOS ====== -->
+      <h2>Cognito: o cora&ccedil;&atilde;o do controle de acesso</h2>
 
-      <div class="callout success">
-        <strong>Ponto-chave:</strong> os arquivos de mídia <strong>nunca</strong> passam pela Lambda. O navegador recebe uma Presigned URL e faz o <code>PUT</code> diretamente no S3. Isso significa que a Lambda não precisa lidar com payloads grandes &mdash; ela só gera a URL (operação leve, ~50ms) e o navegador faz o trabalho pesado.
-      </div>
+      <p>Quando eram dois usu&aacute;rios admin, autentica&ccedil;&atilde;o era um detalhe. Quando o portal cresceu para ~120 colaboradores em sete departamentos, ficou claro: <strong>cada app precisava ser vis&iacute;vel apenas pra quem tem permiss&atilde;o</strong>. RH n&atilde;o pode ver chamados de TI, vendedor n&atilde;o pode ver holerite dos outros, etc.</p>
 
-      <!-- ====== PRÉ-REQUISITOS ====== -->
-      <h2>O que eu usei</h2>
-
-      <ul>
-        <li><strong>Conta AWS</strong> com permissões de administrador (ou pelo menos acesso a S3, Lambda, API Gateway, DynamoDB, Cognito, SSM, SES, CloudFront e IAM)</li>
-        <li><strong>AWS CLI v2</strong> configurado com <code>aws configure</code></li>
-        <li><strong>AWS SAM CLI</strong> &mdash; o framework de deploy serverless da AWS</li>
-        <li><strong>Node.js 20+</strong> (runtime da Lambda)</li>
-        <li><strong>Git</strong></li>
-      </ul>
-
-      <h3>Instalação (macOS / Linux)</h3>
+      <p>A solu&ccedil;&atilde;o foi um sistema de <em>grupos Cognito</em> mais um atributo custom <code>custom:group</code> no token. Sete grupos default, cada um com uma lista de apps vis&iacute;veis:</p>
 
       <details>
-<summary><strong>Instalação — macOS / Linux</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash"># AWS CLI
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
+<summary><strong>src/permissions.js</strong> &mdash; defini&ccedil;&atilde;o dos grupos (clique para expandir)</summary>
+      <pre><code class="language-javascript">// ─── Apps dispon&iacute;veis por grupo ─────────────────────────────
+const GROUPS = {
+  TI: {
+    label: "TI",
+    apps: ["*"],          // wildcard: tudo
+    isAdmin: true,
+  },
+  MI: {
+    label: "Mercado Interno",
+    apps: ["studio", "docs", "loja", "amostras", "chamado", "ideias"],
+  },
+  ME: {
+    label: "Mercado Externo",
+    apps: ["studio", "docs", "loja", "amostras", "chamado", "ideias", "ovacao"],
+  },
+  Producao: {
+    label: "Produ&ccedil;&atilde;o",
+    apps: ["studio", "stonetrack", "docs", "chamado", "ideias", "rh"],
+  },
+  Comercial: {
+    label: "Comercial",
+    apps: ["docs", "loja", "amostras", "chamado", "ideias", "carteira", "rh"],
+  },
+  RH: {
+    label: "Recursos Humanos",
+    apps: ["rh", "hr-onoff", "docs", "chamado", "ideias", "mural"],
+  },
+  Viewer: {
+    label: "Somente leitura",
+    apps: ["docs", "chamado", "ideias", "mural", "rh"],
+  },
+};
 
-# SAM CLI
-brew install aws-sam-cli
-# ou via pip:
-pip install aws-sam-cli
+// ─── Middleware de autoriza&ccedil;&atilde;o por app ────────────────────────
+function requireApp(appId) {
+  return (claims) =&gt; {
+    const group = claims["custom:group"] || "Viewer";
+    const allowed = GROUPS[group]?.apps || [];
+    // Wildcard libera tudo
+    if (allowed.includes("*")) return true;
+    if (allowed.includes(appId)) return true;
+    // Grants/denies individuais via custom:perms (JSON)
+    try {
+      const perms = JSON.parse(claims["custom:perms"] || "{}");
+      if (perms.grants?.includes(appId)) return true;
+      if (perms.denies?.includes(appId)) return false;
+    } catch (_) {}
+    return false;
+  };
+}
 
-# Node.js 20 (via nvm)
-nvm install 20
-nvm use 20
-
-# Verificar tudo
-aws --version
-sam --version
-node --version</code></pre>
+module.exports = { GROUPS, requireApp };</code></pre>
 </details>
 
-      <h3>Instalação (Windows)</h3>
+      <p>No handler de cada rota, o primeiro passo &eacute; validar o token e checar o app:</p>
 
       <details>
-<summary><strong>Instalação — Windows</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash"># AWS CLI — baixe o MSI:
-# https://awscli.amazonaws.com/AWSCLIV2.msi
+<summary><strong>src/index.js</strong> &mdash; padr&atilde;o de prote&ccedil;&atilde;o de rota (clique para expandir)</summary>
+      <pre><code class="language-javascript">const { requireAuth, requireApp } = require("./permissions");
 
-# SAM CLI — baixe o MSI:
-# https://github.com/aws/aws-sam-cli/releases/latest
-
-# Node.js 20 — baixe o instalador:
-# https://nodejs.org/
-
-# Verificar tudo (PowerShell ou Git Bash)
-aws --version
-sam --version
-node --version</code></pre>
-</details>
-
-      <!-- ====== PASSO 1 ====== -->
-      <h2>Passo 1: Configurando o Projeto</h2>
-
-      <p>Criei a estrutura do projeto do zero usando o SAM CLI:</p>
-
-      <details>
-<summary><strong>Estrutura do projeto</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash"># Inicializar o projeto
-mkdir galeria-midia && cd galeria-midia
-sam init --runtime nodejs20.x --name galeria-midia --app-template hello-world
-
-# Estrutura final que vamos construir:
-# galeria-midia/
-# ├── template.yaml          ← SAM template (infraestrutura)
-# ├── src/
-# │   ├── index.js           ← Lambda principal
-# │   ├── relatorio.js       ← Lambda de relatório diário
-# │   ├── package.json
-# │   └── frontend/
-# │       ├── index.html      ← Interface do operador
-# │       ├── login.html      ← Tela de login
-# │       └── admin.html      ← Painel de administração
-# └── .gitignore</code></pre>
-</details>
-
-      <p>Primeiro, o <code>package.json</code> com as dependências do AWS SDK v3. Usei o SDK v3 porque ele é modular &mdash; importei apenas os clientes necessários, reduzindo o tamanho do pacote da Lambda:</p>
-
-      <details>
-<summary><strong>package.json</strong> (clique para expandir)</summary>
-      <pre><code class="language-json">{
-  "name": "galeria-midia",
-  "version": "1.0.0",
-  "description": "Galeria de mídia serverless - Pedra Sul Mineração",
-  "private": true,
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.500.0",
-    "@aws-sdk/s3-request-presigner": "^3.500.0",
-    "@aws-sdk/client-dynamodb": "^3.500.0",
-    "@aws-sdk/client-cognito-identity-provider": "^3.500.0",
-    "@aws-sdk/client-ssm": "^3.500.0",
-    "@aws-sdk/client-ses": "^3.500.0"
+// Ex.: rota do contracheque
+if (method === "GET" && path === "/rh/consultar") {
+  const claims = await requireAuth(event);  // valida JWT do Cognito
+  if (!claims) return jsonResponse(401, { error: "n&atilde;o autenticado" });
+  if (!requireApp("rh")(claims)) {
+    return jsonResponse(403, { error: "app n&atilde;o liberado para seu grupo" });
   }
+  return await handleConsultaRH(event, claims);
 }</code></pre>
 </details>
 
-      <div class="card">
-        <div class="card-title">Por que SDK v3 e não v2?</div>
-        <p>O AWS SDK v2 (<code>aws-sdk</code>) inclui todos os 300+ serviços da AWS num único pacote de ~70 MB. O SDK v3 é modular: cada serviço é um pacote separado. Para Lambda, isso significa cold starts mais rápidos e menos memória consumida.</p>
+      <div class="callout success">
+        <strong>Por que grupos no <em>token</em> e n&atilde;o em uma tabela?</strong> O token JWT chega na Lambda j&aacute; com o atributo <code>custom:group</code>. N&atilde;o preciso consultar DynamoDB nem fazer round-trip extra pra autorizar &mdash; verifico tudo em mem&oacute;ria. Trocar o grupo de algu&eacute;m exige logout (token expira em 1h) ou for&ccedil;ar refresh, mas isso &eacute; aceit&aacute;vel: mudan&ccedil;a de grupo &eacute; rara.
       </div>
 
-      <!-- ====== PASSO 2 ====== -->
-      <h2>Passo 2: Template SAM (template.yaml)</h2>
+      <h3>Refresh silencioso</h3>
 
-      <p>O <code>template.yaml</code> é o coração do projeto. Ele define <strong>toda</strong> a infraestrutura como código: a Lambda, o DynamoDB, o Cognito, as permissões IAM, as rotas da API &mdash; tudo num único arquivo. Quando eu rodava <code>sam deploy</code>, o SAM transformava isso em um CloudFormation stack e criava todos os recursos automaticamente.</p>
+      <p>O IdToken do Cognito dura 1 hora. Para um portal interno onde gente fica logada o dia inteiro, expirar a sess&atilde;o no meio do trabalho &eacute; ru&iacute;do. Implementei refresh autom&aacute;tico no cliente:</p>
 
       <details>
-<summary><strong>template.yaml — Infraestrutura completa</strong> (clique para expandir)</summary>
-      <pre><code class="language-yaml">AWSTemplateFormatVersion: "2010-09-09"
-Transform: AWS::Serverless-2016-10-31
-Description: Galeria de Midia Serverless
+<summary><strong>Frontend</strong> &mdash; refresh autom&aacute;tico antes da expira&ccedil;&atilde;o (clique para expandir)</summary>
+      <pre><code class="language-javascript">// ─── Auto refresh do Cognito (50min depois do login) ────────────
+function startTokenRefresh(refreshToken) {
+  // refresh a cada 50 minutos (IdToken expira em 60)
+  setInterval(async () =&gt; {
+    try {
+      const resp = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!resp.ok) throw new Error("refresh failed");
+      const { idToken } = await resp.json();
+      localStorage.setItem("idToken", idToken);
+    } catch (err) {
+      // Refresh falhou &mdash; force re-login
+      window.location.href = "/login";
+    }
+  }, 50 * 60 * 1000);
+}</code></pre>
+</details>
 
-# ─── Globais ────────────────────────────────────────────────────
-Globals:
-  Api:
-    BinaryMediaTypes:
-      - "*/*"
-    Cors:
-      AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
-      AllowHeaders: "'Content-Type,Authorization'"
-      AllowOrigin: "'*'"
+      <p>Na Lambda, o endpoint <code>/api/auth/refresh</code> usa <code>AdminInitiateAuth</code> com flow <code>REFRESH_TOKEN_AUTH</code> pra trocar o RefreshToken (que dura 30 dias) por um novo IdToken.</p>
 
-# ─── Parâmetros ─────────────────────────────────────────────────
-Parameters:
-  DestBucket:
-    Type: String
-    Description: Nome do bucket S3 para armazenar as midias
-    Default: meu-bucket-de-fotos
+      <!-- ====== LAMBDA MANAGER ====== -->
+      <h2>A Lambda principal: roteador de 80+ endpoints</h2>
 
-  SesFromEmail:
-    Type: String
-    Description: Email remetente para relatorios (verificado no SES)
-    Default: noreply@meudominio.com
+      <p>Tem uma decis&atilde;o controversa aqui que vou defender. O <code>src/index.js</code> &eacute; um arquivo de ~2500 linhas que faz <strong>routing manual</strong> com <code>if</code> encadeados:</p>
 
-  SesToEmail:
-    Type: String
-    Description: Email destinatario dos relatorios
-    Default: admin@meudominio.com
+      <details>
+<summary><strong>src/index.js</strong> &mdash; estrutura do router (clique para expandir)</summary>
+      <pre><code class="language-javascript">exports.handler = async (event) =&gt; {
+  const method = event.httpMethod;
+  const path = event.path;
 
-# ─── Recursos ───────────────────────────────────────────────────
-Resources:
+  // CORS preflight
+  if (method === "OPTIONS") return cors204();
 
-  # ── DynamoDB: Tabela de Auditoria ──
-  AuditTable:
+  try {
+    // ── Auth/Portal ──
+    if (method === "GET" && path === "/")                 return servePortal(event);
+    if (method === "GET" && path === "/login")            return serveLoginPage();
+    if (method === "POST" && path === "/api/auth/login")  return await handleLogin(event);
+    if (method === "POST" && path === "/api/auth/refresh") return await handleRefresh(event);
+
+    // ── VStudio (galeria) ──
+    if (method === "GET" && path === "/studio")           return serveStudio(event);
+    if (method === "GET" && path === "/list-blocos")      return await handleListBlocos(event);
+    if (method === "POST" && path === "/presign-upload")  return await handlePresign(event);
+    if (method === "POST" && path.startsWith("/editor-apply")) return await handleEditor(event);
+    // ... mais 14 rotas do VStudio
+
+    // ── Chamado ──
+    if (method === "GET" && path === "/chamado")          return serveChamado(event);
+    if (method === "POST" && path === "/chamado")         return await handleAbrirChamado(event);
+
+    // ── Ideias / Kaizen ──
+    if (method === "GET" && path === "/ideias")           return serveIdeias(event);
+    if (method === "GET" && path === "/ideias/list")      return await handleListIdeias(event);
+    if (method === "POST" && path === "/ideias")          return await handleCriarIdeia(event);
+    if (method === "POST" && path.match(/^\/ideias\/[^/]+\/vote$/)) return await handleVoto(event);
+    if (method === "POST" && path.match(/^\/ideias\/[^/]+\/status$/)) return await handleStatusIdeia(event);
+
+    // ── RH/Contracheque ──
+    if (method === "POST" && path === "/rh/consultar")    return await handleConsultaRH(event);
+
+    // ── HR On/Offboarding ──
+    if (method === "POST" && path === "/hr-onoffboarding") return await handleOnboarding(event);
+
+    // ── Admin ──
+    if (method === "GET" && path === "/admin/users")      return await handleListUsers(event);
+    if (method === "POST" && path === "/admin/users")     return await handleCreateUser(event);
+    if (method === "GET" && path === "/audit")            return await handleAudit(event);
+    if (method === "GET" && path === "/admin/trash")      return await handleTrash(event);
+
+    // ... 50+ rotas a mais
+
+    return jsonResponse(404, { error: "rota n&atilde;o encontrada" });
+
+  } catch (err) {
+    console.error("handler error:", err);
+    return jsonResponse(500, { error: "erro interno" });
+  }
+};</code></pre>
+</details>
+
+      <p>Por que n&atilde;o Express, Fastify, Hono ou qualquer framework? Tr&ecirc;s motivos:</p>
+
+      <ol>
+        <li><strong>Cold start.</strong> Express adiciona ~80&ndash;120ms de import em ARM64. Para um handler que vai responder uma p&aacute;gina HTML, isso &eacute; tempo &uacute;til perdido. Um <code>if/else</code> custa 0ms.</li>
+        <li><strong>Debug ling&uuml;&iacute;stico.</strong> Se algo quebra, eu sei <em>exatamente</em> onde olhar &mdash; n&atilde;o tem stack trace passando por 8 middlewares antes do meu c&oacute;digo.</li>
+        <li><strong>Zero depend&ecirc;ncia.</strong> Express subiu para v5, virou breaking change. Meu router n&atilde;o quebra nunca, porque s&atilde;o <code>if</code> nativos do JS.</li>
+      </ol>
+
+      <div class="callout warn">
+        <strong>Quando esse modelo quebra?</strong> Se eu tivesse 500+ rotas, ou rotas com matching complexo de path (par&acirc;metros aninhados, vers&otilde;es de API), o <code>if</code> ficaria ileg&iacute;vel. Para ~80 rotas, ainda &eacute; trivial. Acima de 200 eu provavelmente migraria pra um router min&iacute;mo (tipo <code>find-my-way</code>), n&atilde;o um framework completo.
+      </div>
+
+      <!-- ====== VSTUDIO ====== -->
+      <h2>VStudio: a galeria que come&ccedil;ou tudo</h2>
+
+      <div class="print">
+        <div class="t">Print: VStudio (galeria de blocos)</div>
+        <div class="d">Tela inicial do VStudio com busca por bloco/cavalete e blocos acessados recentemente. <code>assets/img/posts/fg-vstudio.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/fg-vstudio.png" alt="VStudio galeria de blocos">
+
+      <p>O fluxo &eacute; o mesmo do post original: o operador da serraria fotografa o bloco no celular, escolhe a refer&ecirc;ncia (ex. <code>BL-58731</code>) e o navegador recebe uma <strong>Presigned URL</strong> do S3, fazendo o <code>PUT</code> direto sem passar pela Lambda. A novidade &eacute; uma s&eacute;rie de modos de uso constru&iacute;dos em cima:</p>
+
+      <ul>
+        <li><strong>Modo Galeria</strong>: visualiza&ccedil;&atilde;o cl&aacute;ssica, com fotos originais + thumbnails de 250&times;150.</li>
+        <li><strong>Modo Editor</strong>: aplica ajuste de exposi&ccedil;&atilde;o, crop e marca d'&aacute;gua no canvas do cliente, depois sobe a vers&atilde;o editada.</li>
+        <li><strong>Modo Cinema</strong>: tela cheia para apresentar a chapa pro cliente comercial.</li>
+        <li><strong>Movimenta&ccedil;&atilde;o</strong>: hist&oacute;rico de onde cada bloco esteve (filial, p&aacute;tio, cavalete).</li>
+        <li><strong>Espelho compartilh&aacute;vel</strong>: gera URL p&uacute;blica <code>/espelho/&#123;bloco&#125;/&#123;chapas&#125;</code> para mandar no WhatsApp sem expor o portal interno.</li>
+      </ul>
+
+      <h3>Presigned URL em uma rota multi-tipo</h3>
+
+      <p>A vers&atilde;o nova da rota de presign suporta foto, v&iacute;deo e thumbnail no mesmo endpoint, com tempos de expira&ccedil;&atilde;o diferentes:</p>
+
+      <details>
+<summary><strong>handler de Presigned URL</strong> (clique para expandir)</summary>
+      <pre><code class="language-javascript">async function handlePresign(event, claims) {
+  const { bloco, fileName, contentType, tipo } = JSON.parse(event.body);
+
+  // Validar acesso ao bloco (RBAC por filial)
+  if (!canAccessBloco(claims, bloco)) {
+    return jsonResponse(403, { error: "bloco fora da sua filial" });
+  }
+
+  // Prefixo varia por tipo
+  // tipo = "thumb" | "video" | "edit" | undefined (original)
+  const prefix = tipo === "thumb" ? "_P"
+              : tipo === "video" ? "video"
+              : tipo === "edit"  ? ".edit"
+              : "originais";
+
+  const key = `FotosGranito/${bloco}/${prefix}/${fileName}`;
+
+  // Expira&ccedil;&atilde;o curta para foto, longa para v&iacute;deo
+  const isVideo = contentType?.startsWith("video/");
+  const expiresIn = isVideo ? 900 : 300;  // 15min vs 5min
+
+  const cmd = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: contentType,
+    Metadata: {
+      uploaded_by: claims["cognito:username"],
+      bloco: bloco,
+    },
+  });
+
+  const url = await getSignedUrl(s3, cmd, { expiresIn });
+
+  await logAudit("PRESIGN", claims["cognito:username"], bloco, { key });
+  return jsonResponse(200, { url, key, expiresIn });
+}</code></pre>
+</details>
+
+      <div class="callout info">
+        <strong>Metadata na key.</strong> Quem subiu, qual bloco, qual filial &mdash; tudo persiste como S3 Object Metadata. Mesmo se o DynamoDB de audit log corromper, eu tenho o rastro no pr&oacute;prio S3.
+      </div>
+
+      <!-- ====== MUTE-VIDEO ====== -->
+      <h2>Pipeline de v&iacute;deo: a segunda Lambda</h2>
+
+      <p>Aqui apareceu um problema espec&iacute;fico. Os operadores filmavam os blocos com celulares Apple, que gravam em <strong>HEVC (.mov)</strong> &mdash; um codec moderno mas que browsers desktop n&atilde;o conseguem reproduzir. Al&eacute;m disso, &agrave;s vezes o operador esquecia que estava gravando &aacute;udio, e a galeria precisava ser silenciosa pra apresentar pro cliente.</p>
+
+      <p>A solu&ccedil;&atilde;o: uma segunda Lambda <code>fotos-granito-mute-video</code> que &eacute; invocada <strong>assincronamente</strong> pela Lambda principal logo depois do upload. Ela transcoda HEVC&rarr;H264 e remove o &aacute;udio. Sai um <code>.mp4</code> universal.</p>
+
+      <details>
+<summary><strong>template.yaml</strong> &mdash; defini&ccedil;&atilde;o da Lambda mute (clique para expandir)</summary>
+      <pre><code class="language-yaml">  MuteVideoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: fotos-granito-mute-video
+      Handler: index.handler
+      Runtime: nodejs20.x
+      CodeUri: src-mute/
+      MemorySize: 3008          # FFmpeg precisa de mem&oacute;ria
+      Timeout: 600              # v&iacute;deos podem demorar
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:21"
+        # Layer FFmpeg p&uacute;blica (precompilada Amazon Linux 2)
+        - arn:aws:lambda:sa-east-1:175033217214:layer:ffmpeg:1
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+              Resource: !Sub "arn:aws:s3:::${DestBucket}/*"</code></pre>
+</details>
+
+      <details>
+<summary><strong>src-mute/index.js</strong> &mdash; transcoding (clique para expandir)</summary>
+      <pre><code class="language-javascript">const { S3Client, GetObjectCommand, PutObjectCommand,
+        DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const { spawn } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
+const s3 = new S3Client({});
+
+exports.handler = async (event) =&gt; {
+  // event.bucket, event.key, event.bloco passados pela manager
+  const { bucket, key, bloco } = event;
+
+  const tmpIn  = `/tmp/${path.basename(key)}`;
+  const tmpOut = `/tmp/out_${Date.now()}.mp4`;
+
+  // 1. Baixa o original do S3
+  const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  await streamToFile(obj.Body, tmpIn);
+
+  // 2. FFmpeg: HEVC → H264, sem audio, preset r&aacute;pido
+  await runFfmpeg([
+    "-y",
+    "-i", tmpIn,
+    "-c:v", "libx264",
+    "-preset", "veryfast",
+    "-crf", "23",
+    "-an",                  // sem audio
+    "-movflags", "+faststart",
+    tmpOut,
+  ]);
+
+  // 3. Sobe a vers&atilde;o tratada substituindo o original
+  const newKey = key.replace(/\.(mov|MOV)$/, ".mp4");
+  await s3.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: newKey,
+    Body: fs.createReadStream(tmpOut),
+    ContentType: "video/mp4",
+    Metadata: { transcoded: "true", original: key },
+  }));
+
+  // 4. Remove o HEVC original se transcoding deu bom
+  if (newKey !== key) {
+    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  }
+
+  // Limpa /tmp
+  fs.unlinkSync(tmpIn);
+  fs.unlinkSync(tmpOut);
+
+  return { ok: true, key: newKey };
+};
+
+function runFfmpeg(args) {
+  return new Promise((resolve, reject) =&gt; {
+    const proc = spawn("/opt/bin/ffmpeg", args);
+    proc.stderr.on("data", (d) =&gt; console.log(d.toString()));
+    proc.on("close", (code) =&gt; code === 0 ? resolve() : reject(new Error(`ffmpeg exit ${code}`)));
+  });
+}</code></pre>
+</details>
+
+      <h3>Invoca&ccedil;&atilde;o ass&iacute;ncrona (fire-and-forget)</h3>
+
+      <p>Na manager, depois do upload registrado, eu disparo a mute-video sem esperar resposta:</p>
+
+      <details>
+<summary><strong>manager invoca mute ass&iacute;ncrono</strong> (clique para expandir)</summary>
+      <pre><code class="language-javascript">const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+const lambda = new LambdaClient({});
+
+async function fireAndForgetMute(bucket, key, bloco) {
+  // S&oacute; v&iacute;deo (MOV/MP4) entra na fila de muting
+  if (!/\.(mov|mp4)$/i.test(key)) return;
+
+  await lambda.send(new InvokeCommand({
+    FunctionName: "fotos-granito-mute-video",
+    InvocationType: "Event",   // ★ ass&iacute;ncrono, n&atilde;o espera resposta
+    Payload: Buffer.from(JSON.stringify({ bucket, key, bloco })),
+  }));
+}</code></pre>
+</details>
+
+      <div class="callout success">
+        <strong>Por que n&atilde;o S3 Event Notification direto?</strong> Considerei. O problema: <code>s3:ObjectCreated:*</code> dispara para <em>todos</em> os PUTs no bucket, inclusive thumbnails e arquivos de edi&ccedil;&atilde;o. Filtrar por prefixo/sufixo na config do bucket &eacute; limitado (n&atilde;o consigo combinar prefixo + ContentType). Invocar manualmente da manager me d&aacute; controle total sobre quando disparar.
+      </div>
+
+      <!-- ====== CHAMADO ====== -->
+      <h2>Helpdesk: do WhatsApp para ticket rastreado</h2>
+
+      <div class="print">
+        <div class="t">Print: tela de abrir chamado</div>
+        <div class="d">Helpdesk interno com categoria, prioridade, descri&ccedil;&atilde;o e anexo opcional. <code>assets/img/posts/fg-chamado.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/fg-chamado.png" alt="Tela de abrir chamado helpdesk">
+
+      <p>Antes do portal, chamado de TI funcionava assim: o colaborador mandava WhatsApp pro analista, que &agrave;s vezes anotava em planilha, &agrave;s vezes esquecia, &agrave;s vezes resolvia direto sem registro. Resultado: zero m&eacute;trica de SLA, zero hist&oacute;rico, zero priorizaqo.</p>
+
+      <p>O app <code>chamado</code> &eacute; uma das views mais simples do portal, mas resolveu mais problema operacional que muito sistema caro. Cada chamado vira um item no DynamoDB <code>ChamadosTable</code>:</p>
+
+      <details>
+<summary><strong>DynamoDB schema &mdash; ChamadosTable</strong> (clique para expandir)</summary>
+      <pre><code class="language-yaml">  ChamadosTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
     Properties:
-      TableName: galeria-audit-log
+      TableName: fotos-granito-chamados
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: pk
+        - AttributeName: pk          # CHAMADO#&lt;year-month&gt;
           AttributeType: S
-        - AttributeName: sk
+        - AttributeName: sk          # &lt;timestamp&gt;#&lt;chamado-id&gt;
           AttributeType: S
-        - AttributeName: bloco
+        - AttributeName: status      # aberto | em-andamento | resolvido
           AttributeType: S
-        - AttributeName: ts
+        - AttributeName: criadoEm    # ISO timestamp
+          AttributeType: S
+        - AttributeName: assignedTo  # usu&aacute;rio respons&aacute;vel (TI)
           AttributeType: S
       KeySchema:
         - AttributeName: pk
@@ -289,1415 +619,599 @@ Resources:
         - AttributeName: sk
           KeyType: RANGE
       GlobalSecondaryIndexes:
-        - IndexName: bloco-ts-index
+        - IndexName: status-criadoEm-index
           KeySchema:
-            - AttributeName: bloco
+            - AttributeName: status
               KeyType: HASH
-            - AttributeName: ts
+            - AttributeName: criadoEm
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-      TimeToLiveSpecification:
-        AttributeName: ttl
-        Enabled: true
+        - IndexName: assignedTo-criadoEm-index
+          KeySchema:
+            - AttributeName: assignedTo
+              KeyType: HASH
+            - AttributeName: criadoEm
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL</code></pre>
+</details>
 
-  # ── Cognito: User Pool ──
-  GaleriaUserPool:
-    Type: AWS::Cognito::UserPool
-    Properties:
-      UserPoolName: galeria-user-pool
-      AdminCreateUserConfig:
-        AllowAdminCreateUserOnly: true
-        InviteMessageTemplate:
-          EmailMessage: >
-            Seu acesso a Galeria de Midia foi criado.
-            Usuario: {username} | Senha temporaria: {####}
-            Acesse e troque sua senha no primeiro login.
-          EmailSubject: "Galeria de Midia - Seu acesso foi criado"
-      Policies:
-        PasswordPolicy:
-          MinimumLength: 8
-          RequireLowercase: true
-          RequireNumbers: true
-          RequireSymbols: false
-          RequireUppercase: false
-      Schema:
-        - Name: email
-          AttributeDataType: String
-          Required: true
-          Mutable: true
-        - Name: custom:role
-          AttributeDataType: String
-          Mutable: true
+      <p>A PK <code>CHAMADO#2026-05</code> garante que todos os chamados do m&ecirc;s ficam na mesma partition (DynamoDB Query barata). Os GSIs respondem perguntas operacionais:</p>
 
-  GaleriaUserPoolClient:
-    Type: AWS::Cognito::UserPoolClient
-    Properties:
-      ClientName: galeria-web-client
-      UserPoolId: !Ref GaleriaUserPool
-      ExplicitAuthFlows:
-        - ALLOW_USER_PASSWORD_AUTH
-        - ALLOW_REFRESH_TOKEN_AUTH
-      GenerateSecret: false
+      <ul>
+        <li><strong>status-criadoEm-index</strong>: lista chamados abertos ordenados por mais antigo (priorizar).</li>
+        <li><strong>assignedTo-criadoEm-index</strong>: hist&oacute;rico de um analista (relat&oacute;rio individual).</li>
+      </ul>
 
-  # ── Lambda: Função Principal ──
-  GaleriaFunction:
+      <h3>Notifica&ccedil;&atilde;o no Telegram (sem SNS)</h3>
+
+      <p>Quando um chamado &eacute; aberto, em vez de configurar SNS &rarr; SES &rarr; inbox sobrecarregada, eu uso um bot do Telegram. O time de TI recebe na hora:</p>
+
+      <details>
+<summary><strong>notifica&ccedil;&atilde;o Telegram (sem SDK)</strong> (clique para expandir)</summary>
+      <pre><code class="language-javascript">async function notifyTelegram(chamado) {
+    const TOKEN  = await getConfig("telegram/bot-token");
+    const CHATID = await getConfig("telegram/chat-id-ti");
+    if (!TOKEN || !CHATID) return; // sem config? n&atilde;o quebra o fluxo
+
+    const url = `https://api.telegram.org/bot${TOKEN}/sendMessage`;
+    const msg = `*Novo chamado* &middot; *${chamado.prioridade}*\n`
+              + `&#x1F464; ${chamado.usuario}\n`
+              + `&#x1F4CC; ${chamado.titulo}\n`
+              + `&#x1F4AC; ${chamado.descricao.slice(0, 120)}...\n`
+              + `\u{1F517} portal.vitoriastone.com/admin/chamados/${chamado.id}`;
+
+    try {
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: CHATID,
+          text: msg,
+          parse_mode: "Markdown",
+        }),
+      });
+    } catch (err) {
+      // Fire-and-forget: n&atilde;o quebra a abertura do ticket
+      console.error("Telegram notify failed:", err.message);
+    }
+}</code></pre>
+</details>
+
+      <div class="callout info">
+        <strong>Por que Telegram e n&atilde;o SES/SNS?</strong> O time de TI j&aacute; usa Telegram pra comunica&ccedil;&atilde;o interna. SES/SNS exigiria que algu&eacute;m acompanhasse o email. Telegram &eacute; em tempo real, todo mundo j&aacute; tem instalado, e o token gratuito do BotFather n&atilde;o tem rate limit relevante pra esse volume (~10 chamados/dia).
+      </div>
+
+      <!-- ====== CONTRACHEQUE ====== -->
+      <h2>Contracheque: Lambda atravessando uma VPC para um Firebird</h2>
+
+      <div class="print">
+        <div class="t">Print: tela de contracheque</div>
+        <div class="d">Consulta de holerite por CPF + data nascimento + compet&ecirc;ncia, com integra&ccedil;&atilde;o ao ERP Athenas (Firebird). <code>assets/img/posts/fg-rh.png</code>.</div>
+      </div>
+      <img src="../assets/img/posts/fg-rh.png" alt="Tela de consulta de contracheque">
+
+      <p>Aqui &eacute; onde a arquitetura saiu da zona de conforto serverless. O ERP Athenas roda em uma EC2 com Firebird 5.0 dentro da VPC corporativa. O Lambda da fun&ccedil;&atilde;o principal precisa <em>consultar</em> esse Firebird para gerar holerite, mas Lambda fora da VPC n&atilde;o enxerga o Firebird (que est&aacute; em subnet privada).</p>
+
+      <p>Tinha duas op&ccedil;&otilde;es:</p>
+
+      <table>
+        <thead>
+          <tr><th>Op&ccedil;&atilde;o</th><th>Pr&oacute;s</th><th>Contras</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Botar a Lambda inteira dentro da VPC</td>
+            <td>Solu&ccedil;&atilde;o direta</td>
+            <td>Cold start +600ms (ENI provisioning), aumenta custo NAT</td>
+          </tr>
+          <tr>
+            <td>Separar em uma segunda Lambda RH dentro da VPC, chamada s&oacute; quando necess&aacute;rio</td>
+            <td>Lambda principal continua ar&eacute;na, sem cold start extra</td>
+            <td>Mais um arquivo, mais um deploy</td>
+          </tr>
+          <tr>
+            <td>Bridge via API REST na pr&oacute;pria EC2</td>
+            <td>Sem mudan&ccedil;a em Lambda</td>
+            <td>Mais um servi&ccedil;o pra manter (Nginx + Node na EC2)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Acabei escolhendo uma quarta op&ccedil;&atilde;o que n&atilde;o tinha pensado: <strong>chamar o Firebird via outra integra&ccedil;&atilde;o que j&aacute; existe</strong>. A empresa j&aacute; tinha uma EC2 com um servi&ccedil;o REST exposto internamente para o LeverPro (outra integra&ccedil;&atilde;o que documentei <a href="integracao-api-aws.html">neste post</a>). Reusei o mesmo endpoint, com um path novo, com allowlist de IPs (somente o Egress IP do Lambda).</p>
+
+      <details>
+<summary><strong>src/paystub_query.js</strong> &mdash; consulta Firebird via REST proxy (clique para expandir)</summary>
+      <pre><code class="language-javascript">const PROXY_URL = process.env.ATHENAS_PROXY_URL;
+// Ex: https://leverpro.vitoriastone.com.br/internal/athenas/paystub
+
+async function fetchPaystub({ cpf, dataNascimento, competencia }) {
+  // Token vai no SSM como SecureString
+  const token = await getConfig("athenas/internal-token");
+
+  const resp = await fetch(`${PROXY_URL}?` + new URLSearchParams({
+    cpf, dataNascimento, competencia,
+  }), {
+    method: "GET",
+    headers: { "X-Internal-Token": token },
+  });
+
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error(`athenas proxy ${resp.status}`);
+  return await resp.json();
+}
+
+module.exports = { fetchPaystub };</code></pre>
+</details>
+
+      <div class="callout danger">
+        <strong>Cuidado com PII em log.</strong> Holerite tem sal&aacute;rio, CPF, depend&ecirc;ntes &mdash; PII pesado. O <code>console.log</code> default do Lambda manda tudo pra CloudWatch Logs. Aqui eu loguei <em>apenas</em> o CPF mascarado (`***.***.123-**`) e nenhum valor financeiro. CloudWatch Logs tem reten&ccedil;&atilde;o de 30 dias mas a regra LGPD &eacute; n&atilde;o expor desnecessariamente.
+      </div>
+
+      <!-- ====== IDEIAS ====== -->
+      <h2>Ideias / Kaizen: o app que ganhou for&ccedil;a</h2>
+
+      <p>Esse n&atilde;o estava no plano. Um diretor pediu uma "caixa de sugest&otilde;es digital", esperando o cl&aacute;ssico formul&aacute;rio que ningu&eacute;m abre. Constru&iacute; com dois componentes que mudaram o uso:</p>
+
+      <ul>
+        <li><strong>Voto p&uacute;blico</strong>: qualquer colaborador v&ecirc; ideias dos colegas e d&aacute; like. Vira termometro de quanta gente concorda.</li>
+        <li><strong>Status p&uacute;blico</strong>: o gestor atualiza pra "em an&aacute;lise", "aprovada", "implementada" ou "n&atilde;o vi&aacute;vel" com justificativa. Quem prop&ocirc;s recebe email.</li>
+      </ul>
+
+      <p>Resultado: em 30 dias, 47 ideias submetidas (a maioria por gente da produ&ccedil;&atilde;o que nunca falava com diretoria), 3 implementadas, e duas economizaram literalmente caminh&otilde;es no processo log&iacute;stico.</p>
+
+      <div class="print">
+        <div class="t">Print: Ideias/Kaizen (a enviar)</div>
+        <div class="d">Tela do app Ideias com cards de sugest&otilde;es + bot&otilde;es de voto + status. <code>assets/img/posts/fg-ideias.png</code> &mdash; envio pendente.</div>
+      </div>
+
+      <details>
+<summary><strong>endpoint de voto idempotente</strong> (clique para expandir)</summary>
+      <pre><code class="language-javascript">async function handleVoto(event, claims) {
+  const ideiaId = event.path.split("/")[2];
+  const user = claims["cognito:username"];
+
+  // Idempotente: cada usu&aacute;rio s&oacute; vota uma vez por ideia
+  // Implementado via SK composta: VOTE#&lt;ideia-id&gt;#&lt;username&gt;
+  const item = {
+    pk: { S: `IDEIA#${ideiaId}` },
+    sk: { S: `VOTE#${user}` },
+    user: { S: user },
+    ts: { S: new Date().toISOString() },
+  };
+
+  try {
+    await ddb.send(new PutItemCommand({
+      TableName: "fotos-granito-ideias",
+      Item: item,
+      // Falha se j&aacute; existe (idempot&ecirc;ncia)
+      ConditionExpression: "attribute_not_exists(sk)",
+    }));
+    return jsonResponse(200, { voted: true });
+  } catch (err) {
+    if (err.name === "ConditionalCheckFailedException") {
+      // J&aacute; tinha votado &mdash; remove (toggle)
+      await ddb.send(new DeleteItemCommand({
+        TableName: "fotos-granito-ideias",
+        Key: { pk: item.pk, sk: item.sk },
+      }));
+      return jsonResponse(200, { voted: false });
+    }
+    throw err;
+  }
+}</code></pre>
+</details>
+
+      <div class="callout info">
+        <strong>Por que <code>ConditionExpression</code>?</strong> Sem ela, se um usu&aacute;rio clica duas vezes rapidamente (race condition no front), ele "vota" duas vezes. Com <code>attribute_not_exists(sk)</code>, o segundo PutItem falha e o handler trata como toggle (remove). Idempot&ecirc;ncia gratuita.
+      </div>
+
+      <!-- ====== ADMIN ====== -->
+      <h2>Admin: audit log, lixeira global, gest&atilde;o</h2>
+
+      <p>Um portal que cresceu precisa de pain&eacute;is internos. A view de admin (gate <code>group === "TI"</code>) cobre:</p>
+
+      <ul>
+        <li><strong>Audit log</strong>: pesquisa por usu&aacute;rio/data/a&ccedil;&atilde;o. Tudo registrado no DynamoDB <code>AuditLogTable</code> em modo fire-and-forget.</li>
+        <li><strong>Lixeira global</strong>: arquivos apagados v&atilde;o pro prefixo <code>.trash/</code> no S3, recuper&aacute;veis por 30 dias.</li>
+        <li><strong>Gest&atilde;o de usu&aacute;rios</strong>: criar/desabilitar/resetar senha via APIs <code>cognito-idp:Admin*</code>.</li>
+        <li><strong>Gest&atilde;o de grupos</strong>: editar quais apps cada grupo v&ecirc;.</li>
+      </ul>
+
+      <div class="print">
+        <div class="t">Print: tela Admin (a enviar)</div>
+        <div class="d">Painel administrativo com audit log + lixeira + users + groups. <code>assets/img/posts/fg-admin.png</code> &mdash; envio pendente.</div>
+      </div>
+
+      <h3>Audit log como single-table design</h3>
+
+      <p>Cada a&ccedil;&atilde;o (login, upload, delete, edit, voto, chamado aberto) escreve no DynamoDB:</p>
+
+      <details>
+<summary><strong>schema audit log</strong> (clique para expandir)</summary>
+      <pre><code class="language-javascript">// PK = AUDIT#&lt;date-iso&gt;     (ex: AUDIT#2026-05-26)
+// SK = &lt;timestamp&gt;#&lt;rand&gt;   (ex: 2026-05-26T13:42:10.341Z#a1b2c3)
+//
+// Atributos:
+//   action: "UPLOAD" | "DELETE" | "LOGIN" | "VOTE" | "CHAMADO_OPEN" | ...
+//   user:   "matheus.nascimento"
+//   bloco:  "58731" | null
+//   ip:     "201.x.x.x"  (User-Agent X-Forwarded-For)
+//   ua:     navegador
+//   details: JSON com payload da a&ccedil;&atilde;o
+//   ttl:    epoch + 90d  (auto-expira)
+
+async function logAudit(action, user, bloco, details = {}) {
+  const now = new Date().toISOString();
+  const rand = Math.random().toString(36).slice(2, 8);
+
+  try {
+    await ddb.send(new PutItemCommand({
+      TableName: AUDIT_TABLE,
+      Item: {
+        pk: { S: `AUDIT#${now.slice(0, 10)}` },
+        sk: { S: `${now}#${rand}` },
+        action: { S: action },
+        user: { S: user || "anonymous" },
+        bloco: { S: bloco || "N/A" },
+        ts: { S: now },
+        details: { S: JSON.stringify(details).slice(0, 4000) },
+        ttl: { N: String(Math.floor(Date.now() / 1000) + 90 * 86400) },
+      },
+    }));
+  } catch (err) {
+    // Falha de audit n&atilde;o deve quebrar a opera&ccedil;&atilde;o do usu&aacute;rio
+    console.error("audit failed:", err.message);
+  }
+}</code></pre>
+</details>
+
+      <div class="callout warn">
+        <strong>TTL n&atilde;o &eacute; instant&acirc;neo.</strong> O DynamoDB TTL deleta dentro de at&eacute; 48h depois que o atributo expira. Se voc&ecirc; quiser ver registros sumirem na hora certa, n&atilde;o &eacute; pelo TTL. Para audit log de 90 dias isso n&atilde;o &eacute; problema; pra compliance r&iacute;gido, considere uma Lambda cron que faz delete explicito.
+      </div>
+
+      <!-- ====== MS GRAPH ====== -->
+      <h2>Microsoft Graph: integra&ccedil;&atilde;o com OneDrive/SharePoint</h2>
+
+      <p>Dois apps do portal (Ova&ccedil;&atilde;o e Planilhas/Telefones) precisam ler documentos que v&iacute;deo no OneDrive/SharePoint corporativo. A integra&ccedil;&atilde;o usa <strong>Microsoft Graph API</strong> com app-only auth (client_credentials).</p>
+
+      <details>
+<summary><strong>Microsoft Graph &mdash; obter token e listar arquivos</strong> (clique para expandir)</summary>
+      <pre><code class="language-javascript">// ─── Cache do token (50 min, valid&aacute; em 60) ───────────────
+let _tokenCache = { value: null, exp: 0 };
+
+async function getGraphToken() {
+  const now = Date.now();
+  if (_tokenCache.value && _tokenCache.exp &gt; now) return _tokenCache.value;
+
+  const TENANT_ID = await getConfig("onedrive/tenant_id");
+  const CLIENT_ID = await getConfig("onedrive/client_id");
+  const CLIENT_SECRET = await getConfig("onedrive/client_secret");
+
+  const url = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    client_id: CLIENT_ID,
+    client_secret: CLIENT_SECRET,
+    scope: "https://graph.microsoft.com/.default",
+    grant_type: "client_credentials",
+  });
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const json = await resp.json();
+  if (!resp.ok) throw new Error(`graph token: ${JSON.stringify(json)}`);
+
+  _tokenCache = { value: json.access_token, exp: now + 50 * 60 * 1000 };
+  return json.access_token;
+}
+
+async function listOvacao(folderPath) {
+  const token = await getGraphToken();
+  const DRIVE_ID = await getConfig("onedrive/drive_id");
+  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/Ovacao/${folderPath}:/children`;
+
+  const resp = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await resp.json();
+  return json.value || [];
+}</code></pre>
+</details>
+
+      <div class="callout success">
+        <strong>Token cache &eacute; obrigat&oacute;rio.</strong> Sem cache, cada chamada ao Graph faz uma round-trip pro login.microsoftonline.com s&oacute; pra pegar token novo. Cold start vira ~800ms. Com cache, fica em ~80ms.
+      </div>
+
+      <!-- ====== RELATÓRIO DIÁRIO ====== -->
+      <h2>Relat&oacute;rio di&aacute;rio: a terceira Lambda</h2>
+
+      <p>Toda noite &agrave;s 18h BRT, uma terceira Lambda separada (<code>fotos-granito-relatorio</code>) &eacute; disparada pelo EventBridge. Ela:</p>
+
+      <ol>
+        <li>Consulta DynamoDB pelos eventos das &uacute;ltimas 24h (audit log, chamados, ideias)</li>
+        <li>Monta um HTML com tabelas + gr&aacute;ficos simples (inline SVG, sem libs)</li>
+        <li>Envia via SES para diretoria + TI</li>
+      </ol>
+
+      <p>Por que uma Lambda separada e n&atilde;o um endpoint na manager? Tr&ecirc;s razoes:</p>
+
+      <ul>
+        <li><strong>Permiss&otilde;es diferentes.</strong> A relat&oacute;rio precisa de <code>ses:SendEmail</code>, a manager n&atilde;o. Manter o least-privilege.</li>
+        <li><strong>Timeout maior.</strong> Relat&oacute;rio pode demorar 30-60s. A manager tem timeout de 30s.</li>
+        <li><strong>Sem cold start no caminho cr&iacute;tico.</strong> A manager &eacute; chamada por usu&aacute;rio; n&atilde;o quero o c&oacute;digo dela maior que o necess&aacute;rio.</li>
+      </ul>
+
+      <details>
+<summary><strong>template.yaml</strong> &mdash; schedule do relat&oacute;rio (clique para expandir)</summary>
+      <pre><code class="language-yaml">  RelatorioFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: galeria-midia-api
-      Handler: index.handler
-      Runtime: nodejs20.x
-      CodeUri: src/
-      MemorySize: 512
-      Timeout: 30
-      Environment:
-        Variables:
-          DEST_BUCKET: !Ref DestBucket
-          AUDIT_TABLE: !Ref AuditTable
-          USER_POOL_ID: !Ref GaleriaUserPool
-          USER_POOL_CLIENT_ID: !Ref GaleriaUserPoolClient
-          SES_FROM_EMAIL: !Ref SesFromEmail
-          SES_TO_EMAIL: !Ref SesToEmail
-      Policies:
-        # S3: ler, escrever e listar objetos
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - s3:PutObject
-                - s3:GetObject
-                - s3:DeleteObject
-              Resource: !Sub "arn:aws:s3:::${DestBucket}/*"
-            - Effect: Allow
-              Action:
-                - s3:ListBucket
-              Resource: !Sub "arn:aws:s3:::${DestBucket}"
-        # DynamoDB: leitura e escrita na tabela de auditoria
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:PutItem
-                - dynamodb:GetItem
-                - dynamodb:Query
-                - dynamodb:Scan
-              Resource:
-                - !GetAtt AuditTable.Arn
-                - !Sub "${AuditTable.Arn}/index/*"
-        # Cognito: gerenciar usuários
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - cognito-idp:AdminCreateUser
-                - cognito-idp:AdminDeleteUser
-                - cognito-idp:AdminGetUser
-                - cognito-idp:AdminInitiateAuth
-                - cognito-idp:AdminRespondToAuthChallenge
-                - cognito-idp:ListUsers
-              Resource: !GetAtt GaleriaUserPool.Arn
-        # SSM: ler parâmetros de configuração
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - ssm:GetParameter
-                - ssm:GetParameters
-              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/galeria/*"
-        # SES: enviar relatórios por email
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - ses:SendEmail
-                - ses:SendRawEmail
-              Resource: "*"
-      Events:
-        # Rotas da API
-        RootGet:
-          Type: Api
-          Properties:
-            Path: /
-            Method: get
-        LoginPage:
-          Type: Api
-          Properties:
-            Path: /login
-            Method: get
-        AdminPage:
-          Type: Api
-          Properties:
-            Path: /admin
-            Method: get
-        ApiLogin:
-          Type: Api
-          Properties:
-            Path: /api/login
-            Method: post
-        ApiPresign:
-          Type: Api
-          Properties:
-            Path: /api/presign
-            Method: post
-        ApiNotify:
-          Type: Api
-          Properties:
-            Path: /api/notify
-            Method: post
-        ApiList:
-          Type: Api
-          Properties:
-            Path: /api/list
-            Method: get
-        ApiDelete:
-          Type: Api
-          Properties:
-            Path: /api/delete
-            Method: post
-        ApiUsers:
-          Type: Api
-          Properties:
-            Path: /api/users
-            Method: get
-        ApiCreateUser:
-          Type: Api
-          Properties:
-            Path: /api/users
-            Method: post
-        ApiDeleteUser:
-          Type: Api
-          Properties:
-            Path: /api/users/delete
-            Method: post
-        ApiAudit:
-          Type: Api
-          Properties:
-            Path: /api/audit
-            Method: get
-        CorsOptions:
-          Type: Api
-          Properties:
-            Path: /{proxy+}
-            Method: options
-
-  # ── Lambda: Relatório Diário ──
-  RelatorioFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: galeria-relatorio-diario
+      FunctionName: fotos-granito-relatorio
       Handler: relatorio.handler
       Runtime: nodejs20.x
       CodeUri: src/
-      MemorySize: 256
-      Timeout: 60
-      Environment:
-        Variables:
-          DEST_BUCKET: !Ref DestBucket
-          AUDIT_TABLE: !Ref AuditTable
-          SES_FROM_EMAIL: !Ref SesFromEmail
-          SES_TO_EMAIL: !Ref SesToEmail
-      Policies:
-        - Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:Query
-                - dynamodb:Scan
-              Resource:
-                - !GetAtt AuditTable.Arn
-                - !Sub "${AuditTable.Arn}/index/*"
-            - Effect: Allow
-              Action:
-                - ses:SendEmail
-              Resource: "*"
+      MemorySize: 512
+      Timeout: 120
       Events:
         DailySchedule:
           Type: Schedule
           Properties:
+            # 21:00 UTC = 18:00 BRT (sem DST)
             Schedule: cron(0 21 * * ? *)
-            Description: Relatorio diario as 18h BRT (21h UTC)
-            Enabled: true
-
-# ─── Outputs ────────────────────────────────────────────────────
-Outputs:
-  ApiEndpoint:
-    Description: URL da API Gateway
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
-
-  UserPoolId:
-    Description: ID do Cognito User Pool
-    Value: !Ref GaleriaUserPool
-
-  UserPoolClientId:
-    Description: ID do Cognito User Pool Client
-    Value: !Ref GaleriaUserPoolClient
-
-  AuditTableName:
-    Description: Nome da tabela DynamoDB
-    Value: !Ref AuditTable</code></pre>
+            Enabled: true</code></pre>
 </details>
 
-      <div class="callout danger">
-        <strong>Atenção ao DeletionPolicy: Retain</strong> na tabela DynamoDB. Sem isso, se o stack do CloudFormation for deletado (por exemplo, durante um teste), <strong>todos os dados de auditoria são apagados permanentemente</strong>. O <code>Retain</code> garante que a tabela sobrevive mesmo se o stack for removido.
+      <div class="print">
+        <div class="t">Print: email relat&oacute;rio di&aacute;rio (a enviar)</div>
+        <div class="d">Exemplo de um email gerado pela Lambda relat&oacute;rio. <code>assets/img/posts/fg-relatorio-email.png</code> &mdash; envio pendente.</div>
       </div>
 
-      <div class="callout info">
-        <strong>Por que PAY_PER_REQUEST no DynamoDB?</strong> O modo on-demand cobra apenas pelas leituras e escritas realizadas, sem necessidade de provisionar capacidade. Para workloads imprevisíveis como esta (muitos uploads durante o dia, zero à noite), é significativamente mais barato do que provisionar RCU/WCU fixos.
-      </div>
+      <!-- ====== CLOUDFRONT ====== -->
+      <h2>CloudFront: dois dom&iacute;nios, uma origem</h2>
 
-      <p>Pontos importantes do template:</p>
+      <p>O portal tem dois dom&iacute;nios p&uacute;blicos:</p>
 
       <ul>
-        <li><strong>BinaryMediaTypes: <code>"*/*"</code></strong> &mdash; instrui o API Gateway a tratar <em>qualquer</em> Content-Type como binário. Sem isso, respostas HTML são corrompidas com encoding base64.</li>
-        <li><strong>AllowAdminCreateUserOnly: true</strong> &mdash; ninguém pode se auto-registrar no Cognito. Apenas um admin pode criar contas, garantindo controle total de acesso.</li>
-        <li><strong>GSI (bloco-ts-index)</strong> &mdash; permite consultar todos os eventos de um bloco ordenados por timestamp, essencial para auditoria.</li>
-        <li><strong>TTL na tabela</strong> &mdash; registros antigos podem expirar automaticamente (útil para logs que não precisam ser mantidos indefinidamente).</li>
-        <li><strong>Lambda com 512 MB</strong> &mdash; mesmo que a função seja leve, o Node.js no Lambda tem performance proporcional à memória alocada. 512 MB dá um bom equilíbrio custo/performance.</li>
+        <li><code>portal.vitoriastone.com</code> &mdash; portal interno</li>
+        <li><code>studio.vitoriastone.com</code> &mdash; VStudio "white-label" pro comercial mostrar pro cliente sem expor a marca interna</li>
       </ul>
 
-      <!-- ====== PASSO 3 ====== -->
-      <h2>Passo 3: Lambda Principal (index.js)</h2>
-
-      <p>A Lambda principal é o "cérebro" da aplicação. Ela serve as páginas HTML, autentica usuários via Cognito, gera Presigned URLs para upload, lista arquivos, gerencia usuários e registra tudo no DynamoDB.</p>
-
-      <p>Construí o código completo assim:</p>
+      <p>Ambos batem na <em>mesma</em> distribui&ccedil;&atilde;o CloudFront, mas s&atilde;o roteados pra rotas diferentes na Lambda usando uma <strong>CloudFront Function</strong>:</p>
 
       <details>
-<summary><strong>index.js — Lambda principal completa</strong> (clique para expandir)</summary>
-      <pre><code class="language-javascript">// ─── Imports do AWS SDK v3 ────────────────────────────────────
-const { S3Client, PutObjectCommand, DeleteObjectCommand,
-        ListObjectsV2Command } = require("@aws-sdk/client-s3");
-const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
-const { DynamoDBClient, PutItemCommand, QueryCommand,
-        ScanCommand } = require("@aws-sdk/client-dynamodb");
-const { CognitoIdentityProviderClient, AdminCreateUserCommand,
-        AdminDeleteUserCommand, AdminInitiateAuthCommand,
-        AdminRespondToAuthChallengeCommand,
-        ListUsersCommand } = require("@aws-sdk/client-cognito-identity-provider");
-const { SSMClient, GetParameterCommand } = require("@aws-sdk/client-ssm");
-const fs = require("fs");
-const path = require("path");
+<summary><strong>scripts/cloudfront/rewrite.js</strong> &mdash; CloudFront Function de URL rewrite (clique para expandir)</summary>
+      <pre><code class="language-javascript">function handler(event) {
+  const request = event.request;
+  const host = request.headers.host?.value || "";
+  const uri = request.uri;
 
-// ─── Clientes (inicializados fora do handler para reutilizar entre invocações)
-const s3 = new S3Client({});
-const ddb = new DynamoDBClient({});
-const cognito = new CognitoIdentityProviderClient({});
-const ssm = new SSMClient({});
+  // studio.vitoriastone.com → reescreve / para /studio
+  if (host.startsWith("studio.")) {
+    if (uri === "/" || uri === "") {
+      request.uri = "/studio";
+    } else if (!uri.startsWith("/studio") && !uri.startsWith("/api")
+            && !uri.startsWith("/assets")) {
+      request.uri = "/studio" + uri;
+    }
+  }
 
-// ─── Variáveis de Ambiente ────────────────────────────────────
-const BUCKET = process.env.DEST_BUCKET;
-const TABLE = process.env.AUDIT_TABLE;
-const POOL_ID = process.env.USER_POOL_ID;
-const CLIENT_ID = process.env.USER_POOL_CLIENT_ID;
+  // portal.vitoriastone.com → mant&eacute;m default (vai pro portal/login)
 
-// ─── Cache de configurações do SSM ───────────────────────────
-const ssmCache = {};
-const SSM_TTL = 5 * 60 * 1000; // 5 minutos
+  return request;
+}</code></pre>
+</details>
+
+      <div class="callout warn">
+        <strong>CloudFront Functions vs Lambda@Edge.</strong> Pra URL rewrite simples (string match, sem network call), CloudFront Functions &eacute; ordens de magnitude mais barata: $0.10/million invocations vs $0.60 do Lambda@Edge. Restri&ccedil;&atilde;o &eacute; que ela roda em 1ms e n&atilde;o pode chamar APIs externas. Para qualquer L&oacute;gica que precise de I/O, use Lambda@Edge.
+      </div>
+
+      <h3>Behaviors com ordem de prioridade</h3>
+
+      <pre><code class="language-bash">CloudFront Distribution
+├── Behavior 0 (mais espec&iacute;fico): /api/*       → API Gateway, cache off
+├── Behavior 1:                      /assets/*    → S3 OAC, cache 24h
+├── Behavior 2:                      /espelho/*   → API Gateway, cache 5min
+└── Behavior 3 (default):            /*           → API Gateway, cache off
+</code></pre>
+
+      <p>O behavior <code>/espelho/*</code> &eacute; o &uacute;nico que cacheia conte&uacute;do din&acirc;mico. A p&aacute;gina compartilh&aacute;vel do bloco no WhatsApp pode ser cacheada por 5 minutos &mdash; trafic spike de "v&aacute;rios clientes abrindo o mesmo espelho" n&atilde;o derruba a Lambda.</p>
+
+      <!-- ====== SSM ====== -->
+      <h2>SSM Parameter Store: zero hardcoded</h2>
+
+      <p>O portal nunca teve credencial em c&oacute;digo. Tudo passa pelo SSM. A &aacute;rvore est&aacute; organizada por dom&iacute;nio:</p>
+
+      <table>
+        <thead>
+          <tr><th>Caminho</th><th>Uso</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/vstudio/onedrive/tenant_id</code></td><td>Graph API tenant</td></tr>
+          <tr><td><code>/vstudio/onedrive/client_id</code></td><td>App registration</td></tr>
+          <tr><td><code>/vstudio/onedrive/client_secret</code></td><td>App secret (SecureString)</td></tr>
+          <tr><td><code>/vstudio/onedrive/drive_id</code></td><td>Drive da Ova&ccedil;&atilde;o</td></tr>
+          <tr><td><code>/vstudio/firebird/proxy_url</code></td><td>REST proxy do Athenas</td></tr>
+          <tr><td><code>/vstudio/firebird/internal_token</code></td><td>Token interno (SecureString)</td></tr>
+          <tr><td><code>/vstudio/telegram/bot-token</code></td><td>Bot helpdesk (SecureString)</td></tr>
+          <tr><td><code>/vstudio/telegram/chat-id-ti</code></td><td>Chat ID do TI</td></tr>
+        </tbody>
+      </table>
+
+      <details>
+<summary><strong>cache de SSM com TTL</strong> (clique para expandir)</summary>
+      <pre><code class="language-javascript">const ssmCache = {};
+const SSM_TTL = 5 * 60 * 1000;  // 5 minutos
 
 async function getConfig(paramName) {
   const now = Date.now();
-  if (ssmCache[paramName] && (now - ssmCache[paramName].ts) < SSM_TTL) {
-    return ssmCache[paramName].value;
-  }
+  const cached = ssmCache[paramName];
+  if (cached && (now - cached.ts) &lt; SSM_TTL) return cached.value;
+
   try {
     const resp = await ssm.send(new GetParameterCommand({
-      Name: `/galeria/${paramName}`,
+      Name: `/vstudio/${paramName}`,
       WithDecryption: true,
     }));
     ssmCache[paramName] = { value: resp.Parameter.Value, ts: now };
     return resp.Parameter.Value;
   } catch (err) {
-    console.warn(`SSM param /galeria/${paramName} nao encontrado:`, err.message);
+    console.warn(`SSM /vstudio/${paramName} missing:`, err.message);
     return null;
   }
-}
-
-// ─── Cache de arquivos HTML do frontend ──────────────────────
-const htmlCache = {};
-
-function loadHtml(fileName) {
-  if (htmlCache[fileName]) return htmlCache[fileName];
-  const filePath = path.join(__dirname, "frontend", fileName);
-  const content = fs.readFileSync(filePath, "utf-8");
-  htmlCache[fileName] = content;
-  return content;
-}
-
-// ─── Helpers de Resposta ─────────────────────────────────────
-function jsonResponse(statusCode, body) {
-  return {
-    statusCode,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type,Authorization",
-    },
-    body: JSON.stringify(body),
-  };
-}
-
-function htmlResponse(html) {
-  return {
-    statusCode: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-    },
-    body: html,
-    isBase64Encoded: false,
-  };
-}
-
-function cors204() {
-  return {
-    statusCode: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type,Authorization",
-    },
-    body: "",
-  };
-}
-
-// ─── Auditoria (fire-and-forget) ─────────────────────────────
-async function logAudit(action, user, bloco, details = {}) {
-  try {
-    const now = new Date().toISOString();
-    await ddb.send(new PutItemCommand({
-      TableName: TABLE,
-      Item: {
-        pk: { S: `AUDIT#${now.slice(0, 10)}` },
-        sk: { S: `${now}#${Math.random().toString(36).slice(2, 8)}` },
-        action: { S: action },
-        user: { S: user || "anonymous" },
-        bloco: { S: bloco || "N/A" },
-        ts: { S: now },
-        details: { S: JSON.stringify(details) },
-        ttl: { N: String(Math.floor(Date.now() / 1000) + 90 * 86400) }, // 90 dias
-      },
-    }));
-  } catch (err) {
-    // Fire-and-forget: não queremos que falha de auditoria quebre o upload
-    console.error("Erro ao registrar auditoria:", err.message);
-  }
-}
-
-// ─── Handler Principal (Router Manual) ───────────────────────
-exports.handler = async (event) => {
-  const method = event.httpMethod;
-  const routePath = event.path;
-
-  console.log(`${method} ${routePath}`);
-
-  // CORS preflight
-  if (method === "OPTIONS") {
-    return cors204();
-  }
-
-  try {
-    // ── Rotas de Páginas HTML ──
-    if (method === "GET" && routePath === "/") {
-      return htmlResponse(loadHtml("index.html"));
-    }
-    if (method === "GET" && routePath === "/login") {
-      return htmlResponse(loadHtml("login.html"));
-    }
-    if (method === "GET" && routePath === "/admin") {
-      return htmlResponse(loadHtml("admin.html"));
-    }
-
-    // ── API: Login ──
-    if (method === "POST" && routePath === "/api/login") {
-      return await handleLogin(JSON.parse(event.body));
-    }
-
-    // ── API: Presigned URL ──
-    if (method === "POST" && routePath === "/api/presign") {
-      return await handlePresign(JSON.parse(event.body));
-    }
-
-    // ── API: Notificação pós-upload ──
-    if (method === "POST" && routePath === "/api/notify") {
-      return await handleNotify(JSON.parse(event.body));
-    }
-
-    // ── API: Listar arquivos de um bloco ──
-    if (method === "GET" && routePath === "/api/list") {
-      const bloco = event.queryStringParameters?.bloco;
-      return await handleList(bloco);
-    }
-
-    // ── API: Deletar arquivo ──
-    if (method === "POST" && routePath === "/api/delete") {
-      return await handleDelete(JSON.parse(event.body));
-    }
-
-    // ── API: Listar usuários ──
-    if (method === "GET" && routePath === "/api/users") {
-      return await handleListUsers();
-    }
-
-    // ── API: Criar usuário ──
-    if (method === "POST" && routePath === "/api/users") {
-      return await handleCreateUser(JSON.parse(event.body));
-    }
-
-    // ── API: Deletar usuário ──
-    if (method === "POST" && routePath === "/api/users/delete") {
-      return await handleDeleteUser(JSON.parse(event.body));
-    }
-
-    // ── API: Consultar auditoria ──
-    if (method === "GET" && routePath === "/api/audit") {
-      const bloco = event.queryStringParameters?.bloco;
-      const date = event.queryStringParameters?.date;
-      return await handleAudit(bloco, date);
-    }
-
-    return jsonResponse(404, { error: "Rota nao encontrada" });
-
-  } catch (err) {
-    console.error("Erro no handler:", err);
-    return jsonResponse(500, { error: "Erro interno do servidor" });
-  }
-};
-
-// ─── Handlers de Rota ────────────────────────────────────────
-
-async function handleLogin({ username, password }) {
-  try {
-    const authResp = await cognito.send(new AdminInitiateAuthCommand({
-      UserPoolId: POOL_ID,
-      ClientId: CLIENT_ID,
-      AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
-      AuthParameters: {
-        USERNAME: username,
-        PASSWORD: password,
-      },
-    }));
-
-    // Primeiro login: Cognito exige troca de senha
-    if (authResp.ChallengeName === "NEW_PASSWORD_REQUIRED") {
-      return jsonResponse(200, {
-        challenge: "NEW_PASSWORD_REQUIRED",
-        session: authResp.Session,
-        message: "Troque sua senha temporaria",
-      });
-    }
-
-    const token = authResp.AuthenticationResult.IdToken;
-    await logAudit("LOGIN", username, null);
-
-    return jsonResponse(200, {
-      token,
-      message: "Login realizado com sucesso",
-    });
-
-  } catch (err) {
-    console.error("Erro no login:", err.message);
-    return jsonResponse(401, { error: "Credenciais invalidas" });
-  }
-}
-
-async function handlePresign({ bloco, fileName, contentType, tipo }) {
-  if (!bloco || !fileName) {
-    return jsonResponse(400, { error: "bloco e fileName sao obrigatorios" });
-  }
-
-  // Montar a key no S3: blocos/{codigo}/{tipo}/{arquivo}
-  const prefix = tipo === "thumb" ? "thumbs" : "originais";
-  const key = `blocos/${bloco}/${prefix}/${fileName}`;
-
-  // Presigned URL com expiração curta
-  // Fotos: 5 min | Vídeos: 15 min (arquivos maiores)
-  const isVideo = contentType?.startsWith("video/");
-  const expiresIn = isVideo ? 900 : 300;
-
-  const command = new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-    ContentType: contentType || "application/octet-stream",
-  });
-
-  const presignedUrl = await getSignedUrl(s3, command, { expiresIn });
-
-  return jsonResponse(200, {
-    url: presignedUrl,
-    key,
-    expiresIn,
-  });
-}
-
-async function handleNotify({ bloco, key, user, action = "UPLOAD" }) {
-  await logAudit(action, user, bloco, { key });
-
-  return jsonResponse(200, { message: "Registrado" });
-}
-
-async function handleList(bloco) {
-  if (!bloco) {
-    return jsonResponse(400, { error: "Parametro bloco e obrigatorio" });
-  }
-
-  const prefix = `blocos/${bloco}/originais/`;
-  const thumbPrefix = `blocos/${bloco}/thumbs/`;
-
-  // Listar originais e thumbnails em paralelo
-  const [origResp, thumbResp] = await Promise.all([
-    s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: prefix })),
-    s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: thumbPrefix })),
-  ]);
-
-  const originais = (origResp.Contents || []).map((obj) => ({
-    key: obj.Key,
-    size: obj.Size,
-    lastModified: obj.LastModified,
-    fileName: obj.Key.split("/").pop(),
-  }));
-
-  const thumbs = (thumbResp.Contents || []).map((obj) => ({
-    key: obj.Key,
-    fileName: obj.Key.split("/").pop(),
-  }));
-
-  return jsonResponse(200, { bloco, originais, thumbs });
-}
-
-async function handleDelete({ key, user, bloco }) {
-  if (!key) {
-    return jsonResponse(400, { error: "Parametro key e obrigatorio" });
-  }
-
-  await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
-  await logAudit("DELETE", user, bloco, { key });
-
-  return jsonResponse(200, { message: "Arquivo deletado" });
-}
-
-async function handleListUsers() {
-  const resp = await cognito.send(new ListUsersCommand({
-    UserPoolId: POOL_ID,
-    Limit: 60,
-  }));
-
-  const users = (resp.Users || []).map((u) => ({
-    username: u.Username,
-    status: u.UserStatus,
-    enabled: u.Enabled,
-    created: u.UserCreateDate,
-    email: u.Attributes?.find((a) => a.Name === "email")?.Value,
-    role: u.Attributes?.find((a) => a.Name === "custom:role")?.Value || "operador",
-  }));
-
-  return jsonResponse(200, { users });
-}
-
-async function handleCreateUser({ username, email, role = "operador" }) {
-  if (!username || !email) {
-    return jsonResponse(400, { error: "username e email sao obrigatorios" });
-  }
-
-  await cognito.send(new AdminCreateUserCommand({
-    UserPoolId: POOL_ID,
-    Username: username,
-    UserAttributes: [
-      { Name: "email", Value: email },
-      { Name: "email_verified", Value: "true" },
-      { Name: "custom:role", Value: role },
-    ],
-    DesiredDelivery: "EMAIL",
-  }));
-
-  await logAudit("CREATE_USER", "admin", null, { username, email, role });
-
-  return jsonResponse(201, { message: `Usuario ${username} criado com sucesso` });
-}
-
-async function handleDeleteUser({ username }) {
-  if (!username) {
-    return jsonResponse(400, { error: "username e obrigatorio" });
-  }
-
-  await cognito.send(new AdminDeleteUserCommand({
-    UserPoolId: POOL_ID,
-    Username: username,
-  }));
-
-  await logAudit("DELETE_USER", "admin", null, { username });
-
-  return jsonResponse(200, { message: `Usuario ${username} removido` });
-}
-
-async function handleAudit(bloco, date) {
-  if (bloco) {
-    // Consultar por bloco usando o GSI
-    const resp = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      IndexName: "bloco-ts-index",
-      KeyConditionExpression: "bloco = :b",
-      ExpressionAttributeValues: { ":b": { S: bloco } },
-      ScanIndexForward: false,
-      Limit: 100,
-    }));
-    return jsonResponse(200, { items: resp.Items });
-  }
-
-  if (date) {
-    // Consultar por data na partition key
-    const resp = await ddb.send(new QueryCommand({
-      TableName: TABLE,
-      KeyConditionExpression: "pk = :pk",
-      ExpressionAttributeValues: { ":pk": { S: `AUDIT#${date}` } },
-      ScanIndexForward: false,
-      Limit: 100,
-    }));
-    return jsonResponse(200, { items: resp.Items });
-  }
-
-  // Sem filtros: scan limitado (últimos registros)
-  const resp = await ddb.send(new ScanCommand({
-    TableName: TABLE,
-    Limit: 50,
-  }));
-  return jsonResponse(200, { items: resp.Items });
 }</code></pre>
-</details>
-
-      <div class="card">
-        <div class="card-title">Sobre o Router Manual</div>
-        <p>Em vez de usar um framework como Express (que adicionaria peso desnecessário à Lambda), usei um simples <code>if/else</code> no <code>event.path</code> e <code>event.httpMethod</code>. Para ~12 rotas, essa abordagem é mais rápida, mais leve e mais fácil de debugar do que qualquer framework.</p>
-      </div>
-
-      <div class="callout info">
-        <strong>Por que fire-and-forget na auditoria?</strong> O <code>logAudit</code> tem um <code>try/catch</code> que engole erros silenciosamente (só loga no CloudWatch). Isso é intencional: se o DynamoDB estiver com problemas, eu não queria que isso impedisse o operador de fazer upload. A auditoria é importante, mas a operação do negócio vem primeiro.
-      </div>
-
-      <!-- ====== PASSO 4 ====== -->
-      <h2>Passo 4: Frontend Embutido na Lambda</h2>
-
-      <p>Uma decisão arquitetural que tomei: o frontend (HTML/CSS/JS) é servido <strong>pela própria Lambda</strong> em vez de ficar em um bucket S3 separado. A função usa <code>fs.readFileSync</code> com cache em memória para servir os arquivos.</p>
-
-      <details>
-<summary><strong>index.js — Cache de HTML no frontend</strong> (clique para expandir)</summary>
-      <pre><code class="language-javascript">// Este trecho já está no index.js acima, mas vale destaque:
-const htmlCache = {};
-
-function loadHtml(fileName) {
-  if (htmlCache[fileName]) return htmlCache[fileName];
-  const filePath = path.join(__dirname, "frontend", fileName);
-  const content = fs.readFileSync(filePath, "utf-8");
-  htmlCache[fileName] = content;
-  return content;
-}
-
-// Na rota GET /:
-if (method === "GET" && routePath === "/") {
-  return htmlResponse(loadHtml("index.html"));
-}</code></pre>
-</details>
-
-      <h3>Trade-offs dessa abordagem</h3>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Aspecto</th>
-            <th>Frontend na Lambda</th>
-            <th>Frontend no S3</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Deploy</strong></td>
-            <td>Um <code>sam deploy</code> atualiza tudo</td>
-            <td>Precisa de <code>aws s3 sync</code> separado</td>
-          </tr>
-          <tr>
-            <td><strong>Latência</strong></td>
-            <td>~50ms a mais no cold start</td>
-            <td>Direto do S3/CloudFront</td>
-          </tr>
-          <tr>
-            <td><strong>Simplicidade</strong></td>
-            <td>Um único artefato, zero config extra</td>
-            <td>Precisa configurar bucket, policy, OAI</td>
-          </tr>
-          <tr>
-            <td><strong>Cache</strong></td>
-            <td>Em memória na Lambda (entre invocações)</td>
-            <td>Nativo do CloudFront</td>
-          </tr>
-          <tr>
-            <td><strong>Custo</strong></td>
-            <td>Invocação Lambda por page view</td>
-            <td>Só custo de S3 GET</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <p>Para um painel interno com poucos usuários (5-20 acessos simultâneos), a abordagem Lambda é perfeitamente adequada e drasticamente mais simples de manter. Se o tráfego crescer significativamente, migrar o frontend para S3 + CloudFront é uma refatoração trivial.</p>
-
-      <!-- ====== PASSO 5 ====== -->
-      <h2>Passo 5: Upload Direto ao S3</h2>
-
-      <p>Este é o coração da performance da solução que construí. O fluxo de upload acontece em 3 etapas:</p>
-
-      <ol>
-        <li><strong>Presign:</strong> o frontend pede à Lambda uma Presigned URL para o arquivo específico</li>
-        <li><strong>PUT:</strong> o navegador faz o upload <strong>diretamente</strong> para o S3, sem passar pela Lambda</li>
-        <li><strong>Notify:</strong> o frontend avisa a Lambda que o upload terminou (para registro de auditoria)</li>
-      </ol>
-
-      <pre><code class="language-bash">┌──────────┐     1. POST /api/presign     ┌──────────┐
-│          │ ──────────────────────────►   │          │
-│          │     { url, key, expiresIn }   │  Lambda  │
-│ Browser  │ ◄──────────────────────────   │          │
-│          │                               └──────────┘
-│          │     2. PUT (arquivo binário)
-│          │ ──────────────────────────►   ┌──────────┐
-│          │     200 OK                    │    S3    │
-│          │ ◄──────────────────────────   └──────────┘
-│          │
-│          │     3. POST /api/notify       ┌──────────┐
-│          │ ──────────────────────────►   │  Lambda  │
-│          │ ◄──────────────────────────   │(DynamoDB)│
-└──────────┘     { message: "Registrado" } └──────────┘</code></pre>
-
-      <p>O código do frontend para realizar o upload com essa cadeia sequencial:</p>
-
-      <details>
-<summary><strong>Frontend — upload com Presigned URL</strong> (clique para expandir)</summary>
-      <pre><code class="language-javascript">// ─── Upload com Presigned URL (frontend) ─────────────────────
-
-async function uploadFile(file, bloco, user) {
-  const statusEl = document.getElementById("upload-status");
-
-  try {
-    // Etapa 1: Obter Presigned URL
-    statusEl.textContent = "Gerando URL de upload...";
-
-    const presignResp = await fetch("/api/presign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bloco: bloco,
-        fileName: file.name,
-        contentType: file.type,
-        tipo: "original",
-      }),
-    });
-
-    if (!presignResp.ok) throw new Error("Erro ao gerar URL");
-    const { url, key } = await presignResp.json();
-
-    // Etapa 2: Upload direto ao S3
-    statusEl.textContent = `Enviando ${file.name}...`;
-
-    const uploadResp = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
-    });
-
-    if (!uploadResp.ok) throw new Error("Erro no upload para S3");
-
-    // Etapa 3: Notificar a Lambda (auditoria)
-    statusEl.textContent = "Registrando...";
-
-    await fetch("/api/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bloco: bloco,
-        key: key,
-        user: user,
-        action: "UPLOAD",
-      }),
-    });
-
-    statusEl.textContent = `${file.name} enviado com sucesso!`;
-
-  } catch (err) {
-    console.error("Erro no upload:", err);
-    statusEl.textContent = `Erro: ${err.message}`;
-  }
-}
-
-// ─── Upload de múltiplos arquivos (sequencial) ───────────────
-async function uploadMultiple(files, bloco, user) {
-  for (let i = 0; i < files.length; i++) {
-    const progress = `[${i + 1}/${files.length}]`;
-    document.getElementById("upload-progress").textContent = progress;
-    await uploadFile(files[i], bloco, user);
-  }
-  document.getElementById("upload-progress").textContent = "Todos os arquivos enviados!";
-}</code></pre>
-</details>
-
-      <div class="callout warn">
-        <strong>Por que sequencial e não paralelo?</strong> Em dispositivos móveis com conexão limitada (que é exatamente o cenário da serraria), disparar 10 uploads simultâneos satura a rede e todos ficam lentos. Upload sequencial garante que cada arquivo completa rapidamente, dando feedback visual ao operador. Se a conexão for boa, a diferença de tempo é imperceptível para 5-10 fotos.
-      </div>
-
-      <!-- ====== PASSO 6 ====== -->
-      <h2>Passo 6: Thumbnails no Cliente</h2>
-
-      <p>Para exibir uma galeria rápida sem carregar fotos de 5-10 MB cada, optei por gerar thumbnails no próprio navegador usando a Canvas API. Isso acontece <strong>antes</strong> do upload:</p>
-
-      <details>
-<summary><strong>Frontend — geração de thumbnail + upload</strong> (clique para expandir)</summary>
-      <pre><code class="language-javascript">// ─── Geração de Thumbnail no Cliente ─────────────────────────
-
-function generateThumbnail(file, maxWidth = 300) {
-  return new Promise((resolve, reject) => {
-    // Só gera thumb para imagens, não para vídeos
-    if (!file.type.startsWith("image/")) {
-      resolve(null);
-      return;
-    }
-
-    const img = new Image();
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-
-    img.onload = () => {
-      // Calcular dimensões mantendo proporção
-      const ratio = maxWidth / img.width;
-      canvas.width = maxWidth;
-      canvas.height = img.height * ratio;
-
-      // Desenhar a imagem redimensionada
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      // Converter para Blob (JPEG com qualidade 70%)
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(new File([blob], `thumb_${file.name}`, {
-              type: "image/jpeg",
-            }));
-          } else {
-            reject(new Error("Falha ao gerar thumbnail"));
-          }
-        },
-        "image/jpeg",
-        0.7
-      );
-    };
-
-    img.onerror = () => reject(new Error("Falha ao carregar imagem"));
-    img.src = URL.createObjectURL(file);
-  });
-}
-
-// ─── Upload completo: original + thumbnail ───────────────────
-async function uploadWithThumbnail(file, bloco, user) {
-  // 1. Gerar thumbnail (se for imagem)
-  const thumb = await generateThumbnail(file);
-
-  // 2. Upload do original
-  await uploadFile(file, bloco, user);
-
-  // 3. Upload do thumbnail (se existir)
-  if (thumb) {
-    const presignResp = await fetch("/api/presign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bloco: bloco,
-        fileName: thumb.name,
-        contentType: "image/jpeg",
-        tipo: "thumb",
-      }),
-    });
-
-    const { url } = await presignResp.json();
-
-    await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "image/jpeg" },
-      body: thumb,
-    });
-  }
-}</code></pre>
-</details>
-
-      <div class="callout info">
-        <strong>Por que gerar thumbnails no cliente e não no servidor?</strong> Três motivos:
-        <br>1. <strong>Custo zero:</strong> a CPU do celular do operador faz o trabalho, não a Lambda.
-        <br>2. <strong>Sem dependências nativas:</strong> bibliotecas de manipulação de imagem no Lambda (Sharp, ImageMagick) exigem layers com binários compilados para Amazon Linux. A Canvas API do navegador funciona em qualquer dispositivo.
-        <br>3. <strong>Velocidade:</strong> o thumbnail é gerado em milissegundos, antes mesmo do upload começar.
-      </div>
-
-      <!-- ====== PASSO 7 ====== -->
-      <h2>Passo 7: Segurança</h2>
-
-      <p>Segurança em produção não é opcional. Cobri todas as camadas:</p>
-
-      <h3>7.1 Autenticação com Cognito</h3>
-
-      <p>O <strong>Amazon Cognito</strong> é o serviço de identidade da AWS. Ele gerencia usuários, senhas, tokens JWT e fluxos de autenticação &mdash; sem que eu precisasse construir nada disso do zero.</p>
-
-      <p>Configurei o User Pool com <code>AllowAdminCreateUserOnly: true</code>, o que significa que <strong>ninguém pode se auto-registrar</strong>. Apenas um administrador (via painel ou API) pode criar novas contas. Quando um usuário é criado, ele recebe um email com uma senha temporária e é obrigado a trocar no primeiro login.</p>
-
-      <h3>7.2 SSM Parameter Store para Segredos</h3>
-
-      <p>Credenciais e configurações sensíveis <strong>nunca</strong> ficam no código ou em variáveis de ambiente em texto puro. Usei o <strong>AWS Systems Manager Parameter Store</strong> para armazená-las de forma segura e criptografada:</p>
-
-      <details>
-<summary><strong>SSM Parameter Store — criação de parâmetros</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash"># Criar parâmetros no SSM (executar uma vez)
-aws ssm put-parameter \
-  --name "/galeria/api-key" \
-  --type "SecureString" \
-  --value "seu-segredo-aqui" \
-  --description "Chave de API para integracao externa"
-
-aws ssm put-parameter \
-  --name "/galeria/allowed-origins" \
-  --type "String" \
-  --value "https://galeria.meudominio.com" \
-  --description "Origens permitidas para CORS"
-
-aws ssm put-parameter \
-  --name "/galeria/max-file-size" \
-  --type "String" \
-  --value "104857600" \
-  --description "Tamanho maximo de arquivo em bytes (100MB)"</code></pre>
-</details>
-
-      <p>Na Lambda, o cache do SSM evita chamadas repetidas (o código já foi mostrado no Passo 3):</p>
-
-      <details>
-<summary><strong>index.js — Cache do SSM com TTL</strong> (clique para expandir)</summary>
-      <pre><code class="language-javascript">// Cache com TTL de 5 minutos
-// Se o parâmetro mudar no SSM, a Lambda pega o novo valor
-// no máximo 5 minutos depois — sem precisar de redeploy.
-const ssmCache = {};
-const SSM_TTL = 5 * 60 * 1000;
-
-async function getConfig(paramName) {
-  const now = Date.now();
-  if (ssmCache[paramName] && (now - ssmCache[paramName].ts) < SSM_TTL) {
-    return ssmCache[paramName].value;
-  }
-  const resp = await ssm.send(new GetParameterCommand({
-    Name: `/galeria/${paramName}`,
-    WithDecryption: true, // descriptografa SecureString automaticamente
-  }));
-  ssmCache[paramName] = { value: resp.Parameter.Value, ts: now };
-  return resp.Parameter.Value;
-}</code></pre>
-</details>
-
-      <h3>7.3 IAM Least-Privilege</h3>
-
-      <p>Cada policy no template.yaml dá à Lambda <strong>apenas</strong> as permissões mínimas necessárias:</p>
-
-      <ul>
-        <li><strong>S3:</strong> <code>PutObject</code>, <code>GetObject</code>, <code>DeleteObject</code> apenas no bucket específico. <code>ListBucket</code> no ARN do bucket (sem <code>/*</code>).</li>
-        <li><strong>DynamoDB:</strong> apenas <code>PutItem</code>, <code>GetItem</code>, <code>Query</code>, <code>Scan</code> na tabela de auditoria e seus índices.</li>
-        <li><strong>Cognito:</strong> apenas operações <code>Admin*</code> no User Pool específico.</li>
-        <li><strong>SSM:</strong> apenas <code>GetParameter</code> em parâmetros com prefixo <code>/galeria/*</code>.</li>
-      </ul>
-
-      <div class="callout danger">
-        <strong>Erro comum: ListBucket ARN.</strong> A ação <code>s3:ListBucket</code> se aplica ao <strong>bucket</strong> (<code>arn:aws:s3:::meu-bucket</code>), não aos objetos (<code>arn:aws:s3:::meu-bucket/*</code>). Se colocar <code>/*</code> no final, o <code>ListBucket</code> simplesmente não funciona e retorna Access Denied &mdash; sem nenhuma mensagem clara.
-      </div>
-
-      <h3>7.4 CORS no Bucket S3</h3>
-
-      <p>Para que o navegador possa fazer <code>PUT</code> direto no S3 via Presigned URL, o bucket precisa de uma configuração CORS:</p>
-
-      <details>
-<summary><strong>cors.json — configuração CORS do bucket S3</strong> (clique para expandir)</summary>
-      <pre><code class="language-json">{
-  "CORSRules": [
-    {
-      "AllowedHeaders": ["*"],
-      "AllowedMethods": ["PUT", "GET"],
-      "AllowedOrigins": ["https://galeria.meudominio.com"],
-      "ExposeHeaders": ["ETag"],
-      "MaxAgeSeconds": 3600
-    }
-  ]
-}</code></pre>
-      <pre><code class="language-bash"># Aplicar configuração CORS ao bucket
-aws s3api put-bucket-cors \
-  --bucket meu-bucket-de-fotos \
-  --cors-configuration file://cors.json</code></pre>
 </details>
 
       <div class="callout danger">
-        <strong>Sem CORS no S3, o upload falha silenciosamente.</strong> O navegador faz o <code>PUT</code>, o S3 rejeita por CORS, e o erro aparece no console do browser como "blocked by CORS policy". A Presigned URL está correta, a permissão IAM está correta, mas sem CORS no bucket, nada funciona.
+        <strong>Cuidado com IAM no SSM.</strong> A pol&iacute;tica da Lambda d&aacute; <code>ssm:GetParameter</code> APENAS pra <code>arn:aws:ssm:*:*:parameter/vstudio/*</code>. Sem o prefixo restrito, qualquer SSM da conta vira potencial vazamento. Se voc&ecirc; compartilha a conta com outros projetos, isso &eacute; cr&iacute;tico.
       </div>
-
-      <h3>7.5 Expiração de Presigned URLs</h3>
-
-      <p>Defini tempos de expiração agressivos:</p>
-
-      <ul>
-        <li><strong>Fotos:</strong> 5 minutos (<code>expiresIn: 300</code>) &mdash; mais que suficiente para uma foto de 5-10 MB</li>
-        <li><strong>Vídeos:</strong> 15 minutos (<code>expiresIn: 900</code>) &mdash; necessário para vídeos de 50-100 MB em conexões lentas</li>
-      </ul>
-
-      <p>Depois que a URL expira, ela se torna completamente inválida. Mesmo que alguém intercepte a URL, ela não serve para nada após o timeout.</p>
-
-      <!-- ====== PASSO 8 ====== -->
-      <h2>Passo 8: CloudFront</h2>
-
-      <p>O <strong>Amazon CloudFront</strong> é a CDN (Content Delivery Network) da AWS. Ele distribui o conteúdo por servidores espalhados pelo mundo (edge locations), reduzindo a latência para o usuário final. No meu caso, ele serviu duas funções:</p>
-
-      <ol>
-        <li><strong>Cache de imagens:</strong> quando um operador acessa a galeria, as thumbnails são servidas do edge mais próximo em vez de ir até o S3 na região da AWS.</li>
-        <li><strong>Ponto de entrada único:</strong> tanto a API (Lambda) quanto as imagens (S3) ficam no mesmo domínio, evitando problemas de CORS entre subdomínios.</li>
-      </ol>
-
-      <h3>Behaviors e Prioridade</h3>
-
-      <p>O CloudFront usa <strong>behaviors</strong> para decidir de onde buscar o conteúdo baseado no caminho da URL. A ordem de prioridade importa:</p>
-
-      <pre><code class="language-bash">┌─────────────────────────────────────────────────────────┐
-│              CloudFront Distribution                    │
-│                                                         │
-│  Behavior 1 (prioridade 0):                             │
-│    Path: /api/*                                         │
-│    Origin: API Gateway                                  │
-│    Cache: desabilitado (CachingDisabled)                 │
-│    → Todas as chamadas de API vão para a Lambda          │
-│                                                         │
-│  Behavior 2 (prioridade 1):                             │
-│    Path: /blocos/*                                      │
-│    Origin: S3 Bucket (OAI)                              │
-│    Cache: 24h (CachingOptimized)                        │
-│    → Imagens e vídeos servidos direto do S3              │
-│                                                         │
-│  Behavior 3 (default, prioridade 2):                    │
-│    Path: * (tudo que não bateu acima)                   │
-│    Origin: API Gateway                                  │
-│    Cache: desabilitado                                  │
-│    → Páginas HTML servidas pela Lambda                  │
-└─────────────────────────────────────────────────────────┘</code></pre>
-
-      <div class="callout danger">
-        <strong>A história do bug do .mp4:</strong> durante os testes, vídeos .mp4 retornavam um erro 403 no CloudFront. Depois de horas debugando, descobri que o behavior <code>/blocos/*</code> estava configurado com <code>Compress: true</code> (gzip). O CloudFront tentava comprimir o .mp4 (que já é comprimido), corrompia o cabeçalho e o S3 retornava Access Denied porque o Content-Type não batia. A solução: desabilitar compressão para o behavior de mídia, ou usar uma whitelist de Content-Types comprimíveis.
-      </div>
-
-      <div class="callout info">
-        <strong>OAI (Origin Access Identity)</strong> garante que o bucket S3 só pode ser acessado via CloudFront. Ninguém consegue acessar as imagens diretamente pela URL do S3 &mdash; apenas pelo domínio do CloudFront. Isso evita que URLs de imagens "vazem" e sejam acessadas sem autenticação.
-      </div>
-
-      <!-- ====== PASSO 9 ====== -->
-      <h2>Passo 9: Deploy com SAM</h2>
-
-      <p>Com toda a infraestrutura definida no <code>template.yaml</code> e o código pronto, o deploy foi surpreendentemente simples:</p>
-
-      <details>
-<summary><strong>Comandos de build e deploy</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash"># Instalar dependências
-cd src && npm install && cd ..
-
-# Build (empacota a Lambda)
-sam build
-
-# Deploy guiado (primeira vez)
-sam deploy --guided</code></pre>
-</details>
-
-      <p>O <code>sam deploy --guided</code> faz uma série de perguntas interativas:</p>
-
-      <details>
-<summary><strong>sam deploy --guided — perguntas interativas</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash">Configuring SAM deploy
-======================
-
-  Setting default arguments for 'sam deploy'
-  =========================================
-  Stack Name [galeria-midia]:                    # Nome do CloudFormation stack
-  AWS Region [us-east-1]: sa-east-1              # São Paulo (mais perto)
-  Parameter DestBucket [meu-bucket-de-fotos]:    # Nome do seu bucket
-  Parameter SesFromEmail [noreply@meudominio.com]:
-  Parameter SesToEmail [admin@meudominio.com]:
-  Confirm changes before deploy [Y/n]: y
-  Allow SAM CLI IAM role creation [Y/n]: y       # SAM cria os roles IAM
-  Disable rollback [y/N]: n
-  Save arguments to configuration file [Y/n]: y  # Salva em samconfig.toml
-  SAM configuration file [samconfig.toml]:
-  SAM configuration environment [default]:</code></pre>
-</details>
-
-      <p>O que acontece durante o deploy:</p>
-
-      <ol>
-        <li><strong><code>sam build</code></strong> cria um diretório <code>.aws-sam/</code> com o código e as dependências empacotadas</li>
-        <li><strong><code>sam deploy</code></strong> faz upload do pacote para um bucket S3 do CloudFormation</li>
-        <li>O CloudFormation cria/atualiza os recursos na seguinte ordem: DynamoDB → Cognito → IAM Roles → Lambda → API Gateway</li>
-        <li>Após ~2-3 minutos, o stack está pronto e os Outputs mostram a URL da API</li>
-      </ol>
-
-      <details>
-<summary><strong>Output do deploy</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash"># Output do deploy:
-CloudFormation outputs from deployed stack
-───────────────────────────────────────────────────────────
-Key                 Value
-───────────────────────────────────────────────────────────
-ApiEndpoint         https://abc123xyz.execute-api.sa-east-1.amazonaws.com/Prod/
-UserPoolId          sa-east-1_AbCdEfGhI
-UserPoolClientId    1a2b3c4d5e6f7g8h9i0j
-AuditTableName      galeria-audit-log
-───────────────────────────────────────────────────────────</code></pre>
-</details>
-
-      <div class="callout info">
-        <strong>Deploys subsequentes:</strong> depois do primeiro <code>--guided</code>, o SAM salva as configurações em <code>samconfig.toml</code>. Nos próximos deploys, basta rodar <code>sam build && sam deploy</code> sem perguntas.
-      </div>
-
-      <div class="callout warn">
-        <strong>Criar o primeiro usuário admin:</strong> como o Cognito está configurado para <code>AllowAdminCreateUserOnly</code>, eu precisei criar o primeiro usuário pelo CLI:
-
-        <details>
-<summary><strong>Cognito — criar primeiro admin</strong> (clique para expandir)</summary>
-        <pre><code class="language-bash">aws cognito-idp admin-create-user \
-  --user-pool-id sa-east-1_ExEmPlO \
-  --username admin \
-  --user-attributes Name=email,Value=admin@exemplo.empresa.com.br Name=email_verified,Value=true Name=custom:role,Value=admin \
-  --temporary-password "SenhaTemp123"</code></pre>
-</details>
-      </div>
-
-      <!-- ====== PASSO 10 ====== -->
-      <h2>Passo 10: GitHub e Boas Práticas</h2>
-
-      <p>Ao versionar o projeto, é crítico não vazar credenciais ou artefatos desnecessários:</p>
-
-      <details>
-<summary><strong>.gitignore</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash"># .gitignore
-node_modules/
-.aws-sam/
-samconfig.toml      # contém nome do bucket e região
-.env
-*.zip
-
-# Arquivos do OS
-.DS_Store
-Thumbs.db</code></pre>
-</details>
-
-      <div class="callout danger">
-        <strong>NUNCA commite o <code>samconfig.toml</code>!</strong> Ele contém o nome do bucket S3 do CloudFormation, a região e os valores dos parâmetros (incluindo nomes de buckets reais). Use SSM Parameter Store para qualquer configuração sensível e mantenha o <code>samconfig.toml</code> no <code>.gitignore</code>.
-      </div>
-
-      <p>Boas práticas para o repositório:</p>
-
-      <ul>
-        <li><strong>Branches:</strong> use <code>main</code> para produção e <code>dev</code> para desenvolvimento. Deploy automático (CI/CD) apenas a partir de <code>main</code>.</li>
-        <li><strong>Commits semânticos:</strong> <code>feat: add thumbnail generation</code>, <code>fix: CORS headers on presign</code>, <code>chore: update SDK versions</code>.</li>
-        <li><strong>Sem segredos no código:</strong> use variáveis de ambiente (referenciando SSM) para qualquer configuração que mude entre ambientes.</li>
-        <li><strong>README:</strong> documente como rodar localmente (<code>sam local start-api</code>) e como fazer deploy.</li>
-      </ul>
 
       <!-- ====== PROBLEMAS REAIS ====== -->
-      <h2>Problemas Reais e Soluções</h2>
+      <h2>Problemas reais que aprendi por queimar tempo</h2>
 
-      <p>Estes são problemas que encontrei em produção &mdash; não em tutoriais. Cada um custou horas de debugging:</p>
+      <h3>1. Lambda na VPC quebrou o cold start</h3>
 
-      <h3>Problema 1: BinaryMediaTypes no API Gateway</h3>
+      <p>Quando tentei a primeira solu&ccedil;&atilde;o "p&otilde;e a Lambda dentro da VPC pra acessar Firebird", o cold start saiu de 250ms pra 900ms. ENI Hyperplane resolveu boa parte (~500ms), mas n&atilde;o &eacute; zero. O proxy REST elimina o problema totalmente, ao custo de uma EC2 extra (que j&aacute; existia por outro motivo).</p>
 
-      <details>
-<summary><strong>template.yaml — BinaryMediaTypes fix</strong> (clique para expandir)</summary>
-      <pre><code class="language-yaml"># SEM isso no Globals:
-Globals:
-  Api:
-    BinaryMediaTypes:
-      - "*/*"
+      <h3>2. Cognito email com `&lt;` quebra HTML</h3>
 
-# O API Gateway converte a resposta HTML da Lambda para Base64,
-# e o navegador exibe lixo em vez da página.
-# Com "*/*", ele trata tudo como binário e a resposta chega intacta.</code></pre>
-</details>
+      <p>O Cognito tem um template de email pra "esqueci minha senha", e ele aceita HTML. Mas se voc&ecirc; usar <code>&lt;</code> ou <code>&gt;</code> em algum lugar (ex: descrevendo um c&oacute;digo), o template quebra silenciosamente no servidor da AWS &mdash; o email sai vazio, sem erro nos CloudWatch Logs. Levou 2 horas pra descobrir.</p>
 
-      <div class="callout warn">
-        <strong>Sintoma:</strong> a página HTML aparece como texto codificado em Base64 no navegador. A Lambda retorna o HTML corretamente (verificado no CloudWatch), mas o API Gateway "ajuda" fazendo encoding. A solução é contraintuitiva: marcar <code>*/*</code> como binary media type e setar <code>isBase64Encoded: false</code> na resposta da Lambda.
-      </div>
+      <h3>3. DynamoDB GSI sem provisioning errado de capacidade</h3>
 
-      <h3>Problema 2: ListBucket com ARN errado</h3>
+      <p>Os primeiros GSIs eu criei com <code>Projection: KEYS_ONLY</code> pra economizar. Resultado: toda Query no GSI tinha que fazer um <code>GetItem</code> extra pra cada resultado, multiplicando reads RCU. Migrei pra <code>Projection: ALL</code> em todos os GSIs cr&iacute;ticos. Custo: 2x espa&ccedil;o de armazenamento (irrelevante a $0.25/GB-m&ecirc;s). Ganho: 10x menos reads.</p>
 
-      <details>
-<summary><strong>IAM — ListBucket ARN correto vs errado</strong> (clique para expandir)</summary>
-      <pre><code class="language-yaml"># ERRADO (não funciona):
-- Effect: Allow
-  Action:
-    - s3:ListBucket
-  Resource: !Sub "arn:aws:s3:::${DestBucket}/*"
-  # ← O /* é para OBJETOS, não para o BUCKET
+      <h3>4. CloudFront Function bloqueia se exceder 1ms</h3>
 
-# CORRETO:
-- Effect: Allow
-  Action:
-    - s3:ListBucket
-  Resource: !Sub "arn:aws:s3:::${DestBucket}"
-  # ← Sem /* — é uma operação no bucket, não nos objetos</code></pre>
-</details>
+      <p>Tentei adicionar regex complexa na CF Function. Erro silencioso: requests come&ccedil;aram a voltar com 503. CloudWatch n&atilde;o mostra erro. S&oacute; vendo o "Function Throttled" no console que descobri. Simplifiquei a regex e voltou.</p>
 
-      <h3>Problema 3: Rotas não declaradas no SAM</h3>
+      <h3>5. Microsoft Graph nega permiss&otilde;es em escopos errados</h3>
 
-      <details>
-<summary><strong>template.yaml — rotas faltando no Events</strong> (clique para expandir)</summary>
-      <pre><code class="language-yaml"># Se a Lambda tem um handler para /api/audit
-# mas o template.yaml não declara o Event:
-#
-#   ApiAudit:
-#     Type: Api
-#     Properties:
-#       Path: /api/audit
-#       Method: get
-#
-# Resultado: a rota funciona com `sam local start-api`
-# mas retorna 403 {"message":"Missing Authentication Token"}
-# depois do deploy.
-#
-# O API Gateway só conhece as rotas declaradas no template.</code></pre>
-</details>
+      <p>O app no Entra precisava de <code>Files.Read.All</code> (Application, n&atilde;o Delegated) <em>+</em> admin consent. Sem o consent, o token sai sem o escopo silenciosamente e a chamada na Graph d&aacute; 403 "Insufficient privileges". A mensagem n&atilde;o diz o &oacute;bvio: "v&aacute; pedir consent ao Global Admin".</p>
 
-      <h3>Problema 4: CloudFront Behavior Conflicts</h3>
+      <h3>6. <code>setTimeout</code> dentro de handler async &eacute; perigoso</h3>
 
-      <details>
-<summary><strong>CloudFront — conflito de behaviors</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash"># Se existem dois behaviors:
-#   /blocos/*  → S3
-#   /*         → API Gateway (default)
-#
-# E adiciona um terceiro:
-#   /blocos/thumbs/*  → S3 (com cache diferente)
-#
-# O CloudFront usa a rota MAIS ESPECÍFICA que bater.
-# /blocos/thumbs/foto.jpg bate em /blocos/thumbs/* (prioridade 2)
-# /blocos/originais/foto.jpg bate em /blocos/* (prioridade 1)
-#
-# Se a prioridade estiver errada, o behavior errado responde
-# e o resultado é 403 ou conteúdo cacheado quando não devia.</code></pre>
-</details>
+      <p>Em um lugar usei <code>setTimeout(() =&gt; logAudit(...), 0)</code> achando que estava deixando ass&iacute;ncrono. A Lambda finalizava antes do timeout disparar &mdash; o audit nunca era escrito. Para fire-and-forget em Lambda, ou voc&ecirc; <code>await</code> direto ou usa <code>InvocationType: Event</code> de outra Lambda. Nunca confie em <code>setTimeout</code>.</p>
 
-      <h3>Problema 5: HTML com divs mal aninhadas</h3>
-
-      <details>
-<summary><strong>HTML — problema de divs mal aninhadas</strong> (clique para expandir)</summary>
-      <pre><code class="language-bash"># Quando o frontend é servido pela Lambda como string:
-# Um &lt;/div&gt; faltando ou sobrando pode não causar erro visual
-# no Chrome (que é tolerante), mas quebra completamente
-# no Safari mobile (que é mais rigoroso).
-#
-# Solução: use um validador HTML antes do deploy.
-# https://validator.w3.org/ ou extensão do VS Code.</code></pre>
-</details>
-
-      <!-- ====== CHECKLIST ====== -->
-      <h2>Checklist Final para Produção</h2>
-
-      <p>Antes de liberar para os operadores, validei cada item:</p>
-
-      <div class="callout success">
-        <strong>Checklist de Validação:</strong>
-        <br>&#9745; Bucket S3 criado com versionamento habilitado
-        <br>&#9745; CORS configurado no bucket (PUT e GET)
-        <br>&#9745; Cognito User Pool criado e primeiro admin cadastrado
-        <br>&#9745; SSM Parameters criados (<code>/galeria/*</code>)
-        <br>&#9745; SES: emails de remetente e destinatário verificados
-        <br>&#9745; Lambda deploy com <code>sam build && sam deploy</code>
-        <br>&#9745; Testar login (credenciais válidas e inválidas)
-        <br>&#9745; Testar upload de foto (celular e desktop)
-        <br>&#9745; Testar upload de vídeo (até 100 MB)
-        <br>&#9745; Verificar que thumbnails aparecem na galeria
-        <br>&#9745; Verificar registros no DynamoDB (auditoria)
-        <br>&#9745; CloudFront behaviors na ordem correta
-        <br>&#9745; Testar com rede lenta (Chrome DevTools → Network → Slow 3G)
-        <br>&#9745; <code>.gitignore</code> inclui <code>samconfig.toml</code> e <code>node_modules</code>
-        <br>&#9745; Nenhuma credencial hardcoded no código
-        <br>&#9745; Relatório diário (SES) funcionando
-      </div>
-
-      <!-- ====== CONCLUSÃO ====== -->
-      <h2>Conclusão e Resultados</h2>
+      <!-- ====== MÉTRICAS ====== -->
+      <h2>O que o portal entrega hoje</h2>
 
       <div class="metrics-grid">
         <div class="metric-card">
-          <span class="metric-value">2-3s</span>
-          <span class="metric-label">Upload de foto (5 MB)</span>
+          <span class="metric-value">10</span>
+          <span class="metric-label">Apps ativos</span>
         </div>
         <div class="metric-card">
-          <span class="metric-value">~$5</span>
-          <span class="metric-label">Custo mensal</span>
+          <span class="metric-value">3</span>
+          <span class="metric-label">Lambdas</span>
         </div>
         <div class="metric-card">
-          <span class="metric-value">95%</span>
-          <span class="metric-label">Adesão dos operadores</span>
+          <span class="metric-value">~120</span>
+          <span class="metric-label">Usu&aacute;rios ativos</span>
         </div>
         <div class="metric-card">
-          <span class="metric-value">0</span>
-          <span class="metric-label">Servidores permanentes</span>
+          <span class="metric-value">~$9</span>
+          <span class="metric-label">Custo mensal AWS</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~280ms</span>
+          <span class="metric-label">Cold start m&eacute;dio</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value">~50ms</span>
+          <span class="metric-label">Warm response</span>
         </div>
       </div>
 
-      <div class="cost-comparison">
-        <div class="cost-bar">
-          <span class="cost-label">Antes (File Gateway)</span>
-          <div class="cost-track"><div class="cost-fill old">~$150/mês</div></div>
-        </div>
-        <div class="cost-bar">
-          <span class="cost-label">Depois (Serverless)</span>
-          <div class="cost-track"><div class="cost-fill new">~$5/mês</div></div>
-        </div>
-      </div>
-
-      <h3>Antes vs Depois</h3>
+      <h3>Custo mensal AWS detalhado</h3>
 
       <table>
         <thead>
-          <tr>
-            <th>Métrica</th>
-            <th>File Gateway (antes)</th>
-            <th>Serverless (depois)</th>
-          </tr>
+          <tr><th>Servi&ccedil;o</th><th>Custo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Lambda (3 fun&ccedil;&otilde;es, ~300k invocations/m&ecirc;s)</td><td>$0.40</td></tr>
+          <tr><td>API Gateway REST (~250k requests)</td><td>$0.90</td></tr>
+          <tr><td>DynamoDB on-demand (5 tabelas, baixo volume)</td><td>$0.60</td></tr>
+          <tr><td>S3 (~80GB de fotos/v&iacute;deos, sem versionamento ativo)</td><td>$2.00</td></tr>
+          <tr><td>CloudFront (egress + requests)</td><td>$3.00</td></tr>
+          <tr><td>SES (~3k emails/m&ecirc;s)</td><td>$0.30</td></tr>
+          <tr><td>Cognito (free tier &lt;50k MAU)</td><td>$0.00</td></tr>
+          <tr><td>SSM Parameter Store (Standard)</td><td>$0.00</td></tr>
+          <tr><td>CloudWatch Logs (7 dias reten&ccedil;&atilde;o)</td><td>$1.50</td></tr>
+          <tr><td><strong>Total estimado</strong></td><td><strong>~$8.70/m&ecirc;s</strong></td></tr>
+        </tbody>
+      </table>
+
+      <div class="cost-comparison">
+        <div class="cost-bar">
+          <span class="cost-label">Antes (File Gateway + Powerapps)</span>
+          <div class="cost-track"><div class="cost-fill old">~$200/m&ecirc;s + licen&ccedil;as PowerApps</div></div>
+        </div>
+        <div class="cost-bar">
+          <span class="cost-label">Depois (Portal Serverless)</span>
+          <div class="cost-track"><div class="cost-fill new">~$9/m&ecirc;s</div></div>
+        </div>
+      </div>
+
+      <h3>Antes vs. Depois</h3>
+
+      <table>
+        <thead>
+          <tr><th>M&eacute;trica</th><th>Antes</th><th>Depois</th></tr>
         </thead>
         <tbody>
           <tr>
-            <td><strong>Upload de foto (5 MB)</strong></td>
-            <td>15-30 segundos</td>
-            <td>2-3 segundos</td>
+            <td><strong>Upload foto (5MB)</strong></td>
+            <td>15&ndash;30s (SMB)</td>
+            <td>2&ndash;3s (Presigned PUT)</td>
           </tr>
           <tr>
-            <td><strong>Upload de vídeo (50 MB)</strong></td>
-            <td>2-5 minutos (quando não travava)</td>
-            <td>15-30 segundos</td>
+            <td><strong>Helpdesk</strong></td>
+            <td>WhatsApp, sem hist&oacute;rico</td>
+            <td>Ticket rastreado, SLA por prioridade</td>
+          </tr>
+          <tr>
+            <td><strong>Contracheque</strong></td>
+            <td>RH atendia no balc&atilde;o</td>
+            <td>Self-service no portal, integrado ao Athenas</td>
+          </tr>
+          <tr>
+            <td><strong>Onboarding</strong></td>
+            <td>Planilha + DCs manuais</td>
+            <td>Form &rarr; Cognito + AD + M365 automatizado</td>
+          </tr>
+          <tr>
+            <td><strong>Ideias</strong></td>
+            <td>Caixa f&iacute;sica no refeit&oacute;rio</td>
+            <td>App com voto p&uacute;blico + status transparent</td>
           </tr>
           <tr>
             <td><strong>Custo mensal</strong></td>
-            <td>~$150 (EC2 m5.xlarge 24/7)</td>
-            <td>~$5 (Lambda + S3 + DynamoDB)</td>
+            <td>~$200 (EC2 m5.xlarge + PowerApps)</td>
+            <td>~$9</td>
           </tr>
           <tr>
-            <td><strong>Adesão dos operadores</strong></td>
-            <td>~30% (maioria usava WhatsApp)</td>
-            <td>~95%</td>
-          </tr>
-          <tr>
-            <td><strong>Organização</strong></td>
-            <td>Pasta rede com nomes aleatórios</td>
-            <td>S3 organizado por bloco + auditoria</td>
-          </tr>
-          <tr>
-            <td><strong>Controle de acesso</strong></td>
-            <td>Share SMB aberto</td>
-            <td>Cognito com roles por usuário</td>
+            <td><strong>Tempo para subir um app novo</strong></td>
+            <td>Semanas (provisionar VM, SQL, login...)</td>
+            <td>Horas (uma view + algumas rotas)</td>
           </tr>
         </tbody>
       </table>
 
+      <!-- ====== CONCLUSÃO ====== -->
+      <h2>Conclus&atilde;o</h2>
+
       <div class="callout success">
-        <strong>O que eu aprendi com esse projeto:</strong> serverless não é apenas sobre economia (embora de $150/mês para $5/mês seja difícil de ignorar). É sobre construir sistemas que escalam para zero quando ninguém está usando e respondem em milissegundos quando precisam. O File Gateway era a solução "enterprise" para o problema. A combinação Lambda + S3 + Presigned URLs é a solução <strong>certa</strong>.
+        <strong>O que aprendi montando esse portal:</strong> "monolito serverless" parece anti-padr&atilde;o, mas pra um time de uma pessoa &eacute; o que destrava velocidade. A &uacute;nica Lambda principal &eacute; o ponto de extens&atilde;o; cada app novo &eacute; uma view + algumas rotas + um middleware de permiss&atilde;o. Sem novo pipeline, sem novo Cognito, sem novo CloudFront. Adicionei 9 apps em 2 meses sem mudar a infra base.
       </div>
+
+      <p>A pergunta cl&aacute;ssica de revisor de arquitetura &eacute;: "<em>e quando voc&ecirc; sair, quem mant&eacute;m?</em>". A resposta &eacute; honesta: HTML+JS vanilla, SAM em YAML, e um router de <code>if</code> &eacute; o c&oacute;digo mais leg&iacute;vel poss&iacute;vel pra qualquer dev j&uacute;nior. Sem build step, sem decorators m&aacute;gicos, sem container customizado. Quem entrar consegue ler em uma tarde.</p>
+
+      <p>Se voc&ecirc; est&aacute; pensando em montar algo parecido pra empresa &mdash; um portal interno que cresce app por app sem virar custo &mdash; serverless monol&iacute;tico com SAM &eacute; uma escolha defens&aacute;vel. Quando o portal crescer pra centenas de rotas ou multi-tenant de verdade, a&iacute; vale a pena olhar microsservi&ccedil;os, App Runner, ECS Fargate. At&eacute; l&aacute; o overhead de modular n&atilde;o se paga.</p>
 
     </div>
 
