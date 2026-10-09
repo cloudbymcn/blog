@@ -48,3 +48,18 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+@keyframes lanyard-sway {
+  0%,
+  100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}
+
+.lanyard-sway {
+  transform-origin: 50% 0;
+  animation: lanyard-sway 4.5s ease-in-out infinite;
+}
