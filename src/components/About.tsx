@@ -31,7 +31,7 @@ function Photo({ src, small, decorative }: { src: string; small: string; decorat
 
 export function About() {
   return (
-    <Section id="sobre" eyebrow="Apresentação" title="Quem é o MCN.">
+    <Section id="sobre" eyebrow="Apresentação">
       {/* cubo de vidro com o logo, na altura do título à direita (só desktop, lazy) */}
       <div className="relative">
         <ImmersiveSlot

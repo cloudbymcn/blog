@@ -12,7 +12,7 @@ export function Section({
 }: {
   id: string
   eyebrow: string
-  title: string
+  title?: string
   children: ReactNode
   tint?: boolean
   className?: string
@@ -22,7 +22,11 @@ export function Section({
       <div className={`mx-auto max-w-6xl px-6 py-28 md:px-8 md:py-40 ${className}`}>
         <Reveal>
           <p className="lc text-sm font-medium text-ink-2">{eyebrow}</p>
-          <h2 className="mt-2 font-display text-4xl font-semibold tracking-[-0.02em] md:text-6xl">{title}</h2>
+          {title && (
+            <h2 className="mt-2 font-display text-4xl font-semibold tracking-[-0.02em] md:text-6xl">
+              {title}
+            </h2>
+          )}
         </Reveal>
         <div className="mt-14 md:mt-20">{children}</div>
       </div>
