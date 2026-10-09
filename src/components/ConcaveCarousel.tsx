@@ -17,8 +17,8 @@ export interface CarouselItem {
 
 const STEP_DEG = 12 // rotação por passo nas laterais; o palco é de ponta a ponta (mx-[calc(50%-50vw)])
 const VISIBLE = 3 // cartões de cada lado do central (no 4º passo ele já viria ~2x maior)
-const DRIFT_PX_S = 14 // deslize contínuo, medido no arco
-const HOVER_FACTOR = 0.2 // no hover o deslize cai pra 20% (desacelera, não para seco)
+const DRIFT_PX_S = 20 // deslize contínuo, medido no arco
+const HOVER_FACTOR = 0.3 // no hover o deslize cai pra ~6px/s (desacelera, não para seco)
 const RESUME_MS = 1800 // depois de uma interação o deslize espera isso e volta com easing
 const FRICTION = 4 // decaimento da inércia (1/s): sobra vel/FRICTION de percurso
 const WHEEL_PX_PER_CARD = 110 // ~1 entalhe de roda = 1 card
