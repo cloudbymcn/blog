@@ -1,6 +1,6 @@
 # PROJECT_STATUS — cloudbymcn v2 (Lanyard)
 
-Atualizado: 2026-10-09 (fechamento da Forja) · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](SPEC-FRONTEND-V2.md)
+Atualizado: 2026-10-09 (Forja: covers animados, livro, 18 projetos) · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](SPEC-FRONTEND-V2.md)
 
 ## Estado atual
 
@@ -21,6 +21,7 @@ Atualizado: 2026-10-09 (fechamento da Forja) · Branch: `v2-lanyard` · Espec: [
 - Assets (Lente): 33/33 covers reais/gerados em `public/projects/<slug>/cover.webp` (6c60e40, ff5c66a); crachá com retrato sorrindo gerado por IA, ombros até as bordas (991f442..58db89e); logo nova — ícone squircle "m" (flat SVG + 3D PNG), wordmark "cloudbymcn", favicons, OG (43d0507, dc2dfa3) e aplicada na nav/rodapé (c68268e).
 - QA do Vigia resolvido no código: 320px sem overflow, a11y (contraste/aria), perf mobile (WebP no LCP, 3D/Lenis fora do mobile, rotas lazy).
 - Fechamento da Forja: SEO por rota sem tags duplicadas (c9aab00); build gera `dist/<rota>/index.html` com OG próprio pras 36 rotas, `404.html` noindex e os 12 redirects de `scripts/redirects.json` (4458d02); nav de vidro + página sem sobra de scrollbar (8530b0a); livro menor com a fonte do site, Paper Mono só na marginália (75f049b); perf desktop: three.js só na primeira interação, Lenis em idle (12c7c94).
+- Rodada de 09/10 fim de tarde (Forja): livro da trajetória menor, 720x380 no desktop / 640 abaixo de 1280 / página de 300 no mobile (f585b2d); covers animados `public/projects/<slug>/cover.{mp4,webm,gif}` detectados no build, tocando só no card central + vizinhos e no hero de `/projetos/:slug`, com poster `cover.webp` e fallback por onError; reduced-motion/saveData/2g ficam no poster (f0bd309); scrub-check ignora vídeo (5f6a3d5); **15 projetos removidos a pedido do Matheus, índice com 18** (f71dc00); nome de produto na frente do título: JEV, StoneTrack, Atelier de Pedra, Sentinela, DungeonAI (c3cde5b). Pendente pro Matheus: liberar SerraVans (gestao-frota-ocr) e batizar os outros 12.
 - Lighthouse (`npx lighthouse`, headless, `npm run preview`): desktop 98–99 (TBT ~100 ms, LCP 0,8 s, CLS 0); mobile 88 (LCP 3,6 s, TBT 40 ms, CLS 0); acessibilidade 96, SEO 100. Bundle inicial do `/`: ~151 KB gzip (JS 137 + CSS 13 + HTML 1).
 - PR #1 `v2-lanyard → main` aberto (https://github.com/cloudbymcn/blog/pull/1), sem merge. Screenshots no PR ainda são as de 3e59b93: as do QA final (f0a1d83) saíram capturadas antes das animações e precisam ser refeitas.
 
