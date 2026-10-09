@@ -1,10 +1,19 @@
-import { LanyardStage } from '../components/Lanyard/LanyardStage'
+import { About } from '../components/About'
+import { Certs } from '../components/Certs'
+import { Contact } from '../components/Contact'
+import { FeaturedProjects } from '../components/FeaturedProjects'
+import { Hero } from '../components/Hero'
+import { StackLoop } from '../components/StackLoop'
 
 export function Home() {
   return (
-    <section className="grid min-h-screen grid-cols-1 md:grid-cols-2">
-      <div className="p-8 font-display text-4xl">Matheus Nascimento</div>
-      <LanyardStage />
-    </section>
+    <>
+      <Hero />
+      <About />
+      <FeaturedProjects />
+      <StackLoop />
+      <Certs />
+      <Contact />
+    </>
   )
 }

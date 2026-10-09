@@ -1,3 +1,11 @@
+import { About as AboutSection } from '../components/About'
+import { Certs } from '../components/Certs'
+
 export function About() {
-  return <section className="p-8 font-display text-2xl">About</section>
+  return (
+    <div className="pt-[var(--nav-h)]">
+      <AboutSection />
+      <Certs />
+    </div>
+  )
 }

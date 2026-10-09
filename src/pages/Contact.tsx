@@ -1,3 +1,9 @@
+import { Contact as ContactSection } from '../components/Contact'
+
 export function Contact() {
-  return <section className="p-8 font-display text-2xl">Contact</section>
+  return (
+    <div className="pt-[var(--nav-h)]">
+      <ContactSection />
+    </div>
+  )
 }
