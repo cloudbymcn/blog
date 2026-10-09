@@ -797,4 +797,53 @@ export const specs = {
     ],
     note: '~15 min/dia de prints manuais → 0. Pills OK/Warn/Err no topo para ler em 3 s.',
   },
+
+  // ── Lote 5 (Tier B) ────────────────────────────────────────────────────
+
+  'pedidos-amostras': {
+    title: 'Pedidos de amostras: formulário → expedição',
+    subtitle: 'Formulário em etapas vira e-mail padronizado; o estoque de lotes vem do ERP.',
+    groups: [{ x: 460, y: 110, w: 470, h: 360, label: 'AWS' }],
+    nodes: {
+      vend: { x: 120, y: 200, label: 'Vendedor', sub: 'form em etapas', kind: 'user', w: 160 },
+      spa: { x: 330, y: 270, label: 'React SPA', sub: 'Amplify Hosting', kind: 'app', w: 170 },
+      mail: { x: 120, y: 400, label: 'Expedição', sub: 'e-mail padronizado', kind: 'user', w: 170 },
+      cog: { x: 580, y: 180, label: 'Cognito', sub: 'login Microsoft · PKCE', kind: 'aws', w: 190 },
+      fn: { x: 580, y: 360, label: 'AWS Lambda', sub: 'Function URL · VPC', kind: 'aws', w: 180 },
+      sm: { x: 820, y: 230, label: 'Secrets Manager', sub: 'credenciais', kind: 'aws', w: 170 },
+      db: { x: 820, y: 400, label: 'Firebird', sub: 'lotes em estoque', kind: 'data', w: 160 },
+    },
+    edges: [
+      { from: 'vend', to: 'spa' },
+      { from: 'spa', to: 'cog', dashed: true },
+      { from: 'spa', to: 'fn', label: 'JWT' },
+      { from: 'fn', to: 'sm', dashed: true },
+      { from: 'fn', to: 'db', label: 'cache 5 min' },
+      { from: 'spa', to: 'mail', label: 'Outlook · mailto' },
+    ],
+    note: 'Warmup agendado renova o cache; attach ao banco com timeout próprio.',
+  },
+
+  'video-downloader-mp4': {
+    title: 'Downloader de vídeo com merge MP4',
+    subtitle: 'Cola o link, escolhe a melhor qualidade e junta vídeo + áudio num MP4.',
+    nodes: {
+      user: { x: 110, y: 270, label: 'Navegador', sub: 'HTML/JS · polling 1,5 s', kind: 'user', w: 190 },
+      api: { x: 360, y: 270, label: 'FastAPI', sub: 'HTTP Basic', kind: 'app', w: 160 },
+      ytdlp: { x: 600, y: 180, label: 'yt-dlp', sub: 'bestvideo+bestaudio', kind: 'app', w: 180 },
+      ff: { x: 600, y: 370, label: 'ffmpeg', sub: 'merge → MP4', kind: 'app', w: 160 },
+      sites: { x: 840, y: 180, label: 'Sites de vídeo', sub: '+1000 extratores', kind: 'ext', w: 170 },
+      out: { x: 840, y: 370, label: 'downloads/', sub: 'Salvar arquivo', kind: 'data', w: 160 },
+      tun: { x: 360, y: 430, label: 'Túnel ou container', sub: 'PC em casa · Render', kind: 'ext', w: 190 },
+    },
+    edges: [
+      { from: 'user', to: 'api', label: 'link' },
+      { from: 'api', to: 'ytdlp' },
+      { from: 'ytdlp', to: 'sites' },
+      { from: 'ytdlp', to: 'ff' },
+      { from: 'ff', to: 'out' },
+      { from: 'tun', to: 'api', dashed: true },
+    ],
+    note: 'GitHub Pages não serve: precisa de servidor com Python, yt-dlp e ffmpeg.',
+  },
 }

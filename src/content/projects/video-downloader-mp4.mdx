@@ -1,0 +1,32 @@
+---
+title: "Downloader de vídeo multi-plataforma com merge MP4"
+slug: video-downloader-mp4
+summary: "Cola um link de qualquer site de vídeo, baixa na melhor qualidade e junta vídeo e áudio num MP4. FastAPI + yt-dlp + ffmpeg, acessível do celular fora de casa."
+category: ferramentas
+tier: B
+date: 2026-08-17
+stack: ["Python", "Docker", "JavaScript"]
+metrics:
+  - { label: "baixar um vídeo", before: "site cheio de anúncio", after: "colar e baixar" }
+  - { label: "formato", before: "vídeo e áudio separados", after: "1 MP4" }
+cover: /projects/video-downloader-mp4/architecture.svg
+---
+
+Baixar um vídeo para usar numa apresentação ou guardar uma referência costuma passar por site cheio de anúncio e pop-up. Este é o meu: uma página, um campo de link e um botão **Baixar**.
+
+<Figure src="/projects/video-downloader-mp4/architecture.svg" alt={"O navegador envia o link para uma API FastAPI protegida por HTTP Basic e acompanha o progresso com polling a cada 1,5 segundo. A API usa o yt-dlp para baixar o melhor vídeo e o melhor áudio do site de origem e o ffmpeg para juntar os dois num MP4, salvo na pasta de downloads e oferecido para salvar no navegador. O acesso de fora vem por túnel a partir do PC de casa ou por um container."} />
+
+**Como funciona.** O yt-dlp extrai de mais de mil sites (YouTube, Instagram, TikTok, X…) pedindo `bestvideo+bestaudio`; o ffmpeg faz o merge em MP4. A página é HTML/JS puro com polling de progresso a cada 1,5 s, e o botão *Salvar arquivo* entrega o MP4 direto no celular.
+
+**Usar fora de casa.** Duas opções documentadas:
+
+- **Túnel** a partir do PC de casa, com URL fixa e reconexão automática. Simples, mas o PC precisa ficar ligado.
+- **Container** num serviço gratuito, com `Dockerfile` e blueprint prontos. Hiberna depois de ~15 min ocioso (primeira requisição leva 30–50 s) e o disco é efêmero, o que não importa: o arquivo é salvo no celular na hora.
+
+<Callout type="info">
+
+**Por que não GitHub Pages:** o app precisa de servidor com Python, yt-dlp e ffmpeg. E alguns sites limitam IP de datacenter, então a versão em nuvem pode precisar de cookies para eles; em casa, com IP residencial, isso costuma não acontecer.
+
+</Callout>
+
+Acesso protegido por HTTP Basic, com usuário e senha por variável de ambiente.
