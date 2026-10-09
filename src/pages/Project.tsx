@@ -5,6 +5,8 @@ import { Figure } from '../components/mdx'
 import { mdxComponents } from '../components/mdx/components'
 import { StackIcon } from '../components/StackIcon'
 import { CATEGORIES, getProject, projectBodies } from '../lib/content'
+import { NOT_FOUND, projectSeo } from '../lib/seoMeta'
+import { useSeo } from '../lib/useSeo'
 import { NotFound } from './NotFound'
 
 interface TocItem {
@@ -57,18 +59,13 @@ export function Project() {
   const Body = projectBodies[slug]
   const articleRef = useRef<HTMLElement>(null)
   const { toc, active } = useToc(slug, articleRef)
+  useSeo(project ? projectSeo(project) : NOT_FOUND, { noindex: !project })
 
   if (!project) return <NotFound />
   const p = project
 
   return (
     <article className="pb-24 pt-[var(--nav-h)]">
-      <title>{`${p.title} · Cloud by MCN`}</title>
-      <meta name="description" content={p.summary} />
-      <meta property="og:title" content={p.title} />
-      <meta property="og:description" content={p.summary} />
-      <meta property="og:image" content={`https://cloudbymcn.com${p.image ?? '/og.png'}`} />
-
       <header className="border-b border-line bg-bg-2">
         <div className="mx-auto max-w-6xl px-5 pb-12 pt-12 md:px-8">
           <Link to="/projetos" className="lc text-sm text-link hover:underline">

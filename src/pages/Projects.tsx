@@ -2,6 +2,8 @@ import { useSearchParams } from 'react-router'
 import { ProjectCard } from '../components/ProjectCard'
 import { Reveal } from '../components/ui/Reveal'
 import { stagger } from '../lib/motion'
+import { PAGES } from '../lib/seoMeta'
+import { useSeo } from '../lib/useSeo'
 import { CATEGORIES, projects, type Category } from '../lib/content'
 
 function normalize(s: string) {
@@ -39,6 +41,7 @@ function Chip({
 }
 
 export function Projects() {
+  useSeo(PAGES['/projetos'])
   // filtros na URL: dá pra compartilhar /projetos?cat=ia&stack=Bedrock
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
@@ -63,11 +66,6 @@ export function Projects() {
 
   return (
     <div className="mx-auto max-w-6xl px-5 pb-24 pt-[calc(var(--nav-h)+3rem)] md:px-8">
-      <title>Projetos · Cloud by MCN</title>
-      <meta
-        name="description"
-        content="Case studies de arquitetura AWS, integrações, IA aplicada e produtos em produção."
-      />
       <p className="lc text-sm font-medium text-ink-2">Portfolio</p>
       <h1 className="mt-2 font-display text-5xl font-semibold tracking-[-0.02em] md:text-7xl">Projetos.</h1>
       <p className="mt-4 max-w-2xl text-ink-2">

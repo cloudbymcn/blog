@@ -1,6 +1,9 @@
+import { NOT_FOUND } from '../lib/seoMeta'
+import { useSeo } from '../lib/useSeo'
 import { Link } from 'react-router'
 
 export function NotFound() {
+  useSeo(NOT_FOUND, { noindex: true })
   return (
     <section className="mx-auto flex min-h-[70svh] max-w-6xl flex-col items-start justify-center px-5 pt-[var(--nav-h)] md:px-8">
       <p className="text-sm font-medium text-ink-2">404</p>
