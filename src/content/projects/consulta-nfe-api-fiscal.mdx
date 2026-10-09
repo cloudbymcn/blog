@@ -1,0 +1,29 @@
+---
+title: "Consulta de NF-e via API com React + Cloudscape"
+slug: consulta-nfe-api-fiscal
+summary: "App interno que sincroniza as NF-e recebidas e emitidas pela API da plataforma fiscal num SQLite local e permite buscar e filtrar sem entrar no site."
+category: produtos
+tier: B
+date: 2026-06-19
+stack: ["React", "Vite", "TypeScript", "Node.js", "SQL"]
+metrics:
+  - { label: "consultar uma nota", before: "login no site", after: "busca direta" }
+  - { label: "chave da API no navegador", before: "risco", after: "nunca" }
+cover: /projects/consulta-nfe-api-fiscal/architecture.svg
+---
+
+A plataforma fiscal que recebe as NF-e da empresa tem um site, mas o time fiscal só queria ver a lista: número, emitente, destinatário, valor, data e status. A plataforma também oferece uma API, então a consulta virou um app pequeno.
+
+<Figure src="/projects/consulta-nfe-api-fiscal/architecture.svg" alt={"O usuário fiscal abre um front em React com Cloudscape, que chama /api/nfe num backend Express. O backend lê o ID e a chave da conta no arquivo .env, chama a API fiscal com esses headers, pagina por cursor de 50 notas, parseia o XML e grava as notas num SQLite local, de onde saem busca, filtros e paginação."} />
+
+**Proxy no meio, por três motivos.** O ID e a chave da API são da conta inteira, não podem ir para o navegador. A API não libera CORS para um front qualquer. E cada nota chega como `access_key` + XML em **base64**: o backend decodifica e extrai os campos que importam, então o front só recebe JSON limpo.
+
+**Sincroniza uma vez, consulta à vontade.** Um botão de sync percorre a API por **cursor** (50 notas por página) e grava cada nota parseada num SQLite local (`node:sqlite`), com upsert pela chave de acesso. A partir daí, busca, filtro por período, ordenação e paginação leem do banco local, rápido e sem gastar chamada da API. Há ainda um `health` que testa a credencial e o download do XML cru de qualquer nota.
+
+**Front em Cloudscape.** O design system da AWS já traz tabela, filtro de texto, seletor de período, paginação e status prontos. Para ferramenta interna, isso economiza muito CSS e deixa a tela com cara de console.
+
+<Callout type="info">
+
+**Pegadinha da API:** incluir um CNPJ novo na conta não basta. A plataforma precisa adicioná-lo à base da API, e as notas só existem a partir dessa data. Esse aprendizado foi direto para a [conciliação de NFS-e](/projetos/conciliacao-nfse), que usa o ERP como fonte do histórico.
+
+</Callout>

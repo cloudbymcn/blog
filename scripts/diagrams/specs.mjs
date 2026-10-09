@@ -558,4 +558,115 @@ export const specs = {
     ],
     note: 'Resultado: lista "a lançar" que antes saía comparando dois Excel na mão.',
   },
+
+  // ── Lote 3 (Tier B) ────────────────────────────────────────────────────
+
+  'consulta-nfe-api-fiscal': {
+    title: 'Consulta de NF-e sem abrir o site',
+    subtitle: 'Um proxy esconde as chaves, parseia o XML e guarda tudo num SQLite local para busca rápida.',
+    nodes: {
+      user: { x: 120, y: 270, label: 'Fiscal', sub: 'navegador', kind: 'user', w: 150 },
+      web: { x: 340, y: 270, label: 'React', sub: 'Cloudscape · tabela', kind: 'app', w: 170 },
+      api: { x: 590, y: 270, label: 'Express', sub: 'proxy · parser XML', kind: 'app', w: 180 },
+      fis: { x: 840, y: 270, label: 'API fiscal', sub: 'NF-e · cursor 50', kind: 'ext', w: 160 },
+      env: { x: 840, y: 420, label: '.env', sub: 'id + chave da conta', kind: 'data', w: 180 },
+      db: { x: 590, y: 420, label: 'SQLite', sub: 'node:sqlite · upsert', kind: 'data', w: 180 },
+    },
+    edges: [
+      { from: 'user', to: 'web' },
+      { from: 'web', to: 'api', label: '/api/nfe' },
+      { from: 'api', to: 'fis', label: 'headers' },
+      { from: 'env', to: 'api', dashed: true },
+      { from: 'api', to: 'db', label: 'sync' },
+    ],
+    note: 'Sync percorre a API uma vez; busca e filtros leem do banco local. Chave nunca vai ao navegador.',
+  },
+
+  'controle-vida-util-insumos': {
+    title: 'Vida útil de insumos de máquina',
+    subtitle: 'Horímetro atual → situação de cada peça contra a garantia do fabricante.',
+    groups: [{ x: 450, y: 110, w: 480, h: 360, label: 'AWS (SST v3 · OpenNext)' }],
+    nodes: {
+      op: { x: 120, y: 270, label: 'Operação', sub: 'celular · desktop', kind: 'user', w: 160 },
+      entra: { x: 330, y: 150, label: 'Entra ID', sub: 'login + allowlist', kind: 'ext', w: 160 },
+      cf: { x: 570, y: 270, label: 'CloudFront', sub: 'Next.js', kind: 'aws', w: 160 },
+      fn: { x: 800, y: 270, label: 'AWS Lambda', sub: 'rotas de API', kind: 'aws', w: 160 },
+      ddb: { x: 800, y: 410, label: 'DynamoDB', sub: 'TROCA# · AUDIT#', kind: 'data', w: 170 },
+      cfg: { x: 570, y: 410, label: 'machines.ts', sub: 'garantia por rolo', kind: 'data', w: 170 },
+    },
+    edges: [
+      { from: 'op', to: 'entra', dashed: true },
+      { from: 'op', to: 'cf' },
+      { from: 'cf', to: 'fn' },
+      { from: 'fn', to: 'ddb' },
+      { from: 'cfg', to: 'fn', dashed: true },
+    ],
+    note: 'OK · Atenção (≥ 80% da garantia) · Vencida. Toda troca e exclusão vai para a auditoria.',
+  },
+
+  'ordens-compra-lote-erp': {
+    title: 'Ordens de compra do ano, em lote',
+    subtitle: 'Gera N ordens mensais no ERP legado com idempotência e retry só do que falhou.',
+    groups: [{ x: 470, y: 110, w: 460, h: 360, label: 'VPC' }],
+    nodes: {
+      ti: { x: 110, y: 200, label: 'Compras de TI', sub: 'SPA Vite + React', kind: 'user', w: 170 },
+      portal: { x: 330, y: 300, label: 'Portal', sub: 'login Microsoft · SigV4', kind: 'app', w: 180 },
+      fn: { x: 590, y: 200, label: 'AWS Lambda', sub: 'Function URL · IAM', kind: 'aws', w: 180 },
+      sm: { x: 590, y: 380, label: 'Secrets Manager', sub: 'Srp256 + wire crypt', kind: 'aws', w: 180 },
+      db: { x: 830, y: 300, label: 'Firebird', sub: 'ERP legado', kind: 'data', w: 150 },
+      s3: { x: 330, y: 440, label: 'S3', sub: 'build da SPA', kind: 'aws', w: 150 },
+    },
+    edges: [
+      { from: 'ti', to: 'portal' },
+      { from: 'portal', to: 'fn', label: 'assinado' },
+      { from: 'fn', to: 'sm', dashed: true },
+      { from: 'fn', to: 'db', label: '1 transação/OC' },
+      { from: 'fn', to: 's3', dashed: true },
+    ],
+    note: 'Chave de idempotência gravada no log da OC: reenviar devolve a mesma ordem, não uma nova.',
+  },
+
+  'painel-producao-diaria': {
+    title: 'Painel diário de produção',
+    subtitle: 'O PCP lança chapas boas e reprocessos por máquina; o painel calcula metas e médias.',
+    groups: [{ x: 450, y: 110, w: 480, h: 360, label: 'AWS (SST v3 · OpenNext)' }],
+    nodes: {
+      pcp: { x: 120, y: 270, label: 'Analista PCP', sub: 'lançamento diário', kind: 'user', w: 170 },
+      entra: { x: 330, y: 150, label: 'Entra ID', sub: 'conta corporativa', kind: 'ext', w: 160 },
+      cf: { x: 570, y: 270, label: 'CloudFront', sub: 'Next.js', kind: 'aws', w: 160 },
+      fn: { x: 800, y: 270, label: 'AWS Lambda', sub: 'cálculo do painel', kind: 'aws', w: 160 },
+      ddb: { x: 800, y: 410, label: 'DynamoDB', sub: 'ENTRY · MACHINE · AUDIT', kind: 'data', w: 200 },
+      meta: { x: 570, y: 410, label: 'Metas', sub: 'versionadas por vigência', kind: 'data', w: 190 },
+    },
+    edges: [
+      { from: 'pcp', to: 'entra', dashed: true },
+      { from: 'pcp', to: 'cf' },
+      { from: 'cf', to: 'fn' },
+      { from: 'fn', to: 'ddb' },
+      { from: 'meta', to: 'fn', dashed: true },
+    ],
+    note: 'Mudar a meta cria nova vigência: relatórios antigos não são reescritos.',
+  },
+
+  'extensao-navegador-voz': {
+    title: 'Navegador controlado por voz',
+    subtitle: 'Parser local resolve quase tudo em < 1 ms; o LLM só escolhe entre opções fechadas.',
+    nodes: {
+      mic: { x: 110, y: 270, label: 'Voz', sub: 'reconhecimento do Chrome', kind: 'user', w: 180 },
+      parser: { x: 350, y: 200, label: 'Parser local', sub: '< 1 ms · PT-BR', kind: 'app', w: 170 },
+      llm: { x: 350, y: 380, label: 'LLM de decisão', sub: 'opções fechadas', kind: 'ai', w: 170 },
+      act: { x: 600, y: 270, label: 'Ação', sub: 'validada', kind: 'app', w: 150 },
+      tab: { x: 840, y: 160, label: 'Página / abas', sub: 'content script', kind: 'ext', w: 170 },
+      win: { x: 840, y: 380, label: 'Windows', sub: 'native host (opcional)', kind: 'ext', w: 180 },
+    },
+    edges: [
+      { from: 'mic', to: 'parser', label: 'frase' },
+      { from: 'parser', to: 'llm', label: 'não entendi', dashed: true },
+      { from: 'parser', to: 'act' },
+      { from: 'llm', to: 'act' },
+      { from: 'act', to: 'tab' },
+      { from: 'act', to: 'win', dashed: true },
+    ],
+    note: 'Nada de áudio gravado. Ao LLM vão só a frase, o site e rótulos curtos dos botões visíveis.',
+  },
 }
