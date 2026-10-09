@@ -1,6 +1,9 @@
 import { useState, type CSSProperties } from 'react'
 import { Section } from './ui/Section'
+import { ImmersiveSlot } from './three/ImmersiveSlot'
 import { Reveal } from './ui/Reveal'
+
+const loadGlassLogo = () => import('./three/GlassLogo')
 
 const PHOTOS = [1, 2, 3, 4, 5].map((n) => ({
   src: `/photos/bastidores-${n}.webp`,
@@ -29,6 +32,14 @@ function Photo({ src, small, decorative }: { src: string; small: string; decorat
 export function About() {
   return (
     <Section id="sobre" eyebrow="Apresentação" title="Quem é o MCN.">
+      {/* cubo de vidro com o logo, na altura do título à direita (só desktop, lazy) */}
+      <div className="relative">
+        <ImmersiveSlot
+          load={loadGlassLogo}
+          media="(min-width: 1024px)"
+          className="absolute -top-56 right-0 hidden h-60 w-60 lg:block"
+        />
+      </div>
       <div className="grid gap-12 md:grid-cols-[1.1fr_1fr]">
         <Reveal>
           {/* TODO Matheus: texto final da apresentação (placeholder baseado na copy atual, SPEC §3) */}

@@ -7,15 +7,18 @@ import { canRunImmersive, whenIdle } from '../../lib/immersive'
  */
 export function ImmersiveSlot({
   load,
+  media,
   className = '',
 }: {
   load: () => Promise<{ default: ComponentType }>
+  /** media query extra (ex.: só desktop largo, quando o slot fica oculto abaixo disso) */
+  media?: string
   className?: string
 }) {
   const [Comp, setComp] = useState<ComponentType | null>(null)
 
   useEffect(() => {
-    if (!canRunImmersive()) return
+    if (!canRunImmersive() || (media && !window.matchMedia(media).matches)) return
     let alive = true
     const cancel = whenIdle(() => {
       load().then((m) => alive && setComp(() => m.default))
@@ -24,7 +27,7 @@ export function ImmersiveSlot({
       alive = false
       cancel()
     }
-  }, [load])
+  }, [load, media])
 
   if (!Comp) return null
   return (
