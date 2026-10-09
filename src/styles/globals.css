@@ -196,8 +196,8 @@ html::-webkit-scrollbar {
 
 /* livro da trajetória (TrajectoryBook): papel, lombada e folha girando */
 .book-root {
-  /* papel claro (decisão do Matheus; a variante escura saiu) */
-  font-family: var(--font-mono);
+  /* papel claro; texto das páginas na fonte do site, Paper Mono só na marginália (.book-mono) */
+  font-family: var(--font-sans);
   --book-bg: #f7f6f2;
   --book-fg: #1d1d1f;
   --book-muted: #6b6a66;
@@ -205,8 +205,19 @@ html::-webkit-scrollbar {
   --book-edge: rgba(0, 0, 0, 0.07);
 }
 
+.book-mono {
+  font-family: var(--font-mono);
+}
+
+/* spread ~880x460 no desktop, ~760 entre 1024 e 1280 */
 .book-stage {
-  max-width: 1000px;
+  max-width: 880px;
+}
+
+@media (max-width: 1279px) {
+  .book-stage {
+    max-width: 760px;
+  }
 }
 
 .book {
@@ -215,7 +226,7 @@ html::-webkit-scrollbar {
 }
 
 .book-spread {
-  aspect-ratio: 3 / 2;
+  aspect-ratio: 880 / 460;
 }
 
 .book-single {
