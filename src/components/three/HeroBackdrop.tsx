@@ -4,7 +4,7 @@ import { heroRibbonsEnabled } from '../../lib/flags'
 import { createRibbons } from './ribbons'
 import { useThreeScene } from './useThreeScene'
 
-const SHAPES = 9
+const SHAPES = 6 // 4 na metade direita (eram 7) + 2 na periferia esquerda
 const PARTICLES = 180
 const FOV = 35
 const CAMERA_Z = 10
@@ -67,10 +67,10 @@ export default function HeroBackdrop() {
       scene.add(group)
       const shapes = Array.from({ length: SHAPES }, (_, i) => {
         const mesh = new THREE.Mesh(geometries[i % geometries.length], glass)
-        // 7 na metade direita (u 0.15..0.95); 2 nos cantos da esquerda (acima/abaixo do texto)
-        const right = i < 7
+        // 4 na metade direita (u 0.15..0.95), espaçadas pras fitas; 2 nos cantos da esquerda
+        const right = i < 4
         const u = right ? 0.15 + rand() * 0.8 : -0.97 + rand() * 0.12
-        const v = right ? (rand() - 0.5) * 1.7 : (i === 7 ? 1 : -1) * (0.82 + rand() * 0.12)
+        const v = right ? (rand() - 0.5) * 1.7 : (i === 4 ? 1 : -1) * (0.82 + rand() * 0.12)
         const z = -2 - rand() * 5
         mesh.scale.setScalar((0.35 + rand() * 0.55) * 0.65)
         mesh.rotation.set(rand() * Math.PI, rand() * Math.PI, 0)

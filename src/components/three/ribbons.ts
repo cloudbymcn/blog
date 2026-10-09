@@ -19,7 +19,7 @@ const fragmentShader = /* glsl */ `
   uniform vec2 uCenter;
   uniform float uOpacity;
 
-  const int WIRES = 36;
+  const int WIRES = 44;
 
   void main() {
     vec2 uv = gl_FragCoord.xy / uRes;
@@ -27,29 +27,31 @@ const fragmentShader = /* glsl */ `
     vec2 p = uv - uCenter;
     p.x *= aspect;
 
-    // máscara: elipse em volta do crachá + corte suave na metade esquerda
-    float m = smoothstep(0.62, 0.08, length(p * vec2(0.9, 0.75)));
-    m *= smoothstep(0.42, 0.62, uv.x);
+    // máscara difusa: faixa x 50%..95% (bordas suaves), topo/base esmaecendo e um radial largo no crachá
+    float m = smoothstep(0.44, 0.62, uv.x) * (1.0 - smoothstep(0.86, 0.99, uv.x));
+    m *= smoothstep(0.0, 0.28, uv.y) * (1.0 - smoothstep(0.72, 1.0, uv.y));
+    m *= mix(0.45, 1.0, 1.0 - smoothstep(0.1, 0.95, length(p * vec2(0.8, 1.0))));
     if (m < 0.002) discard;
 
-    float t = uTime * 0.07;
+    float t = uTime * 0.06;
     float y = p.y;
-    float center = 0.16 * sin(y * 2.1 + t) + 0.05 * sin(y * 4.7 - t * 1.3) - y * 0.22;
-    float spread = 0.075 * sin(y * 2.8 + t * 1.6) + 0.02; // passa por zero: torção da fita
+    // curva suave e mais diagonal; o feixe abre até ~0.56 (≈45% da largura) e fecha (torção)
+    float center = 0.08 * sin(y * 1.3 + t) + 0.03 * sin(y * 2.4 - t * 1.1) - y * 0.38;
+    float spread = 0.16 + 0.12 * sin(y * 1.5 + t * 1.2);
     float px = 1.4 / uRes.y;
 
     float acc = 0.0;
     for (int i = 0; i < WIRES; i++) {
       float k = float(i) / float(WIRES - 1) - 0.5;
-      float x = center + k * spread * 2.0 + 0.006 * sin(y * 8.0 + float(i) * 0.9 + t * 2.0);
+      float x = center + k * spread * 2.0 + 0.012 * sin(y * 4.0 + float(i) * 0.7 + t * 1.6);
       float d = abs(p.x - x);
       acc += 1.0 - smoothstep(0.0, px, d);
-      acc += 0.12 * exp(-d * 260.0); // brilho fraco em volta do fio
+      acc += 0.1 * exp(-d * 220.0); // brilho fraco em volta do fio
     }
     acc = clamp(acc, 0.0, 1.6);
 
     vec3 col = vec3(0.839, 0.875, 0.918); // #d6dfea
-    gl_FragColor = vec4(col, acc * 0.42 * m * uOpacity);
+    gl_FragColor = vec4(col, acc * 0.36 * m * uOpacity);
   }
 `
 
