@@ -35,6 +35,17 @@ export function projectsIndex(): Plugin {
         })
       return `export default ${JSON.stringify(entries)}`
     },
+    configureServer(server) {
+      // MDX criado/apagado muda o índice: invalida o módulo virtual e recarrega a página
+      const onAddOrRemove = (file: string) => {
+        if (!file.replaceAll('\\', '/').includes('/src/content/projects/') || !file.endsWith('.mdx')) return
+        const mod = server.moduleGraph.getModuleById(RESOLVED)
+        if (mod) server.moduleGraph.invalidateModule(mod)
+        server.ws.send({ type: 'full-reload' })
+      }
+      server.watcher.on('add', onAddOrRemove)
+      server.watcher.on('unlink', onAddOrRemove)
+    },
     handleHotUpdate({ file, server }) {
       if (file.replaceAll('\\', '/').includes('/src/content/projects/') && file.endsWith('.mdx')) {
         const mod = server.moduleGraph.getModuleById(RESOLVED)

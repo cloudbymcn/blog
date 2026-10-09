@@ -1,4 +1,16 @@
-import { Callout, Card, CostBar, CostCompare, Figure, Instruction, Metric, Metrics, Step, Steps } from '.'
+import {
+  Callout,
+  Card,
+  CostBar,
+  CostCompare,
+  Figure,
+  Instruction,
+  Metric,
+  Metrics,
+  Step,
+  Steps,
+  Table,
+} from '.'
 
 /** Mapa passado pro MDXProvider (nomes combinados com o Cartógrafo). */
 export const mdxComponents = {
@@ -12,4 +24,5 @@ export const mdxComponents = {
   CostBar,
   Instruction,
   Figure,
+  table: Table,
 }

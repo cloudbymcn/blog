@@ -104,7 +104,7 @@ export function Project() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-12 px-5 pt-12 md:px-8 lg:grid-cols-[minmax(0,1fr)_240px]">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-5 pt-12 md:px-8 lg:grid-cols-[minmax(0,1fr)_240px]">
         <section
           ref={articleRef}
           className="prose prose-invert max-w-none prose-headings:font-display prose-headings:tracking-tight prose-a:text-accent prose-code:before:content-none prose-code:after:content-none prose-pre:border prose-pre:border-line"

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 
 /** Componentes disponíveis dentro dos MDX (contrato combinado com o Cartógrafo na nota do time). */
 
@@ -37,18 +37,19 @@ export function Metric({ value, label }: { value: ReactNode; label: ReactNode })
   )
 }
 
+/** Wrapper opcional: os posts usam <Step> solto, então Step não depende de lista. */
 export function Steps({ children }: { children: ReactNode }) {
-  return <ol className="not-prose my-8 space-y-4">{children}</ol>
+  return <div className="my-8">{children}</div>
 }
 
-export function Step({ n, children }: { n: number; children: ReactNode }) {
+export function Step({ n, children }: { n: number | string; children: ReactNode }) {
   return (
-    <li className="flex gap-4">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-accent/40 font-mono text-sm text-accent">
+    <div className="my-8 flex gap-4">
+      <span className="not-prose flex size-8 shrink-0 items-center justify-center rounded-full border border-accent/40 font-mono text-sm text-accent">
         {n}
       </span>
-      <div className="mdx-inner min-w-0 flex-1 pt-1 text-ink-2">{children}</div>
-    </li>
+      <div className="min-w-0 flex-1 [&>:first-child]:mt-1">{children}</div>
+    </div>
   )
 }
 
@@ -116,5 +117,14 @@ export function Figure({ src, alt, caption }: { src: string; alt: string; captio
       />
       {caption && <figcaption className="mt-2 text-center text-sm text-ink-3">{caption}</figcaption>}
     </figure>
+  )
+}
+
+/** Tabelas GFM rolam na horizontal no mobile em vez de estourar a página. */
+export function Table(props: ComponentProps<'table'>) {
+  return (
+    <div className="my-6 overflow-x-auto">
+      <table {...props} className="my-0" />
+    </div>
   )
 }
