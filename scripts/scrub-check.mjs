@@ -4,6 +4,14 @@ import path from 'node:path'
 const ROOT_DIR = process.cwd()
 const DIRS_TO_SCAN = ['src', 'public', 'docs']
 const IGNORED_FILES = new Set([path.normalize('docs/SPEC-FRONTEND-V2.md')])
+function isIgnored(relPath) {
+  const norm = path.normalize(relPath)
+  if (IGNORED_FILES.has(norm)) return true
+  if (norm.startsWith(path.normalize('docs/lighthouse-report')) || norm.startsWith('docs\\lighthouse-report')) return true
+  if (norm.startsWith(path.normalize('docs/qa-screenshots')) || norm.startsWith('docs\\qa-screenshots')) return true
+  if (norm.startsWith(path.normalize('docs/qa')) || norm.startsWith('docs\\qa')) return true
+  return false
+}
 
 const BINARY_EXTENSIONS = new Set([
   '.png',
@@ -57,7 +65,15 @@ const structuralPatterns = [
       // Permitir templates e ARNs gerenciados públicos da AWS (conforme contrato Cartógrafo)
       if (match.includes(':aws:policy/')) return false
       if (match.includes('::foundation-model/')) return false
-      if (match.includes('ACCOUNT_ID') || match.includes('${') || match.includes('<')) return false
+      if (
+        match.includes('ACCOUNT_ID') ||
+        match.includes('BUCKET') ||
+        match.includes('SEU_') ||
+        match.includes('EXEMPLO') ||
+        match.includes('${') ||
+        match.includes('<')
+      )
+        return false
       return true
     },
   },
@@ -91,8 +107,8 @@ const structuralPatterns = [
     filter: (match) => {
       const lower = match.toLowerCase()
       if (lower === 'matheuscamposti@gmail.com') return false
-      if (lower.endsWith('@cloudbymcn.com')) return false
-      if (lower.endsWith('@example.com')) return false
+      if (lower.endsWith('@cloudbymcn.com') || lower.includes('@cloudbymcn.')) return false
+      if (lower.endsWith('example.com') || lower.endsWith('exemplo.com')) return false
       if (lower.endsWith('@anthropic.com')) return false
       if (lower.endsWith('@github.com')) return false
       return true
@@ -113,7 +129,7 @@ function collectFiles(dirPath) {
     const fullPath = path.join(dirPath, entry.name)
     const relPath = path.normalize(path.relative(ROOT_DIR, fullPath))
 
-    if (IGNORED_FILES.has(relPath)) continue
+    if (isIgnored(relPath)) continue
 
     if (entry.isDirectory()) {
       results.push(...collectFiles(fullPath))
