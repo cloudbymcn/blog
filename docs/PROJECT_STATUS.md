@@ -9,6 +9,7 @@ Atualizado: 2026-10-09 · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](S
 - Home com os 6 blocos, nav fixa, `/sobre` e `/contato` (a1b3133).
 - `scripts/scrub-check.mjs` + `scripts/forbidden-terms.txt` implementados pelo Vigia e integrados ao `npm run check` (5d5acc5, 53ff2fc).
 - 11 posts v1 migrados pra MDX + diagramas de arquitetura (b836b02).
+- 22 projetos novos (8 Tier A + 14 Tier B) escritos, scrubados e com diagrama SVG, em 5 lotes (d8d25a6, d21c939, d3e88f6, 6cb3c57, d3ceddd). Índice com 33 projetos.
 - `/projetos` (busca, chips de categoria/stack, ordenação, filtros na URL) e `/projetos/:slug` (hero, TOC, corpo MDX lazy, Stack usada, links) com os componentes MDX (fcf8a25, 58a5e19). Validado no portal em 390/768/1280.
 - `.github/workflows/deploy.yml`: push em `main` ou manual → check + build + `404.html` (fallback SPA) → `actions/deploy-pages` (a91d025).
 - Site legado: `legacy/index.html` (antigo `index.html` da raiz), `posts/*.html` e `assets/` continuam no repo até a migração ser validada.
@@ -29,7 +30,7 @@ Atualizado: 2026-10-09 · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](S
 | Frente | Dono | Estado |
 |---|---|---|
 | App (scaffold, Lanyard, home, /projetos, deploy) | Forja | scaffold, Lanyard, home, `/projetos`, `/projetos/:slug`, MDX e deploy.yml feitos |
-| Conteúdo (33 MDX) | Cartógrafo | 11 posts v1 migrados; lotes 1-5 (22 novos) pendentes |
+| Conteúdo (33 MDX) | Cartógrafo | 33/33 no índice; covers = SVG de arquitetura até a Lente entregar `cover.webp` (lista de prints/prompts na nota "Covers- lista de prints") |
 | Assets | Lente | pendente: card-front/back/strap, fotos WebP, OG |
 | QA + scrub-check | Vigia | scrub-check feito; QA 6 larguras + Lighthouse pendente (aguarda preview) |
 
@@ -37,6 +38,6 @@ Atualizado: 2026-10-09 · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](S
 
 - Forja: redirects dos 11 posts antigos (§11), OG/meta por página; deploy só roda depois do merge em `main` (origin HEAD hoje é `master`: Matheus decide a branch de publicação e muda Settings → Pages → Source = GitHub Actions).
 - Vigia: `scripts/scrub-check.mjs` local está fora do Prettier (quebra `npm run check` e o deploy.yml).
-- Cartógrafo: lote 1 (5 Tier A).
+- Cartógrafo: trocar `cover:` para `/projects/<slug>/cover.webp` conforme a Lente entregar os prints; redirects dos 11 posts antigos (§11).
 - Lente: texturas do Lanyard + fotos + OG.
 - Vigia: commitar ajustes do scrub-check; QA assim que `npm run preview` subir em 4173.
