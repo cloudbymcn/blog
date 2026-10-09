@@ -179,6 +179,46 @@ html::-webkit-scrollbar {
   transform: scale(1.04) translate(calc(var(--mx, 0) * -8px), calc(var(--my, 0) * -8px));
 }
 
+/* Signal Type (nome do hero): letreiro neon. A letra real fica no span interno (contorno de tubo
+   apagado via filtro SVG); halo e preenchimento são ::before/::after, e o JS escreve --lit/--glow/--base */
+.signal {
+  --signal-glow: #0071e3;
+}
+.signal-g {
+  --lit: 0;
+  --glow: 0;
+  --base: 1;
+  position: relative;
+  display: inline-block;
+}
+.signal-g > span {
+  -webkit-text-fill-color: #000;
+  filter: url(#signal-outline);
+  opacity: var(--base);
+}
+.signal-g::before,
+.signal-g::after {
+  content: attr(data-ch);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.signal-g::before {
+  -webkit-text-fill-color: transparent;
+  text-shadow:
+    0 0 0.05em var(--signal-glow),
+    0 0 0.24em var(--signal-glow);
+  opacity: var(--glow);
+}
+.signal-g::after {
+  opacity: var(--lit);
+}
+.signal-on .signal-g {
+  --lit: 1;
+  --glow: 0.22;
+  --base: 0;
+}
+
 /* concave carousel: posição animada em JS (rAF: deslize, inércia, mola); reflexo esmaecendo pra baixo */
 .concave-card {
   transform-style: preserve-3d;

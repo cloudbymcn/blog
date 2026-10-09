@@ -6,7 +6,7 @@ import { ImmersiveSlot } from './three/ImmersiveSlot'
 import { LANYARD_DEFAULTS } from './Lanyard/settings'
 import { MaskText } from './ui/MaskText'
 import { Magnet } from './ui/Magnet'
-import { VaporName } from './ui/VaporName'
+import { SignalName } from './ui/SignalName'
 
 const desktopQuery = '(min-width: 768px)'
 
@@ -52,16 +52,12 @@ export function Hero() {
 
       <div className="relative z-0 mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center px-6 md:grid-cols-2 md:px-8">
         <div className="pb-16 pt-[calc(70svh-var(--nav-h)+1rem)] md:py-24">
-          {/* entrada em máscara linha a linha; o resto sobe em fade logo depois */}
-          {/* hover: o nome evapora e recondensa (Vapor Type); o h1 real continua no DOM */}
-          <VaporName>
-            <MaskText
-              as="h1"
-              lines={['Matheus', 'Nascimento']}
-              delay={80}
-              className="mt-3 block font-display text-5xl font-semibold leading-[1.05] tracking-[-0.02em] md:text-7xl"
-            />
-          </VaporName>
+          {/* nome acende como letreiro; cargo entra em máscara e o resto sobe em fade logo depois */}
+          {/* letreiro que acende letra por letra (Signal Type); o h1 continua semântico */}
+          <SignalName
+            lines={['Matheus', 'Nascimento']}
+            className="mt-3 block font-display text-5xl font-semibold leading-[1.05] tracking-[-0.02em] md:text-7xl"
+          />
           <MaskText
             as="p"
             lines={['Engenheiro de Infraestrutura Cloud']}
