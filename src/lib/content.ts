@@ -31,6 +31,10 @@ export interface ProjectMeta {
   cover?: string
   repo?: string
   live?: string
+  /** calculado no build: /projects/<slug>/cover.webp quando existe (imagem do card e do hero) */
+  image?: string
+  /** calculado no build: o SVG de `cover` já é referenciado no corpo do MDX */
+  coverInBody?: boolean
 }
 
 const bodies = import.meta.glob<{ default: ComponentType }>('../content/projects/*.mdx')

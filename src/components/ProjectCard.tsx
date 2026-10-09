@@ -1,22 +1,35 @@
 import { Link } from 'react-router'
 import type { ProjectMeta } from '../lib/content'
 
-/** Card glass minimalista (SPEC §0-bis): cover, título, uma linha, chips de stack. */
+/** Card glass minimalista (SPEC §0-bis): cover.webp 16:10, título, uma linha, chips de stack. */
 export function ProjectCard({ project: p }: { project: ProjectMeta }) {
   return (
     <Link
       to={`/projetos/${p.slug}`}
-      className="glass group flex h-full flex-col overflow-hidden rounded-3xl transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(0,0,0,0.10)]"
+      className="glass group flex h-full flex-col overflow-hidden rounded-3xl transition-shadow duration-300 hover:shadow-[0_20px_50px_rgba(0,0,0,0.12)]"
     >
       <div className="aspect-[16/10] overflow-hidden border-b border-line bg-bg-2">
-        {p.cover && (
+        {p.image ? (
           <img
-            src={p.cover}
+            src={p.image}
             alt=""
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            width={1600}
+            height={1000}
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
           />
+        ) : (
+          // sem print ainda: diagrama inteiro (contain) em vez de card vazio
+          p.cover && (
+            <img
+              src={p.cover}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full bg-white object-contain p-5 transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+            />
+          )
         )}
       </div>
       <div className="flex flex-1 flex-col p-6">

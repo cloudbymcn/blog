@@ -1,6 +1,7 @@
 import { MDXProvider } from '@mdx-js/react'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { Figure } from '../components/mdx'
 import { mdxComponents } from '../components/mdx/components'
 import { StackIcon } from '../components/StackIcon'
 import { CATEGORIES, getProject, projectBodies } from '../lib/content'
@@ -66,7 +67,7 @@ export function Project() {
       <meta name="description" content={p.summary} />
       <meta property="og:title" content={p.title} />
       <meta property="og:description" content={p.summary} />
-      {p.cover && <meta property="og:image" content={`https://cloudbymcn.com${p.cover}`} />}
+      <meta property="og:image" content={`https://cloudbymcn.com${p.image ?? '/og.png'}`} />
 
       <header className="border-b border-line bg-bg-2">
         <div className="mx-auto max-w-6xl px-5 pb-12 pt-12 md:px-8">
@@ -95,11 +96,15 @@ export function Project() {
               ))}
             </dl>
           )}
-          {p.cover && (
+          {(p.image ?? p.cover) && (
             <img
-              src={p.cover}
+              src={p.image ?? p.cover}
               alt={`Capa: ${p.title}`}
-              className="mt-12 w-full rounded-3xl border border-line bg-white object-cover shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
+              width={p.image ? 1600 : undefined}
+              height={p.image ? 1000 : undefined}
+              className={`mt-12 aspect-[16/10] w-full rounded-3xl border border-line bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] ${
+                p.image ? 'object-cover' : 'object-contain p-6'
+              }`}
               fetchPriority="high"
             />
           )}
@@ -111,6 +116,10 @@ export function Project() {
           ref={articleRef}
           className="prose prose-lg max-w-none prose-headings:font-display prose-headings:font-semibold prose-headings:tracking-[-0.02em] prose-headings:text-ink prose-p:text-ink/85 prose-a:text-accent prose-a:no-underline hover:prose-a:underline prose-strong:text-ink prose-code:text-ink prose-code:before:content-none prose-code:after:content-none prose-pre:rounded-2xl"
         >
+          {/* com print no hero, o SVG de arquitetura vai pro corpo (se o MDX já não mostra ele) */}
+          {p.image && p.cover && !p.coverInBody && (
+            <Figure src={p.cover} alt={`Arquitetura: ${p.title}`} caption="Arquitetura" />
+          )}
           <MDXProvider components={mdxComponents}>
             <Suspense
               fallback={
