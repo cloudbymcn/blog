@@ -67,7 +67,9 @@ export function Nav() {
       >
         <Link to="/" className="flex items-center gap-2" aria-label="Cloud by MCN, início">
           <img src="/img/logo-mcn.png" alt="" width={28} height={28} className="size-7" />
-          <span className="hidden text-sm font-semibold tracking-[-0.01em] min-[400px]:inline">cloudbymcn</span>
+          <span className="hidden text-sm font-semibold tracking-[-0.01em] min-[400px]:inline">
+            cloudbymcn
+          </span>
         </Link>
         <ul className="flex items-center gap-1 text-[13px]">
           {LINKS.map((l) => (
