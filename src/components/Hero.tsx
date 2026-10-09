@@ -43,7 +43,7 @@ export function Hero() {
       data-section="inicio"
       className="relative isolate flex min-h-svh flex-col overflow-hidden bg-bg pt-[var(--nav-h)]"
     >
-      <ImmersiveSlot load={loadBackdrop} className="absolute inset-0 z-0" />
+      <ImmersiveSlot load={loadBackdrop} delayMs={400} className="absolute inset-0 z-0" />
 
       {/* SPEC §0-bis: o canvas cobre a dobra inteira por cima do texto; só o cartão pega ponteiro */}
       <div className="pointer-events-none absolute inset-x-0 top-[var(--nav-h)] z-10 h-[70svh] md:inset-0 md:h-auto">

@@ -37,6 +37,7 @@ export function About() {
         <ImmersiveSlot
           load={loadGlassLogo}
           media="(min-width: 1024px)"
+          onlyNearViewport
           className="absolute -top-56 right-0 hidden h-60 w-60 lg:block"
         />
       </div>

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
-import { whenIdle } from '../../lib/immersive'
+import { whenEngaged } from '../../lib/immersive'
 import { LANYARD_DEFAULTS, type LanyardSettings } from './settings'
 
 const Lanyard = lazy(() => import('./Lanyard'))
@@ -100,7 +100,9 @@ export function LanyardPlaceholder({
 function useDeferredStart() {
   const [ready, setReady] = useState(false)
   useEffect(() => {
-    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) return whenIdle(() => setReady(true))
+    // desktop: na primeira interação (ou 6s), não logo depois do load (o init do three dava ~550ms de long task)
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches)
+      return whenEngaged(() => setReady(true))
     const events = ['pointerdown', 'touchstart', 'scroll', 'keydown'] as const
     const go = () => {
       events.forEach((e) => window.removeEventListener(e, go))

@@ -1,5 +1,5 @@
-import { useEffect, useState, type ComponentType } from 'react'
-import { canRunImmersive, whenIdle } from '../../lib/immersive'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { canRunImmersive, whenEngaged } from '../../lib/immersive'
 
 /**
  * Carrega um componente three.js decorativo só quando vale a pena: gate de dispositivo + depois do load/idle.
@@ -8,28 +8,55 @@ import { canRunImmersive, whenIdle } from '../../lib/immersive'
 export function ImmersiveSlot({
   load,
   media,
+  delayMs = 0,
+  onlyNearViewport = false,
   className = '',
 }: {
   load: () => Promise<{ default: ComponentType }>
   /** media query extra (ex.: só desktop largo, quando o slot fica oculto abaixo disso) */
   media?: string
+  /** atraso extra depois do gatilho, pra não inicializar junto com o crachá */
+  delayMs?: number
+  /** só carrega quando o slot chega perto da viewport (seções abaixo da dobra) */
+  onlyNearViewport?: boolean
   className?: string
 }) {
   const [Comp, setComp] = useState<ComponentType | null>(null)
+  const anchor = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!canRunImmersive() || (media && !window.matchMedia(media).matches)) return
     let alive = true
-    const cancel = whenIdle(() => {
-      load().then((m) => alive && setComp(() => m.default))
-    })
+    let cancel = () => {}
+    const start = () => {
+      cancel = whenEngaged(
+        () => {
+          load().then((m) => alive && setComp(() => m.default))
+        },
+        { delayMs },
+      )
+    }
+    let io: IntersectionObserver | undefined
+    if (onlyNearViewport && anchor.current) {
+      io = new IntersectionObserver(
+        ([e]) => {
+          if (!e.isIntersecting) return
+          io?.disconnect()
+          start()
+        },
+        { rootMargin: '400px 0px' },
+      )
+      io.observe(anchor.current)
+    } else start()
     return () => {
       alive = false
+      io?.disconnect()
       cancel()
     }
-  }, [load, media])
+  }, [load, media, delayMs, onlyNearViewport])
 
-  if (!Comp) return null
+  // âncora vazia pro IntersectionObserver enquanto o componente não carrega
+  if (!Comp) return <div ref={anchor} className={`pointer-events-none ${className}`} aria-hidden="true" />
   return (
     <div className={`pointer-events-none ${className}`} aria-hidden="true">
       <Comp />
