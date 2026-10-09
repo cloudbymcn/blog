@@ -61,13 +61,13 @@ export function Nav() {
       }`}
     >
       <nav
-        className={`mx-auto flex max-w-6xl items-center justify-between px-6 transition-[height] duration-500 ease-out md:px-8 ${
+        className={`mx-auto flex max-w-6xl items-center justify-between px-4 transition-[height] duration-500 ease-out sm:px-6 md:px-8 ${
           scrolled ? 'h-[var(--nav-h)]' : 'h-16'
         }`}
       >
         <Link to="/" className="flex items-center gap-2" aria-label="Cloud by MCN, início">
           <img src="/img/logo-mcn.png" alt="" width={28} height={28} className="size-7" />
-          <span className="text-sm font-semibold tracking-[-0.01em]">cloudbymcn</span>
+          <span className="hidden text-sm font-semibold tracking-[-0.01em] min-[400px]:inline">cloudbymcn</span>
         </Link>
         <ul className="flex items-center gap-1 text-[13px]">
           {LINKS.map((l) => (
@@ -75,7 +75,7 @@ export function Nav() {
               <NavLink
                 to={isHome ? `/#${l.section}` : l.to}
                 className={({ isActive }) =>
-                  `relative rounded-full px-3 py-1.5 transition-colors hover:text-ink ${
+                  `relative rounded-full px-2 py-1.5 sm:px-3 transition-colors hover:text-ink ${
                     (isHome ? active === l.section : isActive) ? 'text-ink' : 'text-ink/70'
                   }`
                 }

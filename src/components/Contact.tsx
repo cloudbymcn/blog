@@ -34,7 +34,7 @@ export function Contact() {
       <p className="max-w-xl text-lg text-ink-2">
         Arquitetura AWS, integrações, automação ou IA aplicada. Me chama em qualquer um destes canais.
       </p>
-      <ul className="mt-10 grid gap-4 sm:grid-cols-2">
+      <ul className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {CHANNELS.map((c) => {
           const external = c.href.startsWith('http')
           return (
