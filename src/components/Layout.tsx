@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router'
+import { scrollToTarget, startSmoothScroll, stopSmoothScroll } from '../lib/smoothScroll'
 import { Footer } from './Footer'
 import { Nav } from './Nav'
 
@@ -7,12 +8,16 @@ import { Nav } from './Nav'
 function useScrollRestore() {
   const { pathname, hash } = useLocation()
   useEffect(() => {
-    if (hash) document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView()
-    else window.scrollTo(0, 0)
+    const el = hash ? document.getElementById(decodeURIComponent(hash.slice(1))) : null
+    scrollToTarget(el ?? 0, !el)
   }, [pathname, hash])
 }
 
 export function Layout() {
+  useEffect(() => {
+    startSmoothScroll()
+    return stopSmoothScroll
+  }, [])
   useScrollRestore()
   return (
     <>

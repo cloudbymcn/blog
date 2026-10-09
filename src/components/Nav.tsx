@@ -25,7 +25,27 @@ function useActiveSection(enabled: boolean) {
   return enabled ? active : null
 }
 
+/** true depois de rolar um pouco: a nav encolhe e ganha vidro (estilo apple.com). */
+function useScrolled(threshold = 8) {
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    let raf = 0
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => setScrolled(window.scrollY > threshold))
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [threshold])
+  return scrolled
+}
+
 export function Nav() {
+  const scrolled = useScrolled()
   const { pathname } = useLocation()
   const isHome = pathname === '/'
   const active = useActiveSection(isHome)
@@ -34,9 +54,17 @@ export function Nav() {
     // translúcida estilo apple.com (SPEC §0-bis)
     <header
       data-lanyard-block
-      className="fixed inset-x-0 top-0 z-50 border-b border-line bg-white/70 backdrop-blur-[20px] backdrop-saturate-[180%]"
+      className={`fixed inset-x-0 top-0 z-50 border-b transition-[background-color,border-color,backdrop-filter] duration-500 ease-out ${
+        scrolled
+          ? 'border-line bg-white/72 backdrop-blur-[20px] backdrop-saturate-[180%]'
+          : 'border-transparent bg-white/0'
+      }`}
     >
-      <nav className="mx-auto flex h-[var(--nav-h)] max-w-6xl items-center justify-between px-6 md:px-8">
+      <nav
+        className={`mx-auto flex max-w-6xl items-center justify-between px-6 transition-[height] duration-500 ease-out md:px-8 ${
+          scrolled ? 'h-[var(--nav-h)]' : 'h-16'
+        }`}
+      >
         <Link to="/" className="flex items-center gap-2" aria-label="Cloud by MCN, início">
           <img src="/img/logo-mcn.png" alt="" width={28} height={28} className="size-7" />
           <span className="text-sm font-semibold tracking-[-0.01em]">cloudbymcn</span>

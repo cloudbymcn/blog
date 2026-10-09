@@ -225,6 +225,7 @@ export function LanyardControls({
           <div
             id={panelId}
             role="dialog"
+            data-lenis-prevent
             aria-label="Ajustes do crachá"
             className="glass fixed inset-x-0 bottom-0 z-50 max-h-[70svh] overflow-y-auto rounded-t-3xl bg-white/80 px-5 pb-8 pt-4 md:absolute md:inset-x-auto md:bottom-auto md:right-8 md:top-[calc(var(--nav-h)+68px)] md:z-30 md:max-h-[calc(100svh-var(--nav-h)-96px)] md:w-72 md:rounded-3xl md:pb-5"
           >
