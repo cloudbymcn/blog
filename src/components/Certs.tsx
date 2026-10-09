@@ -1,3 +1,4 @@
+import { stagger } from '../lib/motion'
 import { Reveal } from './ui/Reveal'
 import { Section } from './ui/Section'
 
@@ -22,7 +23,7 @@ export function Certs() {
         <ul className="grid grid-cols-3 gap-4 self-start">
           {CERTS.map((c, i) => (
             <li key={c.code}>
-              <Reveal delay={i * 100} className="flex flex-col items-center text-center">
+              <Reveal delay={stagger(i)} className="flex flex-col items-center text-center">
                 <img
                   src={c.src}
                   alt={c.name}
@@ -44,7 +45,7 @@ export function Certs() {
                 aria-hidden="true"
                 className="absolute -left-[37px] top-1.5 size-2.5 rounded-full bg-accent"
               />
-              <Reveal delay={i * 80}>
+              <Reveal delay={stagger(i)}>
                 <p className="text-sm font-semibold text-ink-2">{t.year}</p>
                 <p className="mt-1 text-ink">{t.text}</p>
               </Reveal>

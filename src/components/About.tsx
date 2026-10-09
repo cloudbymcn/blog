@@ -46,7 +46,7 @@ export function About() {
             <p>Pós-graduando em Arquitetura Cloud, com foco em IA, escalabilidade e sistemas distribuídos.</p>
           </div>
         </Reveal>
-        <Reveal delay={150} className="min-w-0">
+        <Reveal delay={120} className="min-w-0">
           <div className="marquee-pause overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)]">
             <div
               className="marquee flex w-max gap-4"

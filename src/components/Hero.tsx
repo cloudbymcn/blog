@@ -4,7 +4,7 @@ import { stats } from '../lib/content'
 import { LanyardControls } from './Lanyard/LanyardControls'
 import { LanyardStage } from './Lanyard/LanyardStage'
 import { LANYARD_DEFAULTS } from './Lanyard/settings'
-import { BlurText } from './ui/BlurText'
+import { MaskText } from './ui/MaskText'
 import { CountUp } from './ui/CountUp'
 
 const desktopQuery = '(min-width: 768px)'
@@ -49,24 +49,28 @@ export function Hero() {
 
       <div className="relative z-0 mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center px-6 md:grid-cols-2 md:px-8">
         <div className="pb-16 pt-[500px] md:py-24">
-          <p className="text-sm font-medium text-ink-2">Cloud by MCN</p>
-          <BlurText
+          {/* entrada em máscara linha a linha; o resto sobe em fade logo depois */}
+          <MaskText lines={['Cloud by MCN']} as="p" className="text-sm font-medium text-ink-2" />
+          <MaskText
             as="h1"
-            text="Matheus Nascimento"
+            lines={['Matheus', 'Nascimento']}
+            delay={80}
             className="mt-3 block font-display text-5xl font-semibold leading-[1.05] tracking-[-0.02em] md:text-7xl"
           />
-          <BlurText
+          <MaskText
             as="p"
-            text="Engenheiro de Infraestrutura Cloud"
-            delay={250}
-            step={60}
+            lines={['Engenheiro de Infraestrutura Cloud']}
+            delay={260}
             className="mt-3 block font-display text-xl font-medium tracking-[-0.01em] text-ink-2 md:text-2xl"
           />
-          <p className="mt-6 max-w-md text-[17px] leading-relaxed text-ink-2">
+          <p
+            className="fade-up mt-6 max-w-md text-[17px] leading-relaxed text-ink-2"
+            style={{ animationDelay: '380ms' }}
+          >
             Arquiteturas AWS reais, decisões técnicas e implementações completas. Pós-graduando em Arquitetura
             Cloud, com foco em IA, escalabilidade e sistemas distribuídos.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div className="fade-up mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: '460ms' }}>
             <Link
               to="/projetos"
               className="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-white transition-opacity hover:opacity-90"
@@ -80,7 +84,10 @@ export function Hero() {
               Falar comigo
             </a>
           </div>
-          <dl className="mt-12 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6">
+          <dl
+            style={{ animationDelay: '540ms' }}
+            className="fade-up mt-12 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6"
+          >
             {items.map((s) => (
               <div key={s.label}>
                 <dt className="sr-only">{s.label}</dt>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-/** ScrollReveal leve: fade + subida quando entra na viewport. */
+/** Reveal estilo apple.com: fade + subida de 24px quando entra na viewport. `delay` faz o stagger. */
 export function Reveal({
   children,
   delay = 0,
@@ -23,7 +23,7 @@ export function Reveal({
           io.disconnect()
         }
       },
-      { rootMargin: '0px 0px -10% 0px' },
+      { rootMargin: '0px 0px -8% 0px' },
     )
     io.observe(el)
     return () => io.disconnect()
@@ -33,7 +33,7 @@ export function Reveal({
     <div
       ref={ref}
       style={{ transitionDelay: `${delay}ms` }}
-      className={`transition-all duration-700 ease-out ${shown ? 'translate-y-0 opacity-100 blur-0' : 'translate-y-6 opacity-0 blur-[2px]'} ${className}`}
+      className={`reveal ${shown ? 'is-shown' : ''} ${className}`}
     >
       {children}
     </div>

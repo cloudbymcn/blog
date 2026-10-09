@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { STACK, type StackGroup } from '../lib/stack'
 import { StackIcon } from './StackIcon'
+import { stagger } from '../lib/motion'
 import { Reveal } from './ui/Reveal'
 import { Section } from './ui/Section'
 
@@ -39,7 +40,7 @@ export function StackLoop() {
       </div>
       <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
         {(Object.entries(STACK) as [StackGroup, readonly string[]][]).map(([group, items], i) => (
-          <Reveal key={group} delay={(i % 3) * 80}>
+          <Reveal key={group} delay={stagger(i)}>
             <h3 className="text-sm font-semibold text-ink">{group}</h3>
             <ul className="mt-3 flex flex-wrap gap-1.5">
               {items.map((s) => (

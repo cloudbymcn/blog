@@ -71,22 +71,48 @@ h3 {
   animation: lanyard-sway 4.5s ease-in-out infinite;
 }
 
-@keyframes blur-in {
+/* reveal e máscara (camada imersiva, SPEC §0-bis): curva de saída longa estilo Apple */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes mask-up {
   from {
-    opacity: 0;
-    filter: blur(10px);
-    transform: translateY(8px);
+    transform: translateY(105%);
   }
   to {
-    opacity: 1;
-    filter: blur(0);
     transform: none;
   }
 }
 
-.blur-in {
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up {
   opacity: 0;
-  animation: blur-in 0.7s ease-out forwards;
+  animation: fade-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mask-up {
+  transform: translateY(105%);
+  animation: mask-up 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* glass (SPEC §0-bis): cards, nav e chips */

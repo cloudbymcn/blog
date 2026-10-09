@@ -1,5 +1,7 @@
 import { useSearchParams } from 'react-router'
 import { ProjectCard } from '../components/ProjectCard'
+import { Reveal } from '../components/ui/Reveal'
+import { stagger } from '../lib/motion'
 import { CATEGORIES, projects, type Category } from '../lib/content'
 
 function normalize(s: string) {
@@ -159,9 +161,11 @@ export function Projects() {
         </div>
       ) : (
         <ul className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {list.map((p) => (
+          {list.map((p, i) => (
             <li key={p.slug}>
-              <ProjectCard project={p} />
+              <Reveal delay={stagger(i % 3)} className="h-full">
+                <ProjectCard project={p} />
+              </Reveal>
             </li>
           ))}
         </ul>
