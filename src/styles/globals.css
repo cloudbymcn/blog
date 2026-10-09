@@ -27,6 +27,8 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* blocos de ponta a ponta (carrossel) usam 100vw; clip evita o scroll horizontal da barra */
+  overflow-x: clip;
 }
 
 h1,
@@ -140,6 +142,21 @@ h3 {
 
 .tilt:hover .tilt-media {
   transform: scale(1.04) translate(calc(var(--mx, 0) * -8px), calc(var(--my, 0) * -8px));
+}
+
+/* concave carousel: snap de 500ms ease-out; reflexo esmaecendo pra baixo */
+.concave-card {
+  transform-style: preserve-3d;
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.concave-reflection {
+  opacity: 0.12;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent 40%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent 40%);
 }
 
 /* glass (SPEC §0-bis): cards, nav e chips */
