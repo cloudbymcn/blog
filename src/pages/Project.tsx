@@ -1,6 +1,7 @@
 import { MDXProvider } from '@mdx-js/react'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { CoverMedia } from '../components/CoverMedia'
 import { Figure } from '../components/mdx'
 import { mdxComponents } from '../components/mdx/components'
 import { StackIcon } from '../components/StackIcon'
@@ -93,16 +94,19 @@ export function Project() {
               ))}
             </dl>
           )}
-          {(p.image ?? p.cover) && (
-            <img
-              src={p.image ?? p.cover}
+          {(p.image ?? p.cover ?? p.video) && (
+            <CoverMedia
+              key={p.slug}
+              poster={p.image ?? p.cover}
+              video={p.video}
+              active
+              priority
               alt={`Capa: ${p.title}`}
               width={p.image ? 1600 : undefined}
               height={p.image ? 1000 : undefined}
               className={`mt-12 aspect-[16/10] w-full rounded-3xl border border-line bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] ${
-                p.image ? 'object-cover' : 'object-contain p-6'
+                p.image || p.video ? 'object-cover' : 'object-contain p-6'
               }`}
-              fetchPriority="high"
             />
           )}
         </div>

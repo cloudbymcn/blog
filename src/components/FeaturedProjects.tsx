@@ -12,6 +12,7 @@ const ITEMS: CarouselItem[] = [...projects]
     key: p.slug,
     href: `/projetos/${p.slug}`,
     image: p.image ?? p.cover,
+    video: p.video,
     fit: p.image ? 'cover' : 'contain',
     title: p.title,
     subtitle: p.summary,

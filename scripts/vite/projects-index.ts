@@ -6,19 +6,29 @@ import { parse } from 'yaml'
 const ID = 'virtual:projects-index'
 const RESOLVED = '\0' + ID
 
-/** Arquivos que mudam o índice: MDX dos projetos e covers em public/projects/<slug>/cover.webp. */
+/** Arquivos que mudam o índice: MDX dos projetos e covers em public/projects/<slug>/cover.{webp,webm,mp4,gif}. */
 function affectsIndex(file: string) {
   const f = file.replaceAll('\\', '/')
   return (
     (f.includes('/src/content/projects/') && f.endsWith('.mdx')) ||
-    (f.includes('/public/projects/') && f.endsWith('/cover.webp'))
+    (f.includes('/public/projects/') && /\/cover\.(webp|webm|mp4|gif)$/.test(f))
   )
+}
+
+/** Cover animado: só os formatos que existem em public/projects/<slug>/ (webm, mp4 e gif de fallback). */
+function coverVideo(publicDir: string, slug: string) {
+  const found = (['webm', 'mp4', 'gif'] as const).filter((ext) =>
+    existsSync(join(publicDir, 'projects', slug, `cover.${ext}`)),
+  )
+  if (found.length === 0) return undefined
+  return Object.fromEntries(found.map((ext) => [ext, `/projects/${slug}/cover.${ext}`]))
 }
 
 export interface ProjectEntry extends Record<string, unknown> {
   file: string
   slug: string
   image?: string
+  video?: Record<string, string>
   coverInBody: boolean
 }
 
@@ -42,7 +52,7 @@ export function readProjects(
         : undefined
       // o SVG de arquitetura já aparece no corpo? (senão a página mostra ele no topo do corpo)
       const coverInBody = typeof meta.cover === 'string' && src.split(meta.cover).length > 2
-      return { ...meta, file, slug, image, coverInBody }
+      return { ...meta, file, slug, image, video: coverVideo(publicDir, slug), coverInBody }
     })
 }
 
@@ -53,6 +63,7 @@ export function readProjects(
  *
  * `image`: /projects/<slug>/cover.webp quando o arquivo existe (print real ou gerado, SPEC §0-bis).
  * O `cover` do frontmatter (SVG de arquitetura) continua só como fallback e no corpo.
+ * `video`: cover.webm / cover.mp4 / cover.gif ao lado do cover.webp, quando existem.
  */
 export function projectsIndex(): Plugin {
   let dir = ''

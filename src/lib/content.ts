@@ -19,6 +19,13 @@ export interface Metric {
   after: string
 }
 
+/** Cover animado (loop curto, sem áudio): webm/mp4 em <video>, gif como último recurso. */
+export interface CoverVideo {
+  webm?: string
+  mp4?: string
+  gif?: string
+}
+
 /** Frontmatter de `src/content/projects/<slug>.mdx` (SPEC §5). */
 export interface ProjectMeta {
   title: string
@@ -34,6 +41,8 @@ export interface ProjectMeta {
   live?: string
   /** calculado no build: /projects/<slug>/cover.webp quando existe (imagem do card e do hero) */
   image?: string
+  /** calculado no build: cover animado em public/projects/<slug>/ (só os formatos que existem) */
+  video?: CoverVideo
   /** calculado no build: o SVG de `cover` já é referenciado no corpo do MDX */
   coverInBody?: boolean
 }

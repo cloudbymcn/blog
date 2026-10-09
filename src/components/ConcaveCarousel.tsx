@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router'
+import type { CoverVideo } from '../lib/content'
+import { CoverMedia } from './CoverMedia'
 
 export interface CarouselItem {
   key: string
   href: string
   image?: string
+  /** cover animado (webm/mp4/gif); toca só no central e nos vizinhos imediatos */
+  video?: CoverVideo
   /** 'contain' pra diagrama SVG (sem print ainda), 'cover' pra screenshot */
   fit: 'cover' | 'contain'
   title: string
@@ -208,16 +212,13 @@ export function ConcaveCarousel({ items, label }: { items: CarouselItem[]; label
                   className="block"
                 >
                   <div className="aspect-[16/10] overflow-hidden rounded-2xl border border-line bg-white shadow-[0_12px_40px_rgba(0,0,0,0.10)]">
-                    {item.image && (
-                      <img
-                        src={item.image}
-                        alt=""
-                        draggable={false}
-                        loading="lazy"
-                        decoding="async"
-                        className={`h-full w-full ${item.fit === 'cover' ? 'object-cover' : 'object-contain p-5'}`}
-                      />
-                    )}
+                    <CoverMedia
+                      poster={item.image}
+                      video={item.video}
+                      active={Math.abs(Math.round(d)) <= 1}
+                      alt=""
+                      className={`h-full w-full ${item.fit === 'cover' ? 'object-cover' : 'object-contain p-5'}`}
+                    />
                   </div>
                   {/* reflexo suave no "chão" da galeria */}
                   <div
