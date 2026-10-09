@@ -55,8 +55,6 @@ const MILESTONES: Milestone[] = [
 /** Página 0 = abertura; depois um marco por página. */
 const PAGE_COUNT = MILESTONES.length + 1
 
-export type BookTone = 'paper' | 'ink'
-
 const FLIP_MS = 700
 const reducedQuery = '(prefers-reduced-motion: reduce)'
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -65,7 +63,7 @@ function PageContent({ index }: { index: number }) {
   if (index < 0 || index >= PAGE_COUNT) return null
   if (index === 0) {
     return (
-      <div className="flex h-full flex-col justify-end">
+      <div className="flex h-full flex-col justify-center">
         <p className="book-muted text-sm">trajetória</p>
         <p className="mt-3 text-[clamp(2rem,4vw,3.25rem)] font-medium leading-[1.02] tracking-[-0.03em]">
           um caderno
@@ -81,18 +79,18 @@ function PageContent({ index }: { index: number }) {
   const m = MILESTONES[index - 1]
   const cert = m.cert ? CERTS.find((c) => c.code === m.cert) : undefined
   return (
-    <div className="flex h-full flex-col">
-      <p className="book-accent text-[clamp(2.75rem,6vw,4.5rem)] font-medium leading-none tracking-[-0.04em]">
+    <div className="flex h-full flex-col justify-center">
+      <p className="book-accent text-[clamp(2.25rem,4.6vw,3.75rem)] font-medium leading-none tracking-[-0.04em]">
         {m.year}
       </p>
-      <p className="mt-5 text-[clamp(1.05rem,1.8vw,1.4rem)] font-medium leading-snug tracking-[-0.01em]">
+      <p className="mt-4 text-[clamp(1.05rem,1.8vw,1.4rem)] font-medium leading-snug tracking-[-0.01em]">
         {m.title}
       </p>
-      <p className="book-muted mt-3 max-w-[34ch] text-sm leading-relaxed">{m.text}</p>
+      <p className="book-muted mt-3 max-w-[34ch] text-[13px] leading-relaxed lg:text-sm">{m.text}</p>
       {cert && (
-        <div className="mt-auto flex items-end justify-between gap-4 pt-4">
-          <CertBadge {...cert} className="w-[clamp(4.5rem,9vw,7rem)]" />
-          <span className="book-muted text-xs">{cert.code.toLowerCase()}</span>
+        <div className="mt-6 flex items-end gap-4">
+          <CertBadge {...cert} className="w-[clamp(6.5rem,14vw,12.5rem)]" />
+          <span className="book-muted pb-2 text-xs">{cert.code.toLowerCase()}</span>
         </div>
       )}
     </div>
@@ -127,7 +125,7 @@ type Flip = { dir: 'next' | 'prev' } | null
  * lombada; mobile: uma página. Virar = folha girando na lombada (rotateY, 700ms) com sombra que
  * acompanha. Setas, teclado (← →), clique na página e swipe; reduced-motion troca sem girar.
  */
-export function TrajectoryBook({ tone = 'paper' }: { tone?: BookTone }) {
+export function TrajectoryBook() {
   const [single, setSingle] = useState(() => window.matchMedia('(max-width: 767px)').matches)
   const [reduced] = useState(() => window.matchMedia(reducedQuery).matches)
   const [pos, setPos] = useState(0) // primeira página visível (par no spread)
@@ -203,7 +201,7 @@ export function TrajectoryBook({ tone = 'paper' }: { tone?: BookTone }) {
   } as CSSProperties
 
   return (
-    <div className={`book-root book-${tone}`} style={vars}>
+    <div className="book-root" style={vars}>
       <div
         role="region"
         aria-roledescription="livro"

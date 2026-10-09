@@ -196,23 +196,13 @@ html::-webkit-scrollbar {
 
 /* livro da trajetória (TrajectoryBook): papel, lombada e folha girando */
 .book-root {
+  /* papel claro (decisão do Matheus; a variante escura saiu) */
   font-family: var(--font-mono);
-}
-
-.book-paper {
   --book-bg: #f7f6f2;
   --book-fg: #1d1d1f;
   --book-muted: #6b6a66;
   --book-accent: #1d1d1f;
   --book-edge: rgba(0, 0, 0, 0.07);
-}
-
-.book-ink {
-  --book-bg: #1c1b18;
-  --book-fg: #ece6d6;
-  --book-muted: #a39e90;
-  --book-accent: #e0a84a;
-  --book-edge: rgba(255, 255, 255, 0.06);
 }
 
 .book-stage {
