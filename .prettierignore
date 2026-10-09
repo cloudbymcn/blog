@@ -8,3 +8,7 @@ package-lock.json
 *.mdx
 docs
 src/components/Lanyard/Lanyard.tsx
+
+# rascunhos locais dos agentes (não versionados)
+tmp
+.maestri
