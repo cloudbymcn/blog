@@ -1,0 +1,31 @@
+---
+title: "Monitor de casas de temporada para grupo, com rateio"
+slug: monitor-casas-temporada
+summary: "Busca e monitora casas de temporada para um grupo de amigos, avisa quando o preço cai e divide a conta por pessoa, por cota ou pelo peso do quarto. O grupo vota por um link."
+category: produtos
+tier: B
+date: 2026-09-28
+stack: ["React", "Vite", "TypeScript", "Node.js", "AWS Lambda", "API Gateway", "EventBridge", "DynamoDB", "SES", "S3", "CloudFront", "CDK"]
+metrics:
+  - { label: "escolher a casa", before: "grupo no chat", after: "link com votos" }
+  - { label: "dividir a conta", before: "planilha", after: "3 modos de rateio" }
+cover: /projects/monitor-casas-temporada/architecture.svg
+---
+
+Viagem em grupo tem sempre o mesmo roteiro: alguém manda uma dúzia de links no grupo, os preços mudam, ninguém sabe quanto cada um vai pagar e a decisão se arrasta. O monitor junta busca, acompanhamento de preço, votação e rateio numa página só.
+
+<Figure src="/projects/monitor-casas-temporada/architecture.svg" alt={"O grupo acessa por CloudFront uma SPA React e a API em /api, com throttling. Um Scheduler do EventBridge chama de hora em hora um dispatcher que decide quais pesquisas estão vencidas e invoca de forma assíncrona um worker com concorrência máxima de 3. O worker consulta um provedor de anúncios, grava resultados e histórico no DynamoDB e envia alertas pelo SES."} />
+
+**Busca e acompanhamento.** Filtros de destino, datas, hóspedes, quartos, orçamento **total**, diária máxima, comodidades e nota. Cada verificação detecta imóvel novo, que saiu ou voltou, e preço que caiu ou subiu (`↓ R$ 1.900 (-11,3%)`). Histórico só é gravado quando preço ou disponibilidade mudam.
+
+**Rateio** calculado no preço de cada imóvel: por pessoa (casal paga 2×), por cota (cada casal ou individual é uma unidade) ou por peso (suíte 1,3 · quarto 1 · sofá 0,7).
+
+**Decisão em grupo.** Link público `/s/<id>`: quem tem o link vê a pesquisa, compara de 2 a 5 imóveis lado a lado, vê no mapa e vota com um apelido, sem criar conta. Score de 0 a 100 com o cálculo explicado na tela.
+
+**Acesso sem Cognito.** Código de organizador para criar pesquisas (protege as requisições pagas do provedor), chave de edição por pesquisa guardada só como hash SHA-256 e leitura aberta para quem tem o link, com limite de participantes.
+
+<Callout type="info">
+
+Um único stack CDK: CloudFront com OAC e CSP, `/api/*` na mesma origem (sem CORS), Lambdas Node 22 ARM64, segredos no SSM Parameter Store. Mudar o intervalo de monitoramento não exige redeploy: o agendamento roda de hora em hora e o dispatcher decide o que está vencido.
+
+</Callout>

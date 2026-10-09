@@ -1,0 +1,31 @@
+---
+title: "Radar de passagens aéreas: PWA + alertas"
+slug: radar-passagens-aereas
+summary: "Monitor de preço de passagens com ranking dos 5 melhores voos, histórico, estimativa com milhas e alerta por e-mail quando surge um preço menor. Custa menos de R$ 1/mês."
+category: produtos
+tier: B
+date: 2026-08-19
+stack: ["PWA", "Node.js", "AWS Lambda", "API Gateway", "EventBridge", "DynamoDB", "SES", "S3", "CloudFront", "PowerShell"]
+metrics:
+  - { label: "checar preço", before: "abrir site todo dia", after: "a cada 30 min" }
+  - { label: "histórico de preço", before: "nenhum", after: "60 dias" }
+cover: /projects/radar-passagens-aereas/architecture.svg
+---
+
+Preço de passagem muda várias vezes por dia. Em vez de abrir o buscador toda manhã, o radar confere sozinho, guarda o histórico e manda e-mail quando aparece um preço melhor que o melhor já visto.
+
+<Figure src="/projects/radar-passagens-aereas/architecture.svg" alt={"Um agente local agendado no Windows a cada 30 minutos busca preços num buscador de voos com navegador headless, porque o buscador bloqueia IPs de nuvem, e envia os resultados para a API Gateway com chave de API. Na AWS, um Scheduler do EventBridge chama a Lambda de checagem, que ranqueia e grava no DynamoDB o último ranking, o melhor preço e o histórico, e dispara alerta pelo SES. O PWA lê tudo pela API."} />
+
+**O problema que mudou a arquitetura.** A checagem foi escrita para rodar numa Lambda com Chromium headless, mas o buscador **bloqueia IPs da AWS**. Outros buscadores bloqueavam navegador headless até em IP residencial (testado). A saída foi um **agente local**: o mesmo código de busca, agendado no Windows a cada 30 min, enviando o resultado para a API. A nuvem continua com o que faz bem: guardar, comparar e avisar. Uma API de voos oficial pode entrar como segunda fonte, com merge pelo menor preço.
+
+**Dados.** Tabela DynamoDB única: configuração (rota, datas, horários, e-mails, intervalo), último ranking, melhor preço histórico, série temporal com TTL de 60 dias e status da última verificação.
+
+**Milhas.** Com as carteiras cadastradas, o app estima o desconto quando a companhia casa com o programa, usando um valor de milheiro configurável.
+
+**Alertas.** E-mail imediato quando surge um novo primeiro lugar mais barato e um resumo diário às 7h.
+
+<Callout type="info">
+
+Custo dentro do free tier: ~48 execuções/dia de Lambda, DynamoDB on-demand, CloudFront e S3 com centavos, SES ~US$ 0,01/mês.
+
+</Callout>
