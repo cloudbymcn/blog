@@ -118,7 +118,7 @@ export function Hero() {
         className="lc pointer-events-none absolute bottom-6 right-[27%] z-0 hidden translate-x-1/2 text-xs text-ink-3 md:block"
         aria-hidden="true"
       >
-        Try dragging
+        Arraste o crachá
       </p>
     </section>
   )
