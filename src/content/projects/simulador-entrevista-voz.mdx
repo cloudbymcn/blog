@@ -1,0 +1,116 @@
+---
+title: "Simulador de entrevista AWS e conversa em inglês, por voz"
+slug: simulador-entrevista-voz
+summary: "PWA para treinar inglês falando com uma IA: entrevista técnica AWS ou papo livre, com Bedrock e Polly orquestrados por Lambda via WebSocket. ~US$ 18/mês."
+category: ia
+tier: A
+date: 2026-05-06
+stack: ["Next.js", "PWA", "Tailwind", "shadcn/ui", "TypeScript", "AWS Lambda", "API Gateway", "Cognito", "DynamoDB", "S3", "SST", "Bedrock (Claude)"]
+cover: /projects/simulador-entrevista-voz/architecture.svg
+---
+
+Ler documentação em inglês eu já fazia todo dia. Falar, não. E entrevista técnica em inglês é o pior lugar para descobrir que você trava na hora de explicar por que escolheu DynamoDB e não RDS.
+
+Aplicativo de idioma treina vocabulário, não conversa técnica. Aula particular resolve, mas tem horário. Eu queria algo no celular, a qualquer hora, que me entrevistasse como um arquiteto sênior da AWS ou só batesse papo, e no fim me dissesse onde eu errei.
+
+<Figure src="/projects/simulador-entrevista-voz/architecture.svg" alt={"O PWA captura o microfone e transcreve no navegador com Web Speech API, autentica no Cognito e abre um WebSocket no API Gateway. Uma Lambda orquestradora manda o texto para o Claude no Bedrock e a resposta para o Polly, devolvendo áudio. Sessões e relatórios ficam no DynamoDB; o áudio só vai para o S3 se o usuário ativar. Transcribe streaming no servidor é o próximo passo."} caption={"Um WebSocket por sessão; a Lambda devolve texto e áudio."} />
+
+## Dois modos, um pipeline
+
+| | Interview | Conversation |
+| --- | --- | --- |
+| Persona | Solutions Architect sênior entrevistando | amigo nativo, casual, opinativo |
+| Ritmo | pergunta → resposta → follow-up | conversa livre, pode discordar e mudar de assunto |
+| Correção | silenciosa, agregada no relatório | inline e gentil ("more natural would be…") |
+| Duração | 15/30/45 min com timer | até você parar |
+| Relatório | score técnico + gramática | erros + vocabulário novo |
+
+A troca de modo é só **system prompt** e campo `mode` na sessão. O caminho fala → texto → LLM → voz é o mesmo, o que simplificou tudo: um orquestrador, dois prompts.
+
+## Como uma sessão funciona
+
+<Steps>
+<Step n={1}>
+
+O PWA autentica no **Cognito** e abre um WebSocket no **API Gateway** com o JWT. A Lambda de `$connect` valida o token e cria a sessão no DynamoDB.
+
+</Step>
+<Step n={2}>
+
+O navegador transcreve a fala e envia o turno quando você termina de falar. Detecção de fim de turno por silêncio mantém a conversa natural.
+
+</Step>
+<Step n={3}>
+
+A Lambda manda o histórico para o **Claude no Bedrock**, que responde no papel do modo escolhido.
+
+</Step>
+<Step n={4}>
+
+A resposta passa pelo **Polly** (voz neural) e volta pelo mesmo WebSocket como áudio em base64. O texto aparece na tela junto.
+
+</Step>
+<Step n={5}>
+
+No `$disconnect`, um gerador de relatório analisa o transcript inteiro e grava o resultado no DynamoDB.
+
+</Step>
+</Steps>
+
+O alvo de latência é **menos de 1,5 s** entre você parar de falar e a voz começar. Para chegar lá, o prompt de sistema usa cache do Bedrock, e o plano é sintetizar a resposta em pedaços, sem esperar o texto completo.
+
+## Decisões que valeram a pena
+
+<Card title="PWA em vez de app nativo">
+
+Instalado na tela inicial do celular, cobre iPhone e Android sem loja. O custo é lidar com as limitações do Safari, que apareceram logo (abaixo).
+
+</Card>
+
+<Card title="SST v3 sobre CDK, monorepo pnpm">
+
+Reaproveitei a estrutura de outro projeto meu com a mesma stack: Next.js + Lambda em TypeScript, uma linguagem do front ao back, AWS SDK v3. Boa parte do boilerplate de backend já existia, e o deploy é `sst deploy`.
+
+</Card>
+
+<Card title="Áudio só com opt-in">
+
+Por padrão a sessão guarda só o transcript. Gravar áudio no S3 é um toggle explícito antes de começar, com lifecycle no bucket.
+
+</Card>
+
+<Card title="Sem Provisioned Concurrency">
+
+Para 10 sessões por mês, pagar Lambda quente o tempo todo não faz sentido. Um cold start no primeiro turno é aceitável.
+
+</Card>
+
+## O problema do iOS
+
+A Web Speech API funciona bem no Chrome, mas no Safari do iPhone é limitada e instável. A primeira versão já saiu com fallback: um toggle "Use text input" na configuração, para digitar quando a voz não está disponível. A resposta continua chegando em áudio.
+
+<Callout type="info">
+
+**Próximo passo:** transcrição com Amazon Transcribe Streaming direto do navegador, usando credenciais temporárias de um Cognito Identity Pool. Isso tira a dependência da Web Speech API e iguala a experiência entre iOS e Android.
+
+</Callout>
+
+## Quanto custa
+
+A estimativa para o meu uso real, 10 sessões de 30 minutos por mês, misturando os dois modos:
+
+<CostCompare>
+<CostBar label="Polly (voz neural)" value="US$ 8,00" pct={44} variant="new" />
+<CostBar label="Transcrição" value="US$ 7,20" pct={39} variant="new" />
+<CostBar label="Bedrock (com cache de prompt)" value="US$ 1,80" pct={10} variant="new" />
+<CostBar label="Lambda + API Gateway + DynamoDB + S3 + CloudFront" value="US$ 1,30" pct={7} variant="new" />
+</CostCompare>
+
+<Metrics>
+<Metric value="~US$ 18" label="por mês (10 × 30 min)" />
+<Metric value="< 1,5 s" label="alvo da pausa até a voz" />
+<Metric value="2" label="modos com o mesmo pipeline" />
+<Metric value="0" label="servidores para manter" />
+</Metrics>
+
+A linha mais cara é a voz, não o LLM. Com cache de prompt, o Claude custa menos que a transcrição. Conversa longa demais é o único jeito de estourar a estimativa, e o controle é simples: a duração da sessão.

@@ -1,0 +1,90 @@
+---
+title: "Digital Twin 3D de uma planta industrial, no navegador"
+slug: digital-twin-3d
+summary: "Planta DWG, ortofoto e fotos de drone viraram um mapa 3D navegável de 7 galpões, com busca em português, estoque real e 60 fps no notebook."
+category: produtos
+tier: A
+date: 2026-10-08
+stack: ["three.js", "React", "TypeScript", "Vite", "AWS Lambda", "API Gateway", "DynamoDB", "CloudFront", "S3", "SAM", "Bedrock"]
+metrics:
+  - { label: "GPU de perto", before: "~30 ms", after: "~13 ms" }
+  - { label: "miniatura", before: "860 KB", after: "8,5 KB" }
+cover: /projects/digital-twin-3d/architecture.svg
+---
+
+Em uma indústria de rochas ornamentais no ES, a pergunta mais comum do dia é "onde está?". Onde está a estiva B1-P33, onde está o bloco que o cliente reservou, onde fica o rack de rede do galpão 2. A resposta morava na cabeça de quem anda pelo pátio, em planilhas e num ERP legado que sabe o nome do local, mas não sabe onde ele fica.
+
+O Digital Twin começou como um mapa 3D da planta e virou a base espacial para logística, produção e TI: sete galpões, docas, pátio de blocos e equipamentos, navegáveis no navegador do notebook, do iPad e do celular.
+
+<Figure src="/projects/digital-twin-3d/architecture.svg" alt={"A planta DWG e as fotos de drone são reconstruídas em arquivos JSON validados com zod e montam o PlantModel, contrato único consumido pela cena React Three Fiber e pelo Orbe Assistente. O build estático vai para CloudFront e S3; a API passa por API Gateway com JWT do Entra ID até uma Lambda arm64 na VPC, que lê ativos e uma cópia do estoque no DynamoDB e, opcionalmente, chama o Bedrock para texto e voz."} caption={"Os dados entram por um contrato só; trocar JSON por API muda uma peça."} />
+
+## Da planta DWG ao PlantModel
+
+A geometria saiu de três fontes: a planta DWG oficial, a ortofoto e fotos de drone. Galpões, pilares, docas e áreas externas viraram JSON em `public/data/`, validados com zod na carga. Cada elemento carrega a **confiança da fonte**. Limite inferido é desenhado tracejado, e um modo "colorir por confiança" pinta tudo de verde, âmbar ou vermelho.
+
+Tudo isso monta o `PlantModel`, o único contrato que a interface conhece. Quando o JSON estático der lugar a uma API, só o `DataSource` muda.
+
+<Callout type="info">
+
+**Honestidade dos dados como requisito.** As estivas têm nome, código e etiqueta reais do ERP, mas posição ilustrativa até a organização em campo. Chapas desenhadas levam selo DEMO. Pessoas e veículos animados são decorativos, não rastreamento. A interface diz isso em cada card.
+
+</Callout>
+
+## Câmera que conta onde você está
+
+O `CameraDirector` transforma toda mudança de contexto em voo com easing: planta → galpão → área → ativo. Ao escolher um galpão, o telhado some, as paredes voltadas para a câmera baixam (cutaway, como no The Sims) e o resto da planta perde saturação. Isométrica é o padrão; dá para alternar para perspectiva ou planta e girar 90°.
+
+Rótulos têm três níveis de detalhe (LOD 0/1/2) pela largura visível: de longe, só galpões; de perto, IDs das estivas e nomes das máquinas. Rótulo nunca sobrepõe outro, e o que está atrás de parede some (oclusão com `three-mesh-bvh`).
+
+No galpão piloto existe ainda o **Walk Mode**: um avatar genérico com EPI em terceira pessoa, WASD ou joystick no tablet, colisão com estivas e máquinas numa grade caminhável de 0,25 m gerada a partir dos mesmos dados.
+
+## Busca em português, sem LLM no caminho crítico
+
+O Orbe Assistente (tecla `/`) entende "onde está o G5", "me leva no galpão cinco", "onde tem Alga Green no G1" ou um código de estiva. Um **parser local** resolve a frase em intenção e alvo. Se há mais de um resultado, vira escolha ("6 docas — qual delas?"). Se não existe, vira explicação com o próximo passo.
+
+A IA (Bedrock: Nova Micro para texto, Nova Sonic para voz) é opcional e desligada por padrão. Ela só entra quando o parser não entende a frase, devolve uma intenção que é validada e convertida num comando seguro, e tem travas de custo no backend: US$ 5/dia e US$ 50/mês em dev.
+
+## Estoque real, somente leitura
+
+O card de um local mostra cavaletes, chapas, material, m² e galeria de fotos, lidos de cópias em DynamoDB que outro sistema já mantinha a partir do ERP. Nenhuma escrita no ERP. Busca por código de barras da chapa resolve mesmo com só 2 ou 3 dígitos, conferindo no estoque.
+
+Medido: busca ~340 ms, card do local p50 195 ms (0–2 ms em cache). As miniaturas WebP geradas pelo Twin têm 8,5 KB, contra 860 KB da foto original.
+
+## Performance como feature
+
+A cena roda com `frameloop="demand"`: parada, não renderiza. O resto foi medição em 6 tamanhos de tela com Playwright e ajuste:
+
+<Steps>
+<Step n={1}>
+
+Presets Médio e Baixo **sem composer** de pós-processamento, com contorno na própria cena. IBL só nos metais, pedra em textura, instâncias desenhadas da frente para trás.
+
+</Step>
+<Step n={2}>
+
+**Bolha de detalhe**: chapa a chapa só perto do centro da vista, reordenando instâncias e ajustando `count`.
+
+</Step>
+<Step n={3}>
+
+Resolução dinâmica quando o FPS cai. O `backdrop-filter` da UI foi descartado: custava ~9 fps no galpão mais pesado em 1920 px.
+
+</Step>
+</Steps>
+
+<Metrics>
+<Metric value="~30 → ~13 ms" label="GPU, galpão piloto de perto, 1920×1080" />
+<Metric value="60 fps" label="notebook" />
+<Metric value="~50 fps" label="iPad deitado" />
+<Metric value="2.780" label="estivas em 172 fileiras" />
+</Metrics>
+
+## Deploy
+
+O backend é um template SAM: HTTP API com autorizador JWT do Entra ID, Lambda arm64 dentro da VPC, DynamoDB com PITR, S3 privado com CloudFront e OAC, `/api/*` no mesmo domínio e CSP. Escrita só com papel de edição no Entra, com auditoria no CloudWatch. Segredo de integração entra sem valor no template. Os custos do projeto aparecem numa aba própria, com orçamento AWS de US$ 25/mês.
+
+<Card title="O que fez diferença">
+
+Um contrato de dados único e honesto sobre a própria precisão. Isso permitiu crescer em camadas (Wi-Fi, racks, estoque, voz) sem reescrever a cena, e evitou que um mapa bonito fosse lido como verdade operacional antes da hora.
+
+</Card>

@@ -1,0 +1,105 @@
+---
+title: "IA explicável para classificar chapas de rocha"
+slug: classificador-chapas-ia
+summary: "POC que analisa fotos de chapas por regiões, sugere a classe com probabilidades e evidências e deixa a decisão final para o especialista. ~US$ 0,027 por chapa."
+category: ia
+tier: A
+date: 2026-10-01
+stack: ["Bedrock (Claude)", "React", "three.js", "TypeScript", "Node.js", "GitHub Actions"]
+metrics:
+  - { label: "sugestão por chapa", before: "só a olho", after: "~9 s" }
+  - { label: "custo por chapa", before: "teto US$ 5/dia", after: "~US$ 0,027" }
+cover: /projects/classificador-chapas-ia/architecture.svg
+---
+
+Numa indústria de rochas ornamentais, cada chapa polida recebe uma classe: 1ST, STANDARD ou COMERCIAL. A classe define preço e destino. Quem decide é um especialista olhando a chapa, procurando trinca, fissura, "mula" (mancha ou inclusão fora do padrão) e defeito de borda. É um trabalho visual, repetitivo e difícil de padronizar entre turnos.
+
+A pergunta da POC não foi "a IA consegue classificar?", e sim: **a IA consegue sugerir uma classe e mostrar por quê, de um jeito que o especialista confie ou corrija em segundos?**
+
+<Figure src="/projects/classificador-chapas-ia/architecture.svg" alt={"Fotos de chapas entram numa fila com retry e timeout. A visão clássica encontra regiões candidatas com análise em espaço Lab e heatmap. O Claude no Bedrock analisa só os recortes dessas regiões; um decisor, que pode ser um LLM ou as regras v0, transforma os achados em probabilidade por classe. A explicação chega à interface por SSE, o especialista confirma ou corrige e a revisão fica gravada. Um orçamento diário e mensal trava a IA quando estoura."} caption={"Visão clássica → IA nos recortes → decisão → explicação → humano."} />
+
+## A IA sugere; a produção decide
+
+Essa frase está no topo do README e guiou todas as decisões. O resultado de cada chapa traz:
+
+- a classe sugerida e a **probabilidade de cada classe**;
+- as **evidências** (tipo de achado, confiança, região);
+- as **regiões que pesaram**, desenhadas sobre a chapa;
+- as versões do pipeline, do modelo, do decisor e das regras.
+
+O especialista confirma ou corrige com motivo. O resultado é imutável; as revisões só acumulam. Uma aba **IA × Humano** mostra onde os dois discordam, que é exatamente o dado necessário para calibrar.
+
+## Pipeline em 6 estágios
+
+<Steps>
+<Step n={1}>
+
+**Preparação:** o upload é validado pelo conteúdo (bytes iniciais, decodificação real, tamanho e resolução mínima), não pela extensão.
+
+</Step>
+<Step n={2}>
+
+**Segmentação:** contorno da chapa contra o fundo.
+
+</Step>
+<Step n={3}>
+
+**Regiões (visão clássica):** grade em espaço Lab com correção do gradiente de luz, detecção robusta de anomalias, heatmap e regiões P1…Pn. Também saem cantos, bordas e a direção do veio.
+
+</Step>
+<Step n={4}>
+
+**IA visual:** o Claude no Bedrock recebe a chapa inteira e os **recortes das regiões candidatas**, e responde num formato validado.
+
+</Step>
+<Step n={5}>
+
+**Decisão:** um segundo LLM recebe só evidências estruturadas (números e tipos de achado, nunca a imagem) e devolve a probabilidade de cada classe. Sem ele, ou se falhar, valem as regras v0: "mula, trinca ou fissura → STANDARD ou menos".
+
+</Step>
+<Step n={6}>
+
+**Explicação:** classe, probabilidades e evidências em linguagem de chão de fábrica.
+
+</Step>
+</Steps>
+
+<Card title="Por que visão clássica antes da IA">
+
+Mandar só a foto inteira para um modelo multimodal funciona, mas a resposta fica genérica e cara. A visão clássica é determinística, barata e localiza *onde* olhar. A IA entra para interpretar *o que* é aquilo. Cada estágio pode ser testado e trocado isoladamente.
+
+</Card>
+
+## Progresso real, não animação fake
+
+Cada estágio publica um evento por SSE (`/api/events`). A tela acompanha esses eventos: a chapa aparece em WebGL durante o upload, uma varredura percorre a imagem enquanto a análise roda, o heatmap acende e as regiões ligam com linhas até o núcleo.
+
+A fila tem concorrência limitada, timeout por chapa e retry com espera para erro temporário. O job é idempotente: mesma foto e mesmas versões dão o mesmo resultado.
+
+## Custo sob controle
+
+Uma aba **Custos** mostra gasto do dia, do mês, por serviço, por modelo e por chapa, com as últimas chamadas, tokens e tempo. O custo é estimado a partir do registro de cada chamada; a fatura oficial continua sendo a da AWS.
+
+Quando o teto é atingido (padrão US$ 5/dia e US$ 50/mês), as próximas chapas saem só com visão clássica e regras v0, e a tela avisa.
+
+<Metrics>
+<Metric value="~US$ 0,027" label="por chapa (IA visual + decisor)" />
+<Metric value="~9 s" label="por chapa, ponta a ponta" />
+<Metric value="97" label="testes unitários e de integração" />
+<Metric value="51" label="testes E2E (17 fluxos × 3 telas)" />
+</Metrics>
+
+## Testes que pegaram bugs de verdade
+
+O E2E com Playwright roda em desktop, iPad em pé e iPad deitado, com servidor próprio e IA simulada, e reprova se houver erro no console. Marcadores no nome do arquivo simulam situações: `lenta`, `trinca`, `falha-temporaria`, `falha-modelo`. Quatro bugs reais saíram daí, cada um com um teste que impede a volta:
+
+- o retry automático nunca acontecia: a deduplicação da fila descartava o reenfileiramento;
+- chapa preta no canvas: o renderer usava um objeto de uniforms diferente do animado;
+- 404 na prévia: o evento "regiões concluídas" saía antes de a prévia ser gravada;
+- chave React duplicada no gráfico de custos com gasto zero.
+
+<Callout type="info">
+
+**Próximos passos:** medir concordância com mais fotos revisadas, fechar com a produção a definição de "mula" (hoje provisória no prompt), calibrar limiares e publicar com login corporativo, DynamoDB/S3 e fila SQS. Os contratos já separam essas peças.
+
+</Callout>

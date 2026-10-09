@@ -1,0 +1,116 @@
+---
+title: "Salesforce como tabela do DuckDB: uma extensão em C++"
+slug: duckdb-salesforce
+summary: "Extensão open source que expõe objetos do Salesforce como tabelas do DuckDB, com pushdown de SOQL, Bulk API 2.0 e guarda de quota. Joins e Parquet ficam no DuckDB."
+category: ferramentas
+tier: A
+date: 2026-06-08
+stack: ["DuckDB", "Salesforce", "SQL", "GitHub Actions"]
+metrics:
+  - { label: "extração", before: "ETL + CSV", after: "1 SELECT" }
+  - { label: "transporte", before: "manual", after: "REST/Bulk auto" }
+cover: /projects/duckdb-salesforce/architecture.svg
+---
+
+Toda vez que alguém precisa cruzar dados do Salesforce com uma planilha, um CSV de território ou um histórico em Parquet, o caminho costuma ser o mesmo: exportar um relatório, baixar o CSV, limpar no Excel e torcer para não ter estourado o limite de linhas. Quando a análise vira rotina, entra um ETL, e com ele um servidor, um agendamento e mais uma coisa para quebrar.
+
+Eu já tinha escrito uma extensão do DuckDB para ler um ERP legado em Firebird. A pergunta foi: e se o Salesforce também fosse só mais uma tabela?
+
+```sql
+ATTACH 'salesforce://production' AS sf (TYPE salesforce, auth_source 'env');
+
+SELECT a.Name, a.Industry, t.segment
+FROM sf.Account a
+JOIN read_csv_auto('territories.csv') t ON a.BillingState = t.state;
+```
+
+`duckdb-salesforce` é isso: uma extensão C++ que expõe os objetos de uma org como tabelas do DuckDB. É **somente leitura** por design e é uma ponte, não uma plataforma de ETL. Autenticação, transporte, metadados e pushdown seguro moram na extensão; joins, agregações, materialização e exportação ficam com o motor vetorizado do DuckDB.
+
+<Figure src="/projects/duckdb-salesforce/architecture.svg" alt={"O analista roda ATTACH e SELECT no DuckDB. Dentro da extensão, o query builder gera SOQL com pushdown, consulta o catálogo de sObjects e entrega ao transporte, que escolhe entre a REST /query para consultas pequenas e a Bulk API 2.0 para extrações grandes, sempre passando pela guarda de quota. Auth suporta OAuth, JWT e variáveis de ambiente. O resultado pode ser cruzado com Parquet e CSV locais."} caption={"A extensão fala com o Salesforce; o resto é DuckDB."} />
+
+## Reaproveitar o que já funcionava
+
+A arquitetura saiu quase inteira da extensão de Firebird: catálogo/storage extension, scanner paralelo com o ciclo `Bind → InitGlobal → InitLocal → Scan`, query builder com pushdown e append vetorizado direto nos `DataChunk` do DuckDB. O que mudou foi a camada de baixo: em vez do protocolo binário do Firebird sobre TCP, HTTPS com JSON e CSV e tokens OAuth 2.0.
+
+| Firebird | Salesforce |
+| --- | --- |
+| `isc_attach_database` | troca de token OAuth + descoberta do `instance_url` |
+| `RDB$RELATIONS` | Global Describe / `EntityDefinition` |
+| `SELECT … ROWS m TO n` | SOQL `LIMIT` + paginação por locator |
+| loop de fetch | página JSON (`records[]`) ou CSV em streaming |
+
+A diferença de verdade é que o Salesforce tem **várias APIs de transporte com quotas publicadas e rígidas**. Isso não existe no Firebird, e virou a parte mais interessante do projeto.
+
+## REST ou Bulk: a extensão escolhe
+
+A REST `/query` devolve até 2.000 registros por página. Cada página é uma chamada contra o limite diário da org. Para consultas interativas é ótima: latência baixa, sem job assíncrono. Para extrair 1 milhão de linhas, são ~500 chamadas.
+
+A Bulk API 2.0 cria um job, espera o Salesforce processar e entrega o resultado em CSV paginado. Tem overhead de criação e polling, mas a partir de ~10 mil registros fica de 2 a 6 vezes mais rápida e quase não gasta chamadas.
+
+```sql
+SET sf_force_transport = 'auto';  -- rest | bulk | auto
+SET sf_bulk_chunks = 4;           -- PK chunking paralelo, opt-in
+
+SELECT count(*) FROM sf.Account;
+SELECT * FROM salesforce_last_transport();  -- qual caminho foi usado e por quê
+```
+
+No modo `auto`, a extensão decide pelo tamanho estimado e explica a decisão numa função de diagnóstico. Os dois caminhos fazem streaming preguiçoso: se o DuckDB já tem as linhas que o `LIMIT` pediu, as próximas páginas nem são baixadas.
+
+<Callout type="warn">
+
+**Bulk não aceita tudo.** Campos blob/base64 não existem no CSV da Bulk API 2.0. Em vez de falhar no meio do job, a extensão bloqueia antes de criar o job e diz qual campo causou o bloqueio.
+
+</Callout>
+
+## Pushdown só quando é seguro
+
+Mandar trabalho para o Salesforce economiza rede e quota, mas SOQL não é SQL. A regra foi: empurrar só o que tem semântica idêntica dos dois lados.
+
+<Steps>
+<Step n={1}>
+
+**Projeção:** só as colunas usadas no `SELECT` entram no SOQL.
+
+</Step>
+<Step n={2}>
+
+**Comparações simples** (`=`, `!=`, `<`, `>=`…) e `IS NULL` viram `WHERE` exato. `IN`, `LIKE` e `OR` vão como pré-filtro mais largo e continuam como filtro residual: o DuckDB refina. O resultado é sempre correto; o pushdown só reduz o que trafega.
+
+</Step>
+<Step n={3}>
+
+**`COUNT(*)`** vai como `SELECT COUNT()` direto. Agregações com `GROUP BY` ficam numa função explícita, `salesforce_aggregate()`, para ninguém ser surpreendido.
+
+</Step>
+<Step n={4}>
+
+**Registros apagados** só aparecem quando pedidos, via `queryAll`.
+
+</Step>
+</Steps>
+
+## Quota é recurso de produção
+
+Uma análise mal escrita não pode derrubar as integrações da empresa. Antes de cada scan, a extensão consulta `/limits` (com cache curto) e recusa a consulta se o saldo de chamadas diárias estiver abaixo de um piso configurável. `salesforce_query_cost()` mostra quantas páginas e chamadas uma consulta gastou.
+
+## Segredos fora do SQL
+
+Quatro fontes de credencial: opções inline (só para desenvolvimento), variáveis de ambiente, URL de auth do Salesforce CLI e JWT bearer com chave RSA para jobs servidor-a-servidor. Token, chave e dado da org nunca vão para log. O smoke test contra uma org real é manual e documentado; o CI nunca fala com o Salesforce nem precisa de segredo.
+
+## Resultado
+
+<Metrics>
+<Metric value="v0.9.1" label="release atual" />
+<Metric value="3" label="SOs no CI (Linux, Windows, macOS arm64)" />
+<Metric value="2–6×" label="Bulk vs REST em extração grande" />
+<Metric value="MIT" label="licença" />
+</Metrics>
+
+Hoje funcionam `ATTACH` nativo, scans REST e Bulk com streaming, escolha automática de transporte, PK chunking paralelo, guarda de quota, relacionamentos pai e avô como `STRUCT`, metadados de picklist e record type e agregações no servidor. Fica para depois o pushdown transparente de `MIN`/`MAX`, que exige reescrever o plano no otimizador do DuckDB. Escrita no Salesforce está fora do escopo.
+
+<Card title="O que eu levaria para outro conector SaaS">
+
+Catálogo, scanner, type mapper e append são genéricos. O que muda de SaaS para SaaS é o transporte e a política de quota. Separar essas duas camadas desde o início fez a extensão de Firebird virar a de Salesforce em uma semana. O próximo conector deve sair ainda mais rápido.
+
+</Card>
