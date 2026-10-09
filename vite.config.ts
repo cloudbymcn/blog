@@ -5,27 +5,23 @@ import mdx from '@mdx-js/rollup'
 import remarkFrontmatter from 'remark-frontmatter'
 import remarkMdxFrontmatter from 'remark-mdx-frontmatter'
 import remarkGfm from 'remark-gfm'
+import rehypeSlug from 'rehype-slug'
 import rehypeShiki from '@shikijs/rehype'
+import { projectsIndex } from './scripts/vite/projects-index'
 
 export default defineConfig({
   base: '/',
   plugins: [
+    projectsIndex(),
     {
       enforce: 'pre',
       ...mdx({
         providerImportSource: '@mdx-js/react',
         remarkPlugins: [remarkFrontmatter, [remarkMdxFrontmatter, { name: 'frontmatter' }], remarkGfm],
-        rehypePlugins: [[rehypeShiki, { theme: 'github-dark-default' }]],
+        rehypePlugins: [rehypeSlug, [rehypeShiki, { theme: 'github-dark-default' }]],
       }),
     },
     react({ include: /\.(jsx|js|mdx|md|tsx|ts)$/ }),
     tailwindcss(),
   ],
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: { three: ['three'] },
-      },
-    },
-  },
 })

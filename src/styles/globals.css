@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './tokens.css';
+@plugin '@tailwindcss/typography';
 
 @theme inline {
   --color-bg: var(--bg);
@@ -132,4 +133,43 @@ body {
 
 .scroll-hint {
   animation: scroll-hint 2s ease-in-out infinite;
+}
+
+/* conteúdo markdown dentro dos componentes MDX (que são not-prose) */
+.mdx-inner > * + * {
+  margin-top: 0.75em;
+}
+
+.mdx-inner a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.mdx-inner code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  color: var(--ink);
+}
+
+.mdx-inner ul {
+  list-style: disc;
+  padding-left: 1.25em;
+}
+
+.mdx-inner ol {
+  list-style: decimal;
+  padding-left: 1.25em;
+}
+
+.prose details {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.prose summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
 }

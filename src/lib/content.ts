@@ -1,4 +1,5 @@
-import type { ComponentType } from 'react'
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
+import index from 'virtual:projects-index' // só frontmatter (scripts/vite/projects-index.ts)
 import { isAwsService } from './stack'
 
 export type Category = 'cloud' | 'integracoes' | 'ia' | 'produtos' | 'ferramentas'
@@ -32,51 +33,34 @@ export interface ProjectMeta {
   live?: string
 }
 
-const metas = import.meta.glob<ProjectMeta>('../content/projects/*.mdx', {
-  eager: true,
-  import: 'frontmatter',
-})
-
 const bodies = import.meta.glob<{ default: ComponentType }>('../content/projects/*.mdx')
 
 function toDateString(d: unknown): string {
   return d instanceof Date ? d.toISOString().slice(0, 10) : String(d ?? '')
 }
 
-/** Índice de projetos, mais recente primeiro. */
-export const projects: ProjectMeta[] = Object.entries(metas)
-  .map(([path, m]) => ({
+const entries = index.map(({ file, ...raw }) => {
+  const m = raw as Partial<ProjectMeta>
+  const meta = {
     ...m,
-    slug:
-      m.slug ??
-      path
-        .split('/')
-        .pop()!
-        .replace(/\.mdx$/, ''),
+    slug: m.slug ?? file.replace(/\.mdx$/, ''),
     date: toDateString(m.date),
     stack: m.stack ?? [],
-  }))
-  .sort((a, b) => b.date.localeCompare(a.date))
+  } as ProjectMeta
+  return { meta, path: `../content/projects/${file}` }
+})
 
-const pathBySlug = new Map(
-  Object.entries(metas).map(([path, m]) => [
-    m.slug ??
-      path
-        .split('/')
-        .pop()!
-        .replace(/\.mdx$/, ''),
-    path,
-  ]),
-)
+/** Índice de projetos, mais recente primeiro. */
+export const projects: ProjectMeta[] = entries.map((e) => e.meta).sort((a, b) => b.date.localeCompare(a.date))
 
 export function getProject(slug: string): ProjectMeta | undefined {
   return projects.find((p) => p.slug === slug)
 }
 
-export function loadProjectBody(slug: string): Promise<{ default: ComponentType }> | undefined {
-  const path = pathBySlug.get(slug)
-  return path ? bodies[path]() : undefined
-}
+/** Corpo MDX de cada projeto como componente lazy (um chunk por projeto). */
+export const projectBodies: Record<string, LazyExoticComponent<ComponentType>> = Object.fromEntries(
+  entries.filter((e) => bodies[e.path]).map((e) => [e.meta.slug, lazy(bodies[e.path])]),
+)
 
 export const featured = projects.filter((p) => p.tier === 'A').slice(0, 6)
 
