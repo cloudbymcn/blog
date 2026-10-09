@@ -51,8 +51,15 @@ const structuralPatterns = [
     regex: /\b\d{12}\b/,
   },
   {
-    name: 'AWS ARN',
-    regex: /\barn:aws[a-z0-9-]*:[a-z0-9-]*:[a-z0-9-]*:[0-9]*:[a-z0-9-_/.:]+/,
+    name: 'AWS ARN real ou sensível',
+    regex: /\barn:aws[a-z0-9-]*:[a-z0-9-]*:[a-z0-9-]*:[0-9]*:[a-z0-9-_/.:]+/i,
+    filter: (match) => {
+      // Permitir templates e ARNs gerenciados públicos da AWS (conforme contrato Cartógrafo)
+      if (match.includes(':aws:policy/')) return false
+      if (match.includes('::foundation-model/')) return false
+      if (match.includes('ACCOUNT_ID') || match.includes('${') || match.includes('<')) return false
+      return true
+    },
   },
   {
     name: 'AWS Access Key ID',
