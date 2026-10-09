@@ -1,17 +1,26 @@
+/* SPEC §0-bis: fundo branco, glass, tipografia Apple, acento único #0071e3 */
 :root {
-  --bg: #09090b;
-  --bg-2: #121214;
-  --ink: #f4f4f5;
-  --ink-2: #a1a1aa;
-  --ink-3: #71717a;
-  --accent: #38bdf8;
-  --accent-2: #f59e0b;
-  --ring: rgba(56, 189, 248, 0.35);
-  --line: rgba(244, 244, 245, 0.08);
+  --bg: #ffffff;
+  --bg-2: #f5f5f7;
+  --ink: #1d1d1f;
+  --ink-2: #6e6e73;
+  --ink-3: #86868b;
+  --accent: #0071e3;
+  --ring: rgba(0, 113, 227, 0.25);
+  --line: rgba(0, 0, 0, 0.08);
 
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+  --glass-blur: blur(20px) saturate(180%);
 
-  --nav-h: 64px;
+  --font-display:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Inter, system-ui,
+    sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Inter, system-ui,
+    sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --nav-h: 52px;
 }

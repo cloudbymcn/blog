@@ -68,26 +68,28 @@ export function Project() {
       <meta property="og:description" content={p.summary} />
       {p.cover && <meta property="og:image" content={`https://cloudbymcn.com${p.cover}`} />}
 
-      <header className="border-b border-line">
+      <header className="border-b border-line bg-bg-2">
         <div className="mx-auto max-w-6xl px-5 pb-12 pt-12 md:px-8">
-          <Link to="/projetos" className="font-mono text-xs text-ink-3 hover:text-accent">
-            ← Todos os projetos
+          <Link to="/projetos" className="text-sm text-accent hover:underline">
+            ‹ Todos os projetos
           </Link>
-          <p className="mt-6 font-mono text-xs uppercase tracking-[0.2em] text-accent">
+          <p className="mt-8 text-sm font-medium text-ink-2">
             {CATEGORIES[p.category] ?? p.category} · {formatDate(p.date)}
           </p>
-          <h1 className="mt-3 max-w-4xl font-display text-3xl font-semibold leading-tight tracking-tight md:text-5xl">
+          <h1 className="mt-2 max-w-4xl font-display text-4xl font-semibold leading-[1.08] tracking-[-0.02em] md:text-6xl">
             {p.title}
           </h1>
-          <p className="mt-4 max-w-3xl text-lg text-ink-2">{p.summary}</p>
+          <p className="mt-5 max-w-3xl text-xl leading-relaxed text-ink-2">{p.summary}</p>
           {p.metrics && p.metrics.length > 0 && (
             <dl className="mt-8 flex flex-wrap gap-3">
               {p.metrics.map((m) => (
-                <div key={m.label} className="rounded-xl border border-line bg-bg-2 px-4 py-3">
-                  <dt className="font-mono text-[11px] uppercase tracking-wider text-ink-3">{m.label}</dt>
+                <div key={m.label} className="glass rounded-2xl px-5 py-4">
+                  <dt className="text-xs font-medium text-ink-2">{m.label}</dt>
                   <dd className="mt-1">
                     <span className="text-ink-3 line-through decoration-ink-3/60">{m.before}</span>{' '}
-                    <span className="font-display text-xl font-semibold text-accent">→ {m.after}</span>
+                    <span className="font-display text-xl font-semibold tracking-[-0.02em] text-ink">
+                      → {m.after}
+                    </span>
                   </dd>
                 </div>
               ))}
@@ -97,7 +99,7 @@ export function Project() {
             <img
               src={p.cover}
               alt={`Capa: ${p.title}`}
-              className="mt-10 w-full rounded-2xl border border-line bg-bg-2 object-cover"
+              className="mt-12 w-full rounded-3xl border border-line bg-white object-cover shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
               fetchPriority="high"
             />
           )}
@@ -107,7 +109,7 @@ export function Project() {
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-5 pt-12 md:px-8 lg:grid-cols-[minmax(0,1fr)_240px]">
         <section
           ref={articleRef}
-          className="prose prose-invert max-w-none prose-headings:font-display prose-headings:tracking-tight prose-a:text-accent prose-code:before:content-none prose-code:after:content-none prose-pre:border prose-pre:border-line"
+          className="prose prose-lg max-w-none prose-headings:font-display prose-headings:font-semibold prose-headings:tracking-[-0.02em] prose-headings:text-ink prose-p:text-ink/85 prose-a:text-accent prose-a:no-underline hover:prose-a:underline prose-strong:text-ink prose-code:text-ink prose-code:before:content-none prose-code:after:content-none prose-pre:rounded-2xl"
         >
           <MDXProvider components={mdxComponents}>
             <Suspense
@@ -116,7 +118,7 @@ export function Project() {
                   {[90, 75, 85, 60].map((w) => (
                     <div
                       key={w}
-                      className="h-4 animate-pulse rounded bg-white/5"
+                      className="h-4 animate-pulse rounded bg-black/5"
                       style={{ width: `${w}%` }}
                     />
                   ))}
@@ -131,7 +133,7 @@ export function Project() {
         <aside className="space-y-10 lg:sticky lg:top-[calc(var(--nav-h)+2rem)] lg:self-start">
           {toc.length > 0 && (
             <nav aria-label="Nesta página" className="hidden lg:block">
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-3">Nesta página</p>
+              <p className="text-xs font-semibold text-ink">Nesta página</p>
               <ul className="mt-3 space-y-2 border-l border-line text-sm">
                 {toc.map((t) => (
                   <li key={t.id}>
@@ -152,13 +154,13 @@ export function Project() {
           )}
 
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-3">Stack usada</p>
+            <p className="text-xs font-semibold text-ink">Stack usada</p>
             <ul className="mt-3 flex flex-wrap gap-2">
               {p.stack.map((s) => (
                 <li key={s}>
                   <Link
                     to={`/projetos?stack=${encodeURIComponent(s)}`}
-                    className="flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-sm text-ink-2 hover:border-accent hover:text-accent"
+                    className="glass flex items-center gap-1.5 rounded-full px-3 py-1 text-sm text-ink-2 hover:text-accent"
                   >
                     <StackIcon name={s} className="size-3.5" />
                     {s}
@@ -175,7 +177,7 @@ export function Project() {
                   href={p.repo}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-xl border border-line px-4 py-2.5 text-sm hover:border-accent hover:text-accent"
+                  className="glass rounded-full px-4 py-2.5 text-center text-sm font-medium text-accent hover:bg-white"
                 >
                   Código no GitHub ↗
                 </a>
@@ -185,7 +187,7 @@ export function Project() {
                   href={p.live}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-xl border border-line px-4 py-2.5 text-sm hover:border-accent hover:text-accent"
+                  className="glass rounded-full px-4 py-2.5 text-center text-sm font-medium text-accent hover:bg-white"
                 >
                   Ver ao vivo ↗
                 </a>

@@ -19,7 +19,7 @@ function Loop({ items, reverse }: { items: string[]; reverse?: boolean }) {
           <li
             key={i}
             aria-hidden={i >= items.length}
-            className="flex items-center gap-2 rounded-full border border-line bg-bg-2 px-4 py-2 text-sm text-ink-2"
+            className="glass flex items-center gap-2 rounded-full px-4 py-2 text-sm text-ink-2"
           >
             <StackIcon name={name} className="size-4 text-ink" />
             {name}
@@ -32,18 +32,18 @@ function Loop({ items, reverse }: { items: string[]; reverse?: boolean }) {
 
 export function StackLoop() {
   return (
-    <Section id="stack" eyebrow="Stack" title="Ferramentas do dia a dia">
-      <div className="-mx-5 space-y-3 md:-mx-8">
+    <Section id="stack" eyebrow="Stack" title="Ferramentas do dia a dia." tint>
+      <div className="-mx-6 space-y-3 md:-mx-8">
         <Loop items={ROWS[0]} />
         <Loop items={ROWS[1]} reverse />
       </div>
       <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
         {(Object.entries(STACK) as [StackGroup, readonly string[]][]).map(([group, items], i) => (
           <Reveal key={group} delay={(i % 3) * 80}>
-            <h3 className="font-mono text-xs uppercase tracking-[0.18em] text-ink-3">{group}</h3>
+            <h3 className="text-sm font-semibold text-ink">{group}</h3>
             <ul className="mt-3 flex flex-wrap gap-1.5">
               {items.map((s) => (
-                <li key={s} className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-2">
+                <li key={s} className="rounded-full bg-white px-2.5 py-1 text-sm text-ink-2 ring-1 ring-line">
                   {s}
                 </li>
               ))}

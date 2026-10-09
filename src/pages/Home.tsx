@@ -9,8 +9,8 @@ export function Home() {
   return (
     <>
       <Hero />
-      <About />
       <FeaturedProjects />
+      <About />
       <StackLoop />
       <Certs />
       <Contact />

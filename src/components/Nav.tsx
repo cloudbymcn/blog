@@ -31,20 +31,24 @@ export function Nav() {
   const active = useActiveSection(isHome)
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-line bg-bg/70 backdrop-blur-md">
-      <nav className="mx-auto flex h-[var(--nav-h)] max-w-6xl items-center justify-between px-5 md:px-8">
+    // translúcida estilo apple.com (SPEC §0-bis)
+    <header
+      data-lanyard-block
+      className="fixed inset-x-0 top-0 z-50 border-b border-line bg-white/70 backdrop-blur-[20px] backdrop-saturate-[180%]"
+    >
+      <nav className="mx-auto flex h-[var(--nav-h)] max-w-6xl items-center justify-between px-6 md:px-8">
         <Link to="/" className="flex items-center gap-2" aria-label="Cloud by MCN, início">
-          <img src="/img/logo-mcn.png" alt="" width={32} height={32} className="size-8 rounded" />
-          <span className="font-display text-sm font-semibold tracking-tight">cloudbymcn</span>
+          <img src="/img/logo-mcn.png" alt="" width={28} height={28} className="size-7" />
+          <span className="text-sm font-semibold tracking-[-0.01em]">cloudbymcn</span>
         </Link>
-        <ul className="flex items-center gap-1 text-sm">
+        <ul className="flex items-center gap-1 text-[13px]">
           {LINKS.map((l) => (
             <li key={l.to}>
               <NavLink
                 to={isHome ? `/#${l.section}` : l.to}
                 className={({ isActive }) =>
                   `relative rounded-full px-3 py-1.5 transition-colors hover:text-ink ${
-                    (isHome ? active === l.section : isActive) ? 'bg-white/5 text-ink' : 'text-ink-2'
+                    (isHome ? active === l.section : isActive) ? 'text-ink' : 'text-ink/70'
                   }`
                 }
               >

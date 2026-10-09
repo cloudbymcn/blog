@@ -9,7 +9,6 @@
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-accent: var(--accent);
-  --color-accent-2: var(--accent-2);
   --color-line: var(--line);
   --font-display: var(--font-display);
   --font-sans: var(--font-sans);
@@ -26,6 +25,13 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
 }
 
 ::selection {
@@ -83,22 +89,67 @@ body {
   animation: blur-in 0.7s ease-out forwards;
 }
 
-.spotlight-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s;
-  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), var(--ring), transparent 60%);
+/* glass (SPEC §0-bis): cards, nav e chips */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
-.spotlight-card:hover::before {
-  opacity: 0.6;
+/* painel de ajustes do crachá: slider fino e color picker redondo */
+.lanyard-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--accent) var(--pct, 50%), rgba(0, 0, 0, 0.1) var(--pct, 50%));
+  cursor: pointer;
 }
 
-.grain {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+.lanyard-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.lanyard-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.lanyard-color {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  background: none;
+}
+
+.lanyard-color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.lanyard-color::-webkit-color-swatch {
+  border: 0;
+  border-radius: 999px;
+}
+
+.lanyard-color::-moz-color-swatch {
+  border: 0;
+  border-radius: 999px;
 }
 
 @keyframes marquee {
@@ -164,6 +215,10 @@ body {
 /* nomes de evento/ARN longos em código inline não estouram o mobile */
 .prose :not(pre) > code {
   overflow-wrap: anywhere;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+  font-weight: 500;
 }
 
 .prose details {

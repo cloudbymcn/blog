@@ -28,7 +28,7 @@ function Photo({ src, small, decorative }: { src: string; small: string; decorat
 
 export function About() {
   return (
-    <Section id="sobre" eyebrow="Apresentação" title="Quem é o MCN">
+    <Section id="sobre" eyebrow="Apresentação" title="Quem é o MCN.">
       <div className="grid gap-12 md:grid-cols-[1.1fr_1fr]">
         <Reveal>
           {/* TODO Matheus: texto final da apresentação (placeholder baseado na copy atual, SPEC §3) */}

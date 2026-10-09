@@ -3,22 +3,19 @@ import type { ComponentProps, ReactNode } from 'react'
 /** Componentes disponíveis dentro dos MDX (contrato combinado com o Cartógrafo na nota do time). */
 
 const CALLOUT = {
-  info: { border: 'border-accent/40', bg: 'bg-accent/5', label: 'Nota', color: 'text-accent' },
-  success: {
-    border: 'border-emerald-400/40',
-    bg: 'bg-emerald-400/5',
-    label: 'Resultado',
-    color: 'text-emerald-400',
-  },
-  warn: { border: 'border-accent-2/40', bg: 'bg-accent-2/5', label: 'Atenção', color: 'text-accent-2' },
-  danger: { border: 'border-rose-400/40', bg: 'bg-rose-400/5', label: 'Cuidado', color: 'text-rose-400' },
+  // cores de sistema da Apple (modo claro); o fundo fica neutro, só o rótulo e a barra levam cor
+  info: { bar: 'bg-accent', label: 'Nota', color: 'text-accent' },
+  success: { bar: 'bg-[#248a3d]', label: 'Resultado', color: 'text-[#248a3d]' },
+  warn: { bar: 'bg-[#c93400]', label: 'Atenção', color: 'text-[#c93400]' },
+  danger: { bar: 'bg-[#d70015]', label: 'Cuidado', color: 'text-[#d70015]' },
 }
 
 export function Callout({ type = 'info', children }: { type?: keyof typeof CALLOUT; children: ReactNode }) {
   const c = CALLOUT[type] ?? CALLOUT.info
   return (
-    <aside className={`not-prose my-6 rounded-xl border ${c.border} ${c.bg} px-5 py-4`}>
-      <p className={`font-mono text-[11px] uppercase tracking-[0.18em] ${c.color}`}>{c.label}</p>
+    <aside className="not-prose relative my-8 overflow-hidden rounded-2xl bg-bg-2 px-6 py-5">
+      <span className={`absolute inset-y-0 left-0 w-1 ${c.bar}`} aria-hidden="true" />
+      <p className={`text-xs font-semibold ${c.color}`}>{c.label}</p>
       <div className="mdx-inner mt-1 text-ink-2">{children}</div>
     </aside>
   )
@@ -30,9 +27,9 @@ export function Metrics({ children }: { children: ReactNode }) {
 
 export function Metric({ value, label }: { value: ReactNode; label: ReactNode }) {
   return (
-    <div className="rounded-xl border border-line bg-bg-2 px-4 py-3">
-      <p className="font-display text-2xl font-semibold text-accent">{value}</p>
-      <p className="mt-1 font-mono text-[11px] uppercase tracking-wider text-ink-3">{label}</p>
+    <div className="rounded-2xl bg-bg-2 px-5 py-4">
+      <p className="font-display text-3xl font-semibold tracking-[-0.02em] text-ink">{value}</p>
+      <p className="mt-1 text-xs font-medium text-ink-2">{label}</p>
     </div>
   )
 }
@@ -45,7 +42,7 @@ export function Steps({ children }: { children: ReactNode }) {
 export function Step({ n, children }: { n: number | string; children: ReactNode }) {
   return (
     <div className="my-8 flex gap-4">
-      <span className="not-prose flex size-8 shrink-0 items-center justify-center rounded-full border border-accent/40 font-mono text-sm text-accent">
+      <span className="not-prose flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
         {n}
       </span>
       <div className="min-w-0 flex-1 [&>:first-child]:mt-1">{children}</div>
@@ -55,15 +52,15 @@ export function Step({ n, children }: { n: number | string; children: ReactNode 
 
 export function Card({ title, children }: { title?: ReactNode; children: ReactNode }) {
   return (
-    <div className="not-prose my-6 rounded-xl border border-line bg-bg-2 px-5 py-4">
-      {title && <p className="font-display font-semibold text-ink">{title}</p>}
+    <div className="glass not-prose my-8 rounded-3xl px-6 py-5">
+      {title && <p className="font-display text-lg font-semibold tracking-[-0.02em] text-ink">{title}</p>}
       <div className="mdx-inner mt-1 text-ink-2">{children}</div>
     </div>
   )
 }
 
 export function CostCompare({ children }: { children: ReactNode }) {
-  return <div className="not-prose my-8 space-y-3 rounded-xl border border-line bg-bg-2 p-5">{children}</div>
+  return <div className="not-prose my-8 space-y-4 rounded-3xl bg-bg-2 p-6">{children}</div>
 }
 
 export function CostBar({
@@ -82,11 +79,11 @@ export function CostBar({
     <div>
       <div className="flex justify-between text-sm">
         <span className="text-ink-2">{label}</span>
-        <span className={variant === 'old' ? 'text-ink-3' : 'font-semibold text-accent'}>{value}</span>
+        <span className={variant === 'old' ? 'text-ink-2' : 'font-semibold text-ink'}>{value}</span>
       </div>
-      <div className="mt-1.5 h-2 rounded-full bg-white/5">
+      <div className="mt-1.5 h-2 rounded-full bg-black/[0.06]">
         <div
-          className={`h-full rounded-full ${variant === 'old' ? 'bg-ink-3/60' : 'bg-accent'}`}
+          className={`h-full rounded-full ${variant === 'old' ? 'bg-ink-3/50' : 'bg-accent'}`}
           style={{ width: `${w}%` }}
         />
       </div>
@@ -96,11 +93,11 @@ export function CostBar({
 
 export function Instruction({ title, children }: { title?: ReactNode; children: ReactNode }) {
   return (
-    <div className="not-prose my-6 overflow-hidden rounded-xl border border-line">
-      <p className="border-b border-line bg-white/[0.03] px-5 py-2 font-mono text-xs text-ink-2">
+    <div className="glass not-prose my-8 overflow-hidden rounded-3xl">
+      <p className="border-b border-line px-6 py-3 text-sm font-semibold text-ink">
         {title ?? 'Passo a passo'}
       </p>
-      <div className="mdx-inner px-5 py-4 text-ink-2">{children}</div>
+      <div className="mdx-inner px-6 py-5 text-ink-2">{children}</div>
     </div>
   )
 }
@@ -113,7 +110,7 @@ export function Figure({ src, alt, caption }: { src: string; alt: string; captio
         alt={alt}
         loading="lazy"
         decoding="async"
-        className="w-full rounded-xl border border-line bg-bg-2"
+        className="w-full rounded-2xl border border-line bg-white"
       />
       {caption && <figcaption className="mt-2 text-center text-sm text-ink-3">{caption}</figcaption>}
     </figure>

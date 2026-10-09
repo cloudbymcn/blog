@@ -30,7 +30,7 @@ const CHANNELS = [
 
 export function Contact() {
   return (
-    <Section id="contato" eyebrow="Contato" title="Vamos conversar">
+    <Section id="contato" eyebrow="Contato" title="Vamos conversar." tint>
       <p className="max-w-xl text-lg text-ink-2">
         Arquitetura AWS, integrações, automação ou IA aplicada. Me chama em qualquer um destes canais.
       </p>
@@ -43,7 +43,7 @@ export function Contact() {
                 href={c.href}
                 target={external ? '_blank' : undefined}
                 rel={external ? 'noopener noreferrer' : undefined}
-                className="group flex items-center gap-4 rounded-2xl border border-line bg-bg-2 p-5 transition-colors hover:border-accent/50"
+                className="glass group flex items-center gap-4 rounded-3xl p-6 transition-shadow hover:shadow-[0_16px_40px_rgba(0,0,0,0.10)]"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -54,9 +54,7 @@ export function Contact() {
                   <path d={c.path} />
                 </svg>
                 <span className="min-w-0">
-                  <span className="block font-mono text-xs uppercase tracking-wider text-ink-3">
-                    {c.label}
-                  </span>
+                  <span className="block text-xs font-medium text-ink-2">{c.label}</span>
                   <span className="block truncate font-medium">{c.value}</span>
                 </span>
               </a>

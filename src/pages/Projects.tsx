@@ -28,9 +28,7 @@ function Chip({
       aria-pressed={active}
       onClick={onClick}
       className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-        active
-          ? 'border-accent bg-accent/10 text-accent'
-          : 'border-line text-ink-2 hover:border-ink-3 hover:text-ink'
+        active ? 'border-ink bg-ink text-white' : 'glass border-transparent text-ink-2 hover:text-ink'
       }`}
     >
       {children}
@@ -68,8 +66,8 @@ export function Projects() {
         name="description"
         content="Case studies de arquitetura AWS, integrações, IA aplicada e produtos em produção."
       />
-      <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">Portfolio</p>
-      <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight md:text-6xl">Projetos</h1>
+      <p className="text-sm font-medium text-ink-2">Portfolio</p>
+      <h1 className="mt-2 font-display text-5xl font-semibold tracking-[-0.02em] md:text-7xl">Projetos.</h1>
       <p className="mt-4 max-w-2xl text-ink-2">
         {projects.length} projetos: case studies completos e cards curtos. Filtre por categoria, stack ou
         texto.
@@ -84,7 +82,7 @@ export function Projects() {
               value={q}
               onChange={(e) => update((p) => (e.target.value ? p.set('q', e.target.value) : p.delete('q')))}
               placeholder="Buscar por título, resumo ou stack…"
-              className="w-full rounded-xl border border-line bg-bg-2 px-4 py-2.5 text-sm placeholder:text-ink-3 focus:border-accent focus:outline-none"
+              className="glass w-full rounded-2xl px-4 py-3 text-[15px] placeholder:text-ink-3 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             />
           </label>
           <label className="flex items-center gap-2 text-sm text-ink-2">
@@ -94,7 +92,7 @@ export function Projects() {
               onChange={(e) =>
                 update((p) => (e.target.value === 'antigos' ? p.set('ordem', 'antigos') : p.delete('ordem')))
               }
-              className="rounded-xl border border-line bg-bg-2 px-3 py-2.5 text-ink focus:border-accent focus:outline-none"
+              className="glass rounded-2xl px-3 py-3 text-ink focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             >
               <option value="recentes">Mais recentes</option>
               <option value="antigos">Mais antigos</option>
@@ -119,7 +117,7 @@ export function Projects() {
 
         {STACK_COUNTS.length > 0 && (
           <details className="group" open={stack.length > 0}>
-            <summary className="cursor-pointer font-mono text-xs uppercase tracking-[0.18em] text-ink-3 hover:text-ink">
+            <summary className="cursor-pointer text-sm font-medium text-ink-2 hover:text-ink">
               Filtrar por stack {stack.length > 0 && `(${stack.length})`}
             </summary>
             <div role="group" aria-label="Stack" className="mt-3 flex flex-wrap gap-2">
@@ -160,7 +158,7 @@ export function Projects() {
           </button>
         </div>
       ) : (
-        <ul className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
           {list.map((p) => (
             <li key={p.slug}>
               <ProjectCard project={p} />
