@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 @import './tokens.css';
+
+/* Paper Mono (paper.design/mono, SIL OFL 1.1 — licença em /fonts/paper-mono/OFL.txt), variável wght 100–800 */
+@font-face {
+  font-family: 'Paper Mono';
+  src: url('/fonts/paper-mono/PaperMono-wght.woff2') format('woff2');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
 @plugin '@tailwindcss/typography';
 
 @theme inline {

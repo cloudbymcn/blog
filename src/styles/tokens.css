@@ -21,7 +21,7 @@
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter Variable', Inter, system-ui,
     sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: 'Paper Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --nav-h: 52px;
 }
