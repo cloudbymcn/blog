@@ -58,7 +58,7 @@ Ordem vertical, uma tela por bloco no desktop, fluido no mobile:
    - Fundo quase preto com grão sutil + "spotlight" radial que segue o mouse (React Bits *Glow Cursor* ou CSS puro).
    - `<Lanyard>` ocupa a metade direita no desktop (esquerda fica texto); no mobile fica em cima, texto embaixo. Container do Lanyard: `min-height: 520px`.
    - Esquerda: `SplitText`/`BlurText` (React Bits) com o nome e o título, depois um sub (ver §3 copy), CTAs "Ver projetos" (`Magnet`) e "Falar comigo".
-   - Barra de stats com `CountUp`: N projetos publicados · N serviços AWS usados · 3 certificações AWS. Valores vêm do índice de conteúdo, não hardcoded.
+   - Barra de stats com `CountUp`: N projetos publicados · N serviços AWS usados · 4 certificações AWS. Valores vêm do índice de conteúdo, não hardcoded.
    - Seta "scroll" animada no rodapé do hero.
 2. **Apresentação** — "Quem é o MCN". O Matheus vai escrever o texto final; o executor deixa um texto placeholder marcado `<!-- TODO Matheus -->` baseado na copy atual (§3). Ao lado, strip horizontal com 3-4 fotos (§4) em `Masonry`/marquee lento com hover-zoom.
 3. **Projetos em destaque** — 6 cards `SpotlightCard` (ou `TiltedCard`) dos projetos Tier A (§6). Botão "Todos os projetos" → `/projetos`.
