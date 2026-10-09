@@ -17,6 +17,8 @@ Atualizado: 2026-10-09 · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](S
 
 - Pivô claro estilo Apple (§0-bis): tokens, nav glass, hero com crachá por cima do texto + painel `<LanyardControls>`, covers `public/projects/<slug>/cover.webp` (37ec0ed..f794581).
 - Camada imersiva (Forja): Lenis (desktop), nav que encolhe, reveal/stagger, hero em máscara, tilt 3D nos cards, botões magnéticos, fundo three.js no hero e cubo de vidro no Sobre (1b0cb5d..ddd470f).
+- Rodada de 09/10 à tarde (decisões do Matheus na SPEC §0-bis): fonte SF Pro + Inter self-hosted e tudo em minúsculo (a9ae7f2); Paper Mono como `--font-mono` (03d93b2); seção Projetos = Concave Carousel reproduzido do React Bits Pro (f9df36e); Contato = bloco "Let's connect" adaptado do rbp-portfolio (f80e94d); Interference Ribbons atrás do crachá, ligado por padrão, `?ribbons=0` desliga (6ab9d9f, 2172c83); crachá ~30% menor (85d413c); trajetória = livro aberto em Paper Mono com virar de página 3D (831a1d1, 6431ca3); certificação CloudOps Engineer – Associate (0869fa2 + badge ea13b44).
+- Assets (Lente): 33/33 covers reais/gerados em `public/projects/<slug>/cover.webp` (6c60e40, ff5c66a); crachá com retrato sorrindo gerado por IA, ombros até as bordas (991f442..58db89e); logo nova — ícone squircle "m" (flat SVG + 3D PNG), wordmark "cloudbymcn", favicons, OG (43d0507, dc2dfa3) e aplicada na nav/rodapé (c68268e).
 - QA do Vigia resolvido no código: 320px sem overflow, a11y (contraste/aria), perf mobile (WebP no LCP, zero webfont, 3D/Lenis fora do mobile, rotas lazy). Falta rodar Lighthouse de novo.
 
 ## Contratos pro time
@@ -33,15 +35,15 @@ Atualizado: 2026-10-09 · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](S
 
 | Frente | Dono | Estado |
 |---|---|---|
-| App (scaffold, Lanyard, home, /projetos, deploy) | Forja | app completo + pivô claro + camada imersiva; aguardando novo Lighthouse do Vigia |
-| Conteúdo (33 MDX) | Cartógrafo | 33/33 no índice; covers = SVG de arquitetura até a Lente entregar `cover.webp` (lista de prints/prompts na nota "Covers- lista de prints") |
-| Assets | Lente | pendente: card-front/back/strap, fotos WebP, OG |
-| QA + scrub-check | Vigia | scrub-check feito; QA 6 larguras + Lighthouse pendente (aguarda preview) |
+| App | Forja | completo: pivô claro, imersivo, carrossel, let's connect, livro, logo, ribbons; aguardando QA final |
+| Conteúdo (33 MDX) | Cartógrafo | 33/33 no índice com cover.webp; dispensável após redirects §11 |
+| Assets | Lente | completo (covers, crachá, logo, OG, badges) |
+| QA + scrub-check | Vigia | ciclo final em andamento: 6 larguras, Lighthouse desktop/mobile, FPS com/sem ribbons |
 
 ## Próximo passo
 
 - Forja: redirects dos 11 posts antigos (§11), OG/meta por página; deploy só roda depois do merge em `main` (origin HEAD hoje é `master`: Matheus decide a branch de publicação e muda Settings → Pages → Source = GitHub Actions).
 - Vigia: `scripts/scrub-check.mjs` local está fora do Prettier (quebra `npm run check` e o deploy.yml).
 - Cartógrafo: trocar `cover:` para `/projects/<slug>/cover.webp` conforme a Lente entregar os prints; redirects dos 11 posts antigos (§11).
-- Lente: texturas do Lanyard + fotos + OG.
-- Vigia: commitar ajustes do scrub-check; QA assim que `npm run preview` subir em 4173.
+- Vigia: relatório final (FPS, Lighthouse) e eventuais fixes pra Forja.
+- Matheus: revisar o site no portal, decidir branch de publicação (`master` vs `main`) e Settings → Pages → Source = GitHub Actions; merge em `main` dispara o deploy.
