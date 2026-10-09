@@ -1,6 +1,5 @@
 import { PAGES } from '../lib/seoMeta'
 import { useSeo } from '../lib/useSeo'
-import { About } from '../components/About'
 import { Certs } from '../components/Certs'
 import { Contact } from '../components/Contact'
 import { FeaturedProjects } from '../components/FeaturedProjects'
@@ -13,7 +12,6 @@ export function Home() {
     <>
       <Hero />
       <FeaturedProjects />
-      <About />
       <StackLoop />
       <Certs />
       <Contact />

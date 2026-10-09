@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, Navigate } from 'react-router'
 import { Layout } from './components/Layout'
 import { Home } from './pages/Home'
 
@@ -13,7 +13,7 @@ export const router = createBrowserRouter([
         path: '/projetos/:slug',
         lazy: async () => ({ Component: (await import('./pages/Project')).Project }),
       },
-      { path: '/sobre', lazy: async () => ({ Component: (await import('./pages/About')).About }) },
+      { path: '/sobre', element: <Navigate to="/" replace /> },
       { path: '/contato', lazy: async () => ({ Component: (await import('./pages/Contact')).Contact }) },
       { path: '*', lazy: async () => ({ Component: (await import('./pages/NotFound')).NotFound }) },
     ],

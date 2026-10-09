@@ -60,7 +60,6 @@ export function Hero() {
       <div className="relative z-0 mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center px-6 md:grid-cols-2 md:px-8">
         <div className="pb-16 pt-[calc(70svh-var(--nav-h)+1rem)] md:py-24">
           {/* entrada em máscara linha a linha; o resto sobe em fade logo depois */}
-          <MaskText lines={['Cloud by MCN']} as="p" className="lc text-sm font-medium text-ink-2" />
           <MaskText
             as="h1"
             lines={['Matheus', 'Nascimento']}

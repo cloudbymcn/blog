@@ -3,7 +3,6 @@ import { Link, NavLink, useLocation } from 'react-router'
 
 const LINKS = [
   { to: '/projetos', label: 'Projetos', section: 'projetos' },
-  { to: '/sobre', label: 'Sobre', section: 'sobre' },
   { to: '/contato', label: 'Contato', section: 'contato' },
 ]
 

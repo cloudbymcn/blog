@@ -4,8 +4,8 @@ import { heroRibbonsEnabled } from '../../lib/flags'
 import { createRibbons } from './ribbons'
 import { useThreeScene } from './useThreeScene'
 
-const SHAPES = 6 // 4 na metade direita (eram 7) + 2 na periferia esquerda
-const PARTICLES = 180
+const SHAPES = 0 // formas de vidro desligadas a pedido do Matheus (só as ribbons ficam)
+const PARTICLES = 0 // partículas desligadas a pedido do Matheus
 const FOV = 35
 const CAMERA_Z = 10
 

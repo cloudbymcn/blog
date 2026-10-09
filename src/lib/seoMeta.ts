@@ -29,13 +29,6 @@ export const PAGES = {
     image: DEFAULT_IMAGE,
     path: '/projetos',
   },
-  '/sobre': {
-    title: `Sobre · ${BRAND}`,
-    description:
-      'Matheus Nascimento, engenheiro de infraestrutura cloud: trajetória, certificações AWS e como o Cloud by MCN nasceu.',
-    image: DEFAULT_IMAGE,
-    path: '/sobre',
-  },
   '/contato': {
     title: `Contato · ${BRAND}`,
     description:

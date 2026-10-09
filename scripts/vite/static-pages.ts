@@ -71,7 +71,6 @@ export function staticPages(): Plugin {
 
       const routes: [string, SeoMeta][] = [
         ['projetos/index.html', PAGES['/projetos']],
-        ['sobre/index.html', PAGES['/sobre']],
         ['contato/index.html', PAGES['/contato']],
       ]
       const projects = readProjects(resolve(config.root, 'src/content/projects'), config.publicDir)
