@@ -1,10 +1,13 @@
-import { lazy, Suspense, useState, useSyncExternalStore } from 'react'
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
+import { whenIdle } from '../../lib/immersive'
 import { LANYARD_DEFAULTS, type LanyardSettings } from './settings'
 
 const Lanyard = lazy(() => import('./Lanyard'))
 
-// cartão v3 da Lente (SPEC §0-bis): foto, logo e @cloudbymcn sobre branco
-const FRONT = '/lanyard/card-front.png'
+// cartão v3 da Lente (SPEC §0-bis): foto, logo e @cloudbymcn sobre branco.
+// WebP derivados do card-front.png (826 KB): textura do 3D em 1024px e placeholder/LCP em 480px.
+const FRONT = '/lanyard/card-front.webp'
+const FRONT_SMALL = '/lanyard/card-front-480.webp'
 
 const reducedMotionQuery = '(prefers-reduced-motion: reduce)'
 
@@ -36,36 +39,77 @@ type Anchor = 'left' | 'center' | 'right'
 // mesmas posições do Lanyard (ANCHORS), pro placeholder pender do mesmo ponto
 const ANCHOR_X: Record<Anchor, string> = { left: '27%', center: '50%', right: '73%' }
 
-export function LanyardPlaceholder({ anchor = 'center' }: { anchor?: Anchor }) {
+/**
+ * Mesmo enquadramento do Lanyard: topo do cartão em mix(0.12, 0.42, strapLength) da altura
+ * e altura do cartão = size (frações do container), pra troca placeholder → 3D não pular.
+ */
+export function LanyardPlaceholder({
+  anchor = 'center',
+  size = LANYARD_DEFAULTS.size,
+  strapLength = LANYARD_DEFAULTS.strapLength,
+}: {
+  anchor?: Anchor
+  size?: number
+  strapLength?: number
+}) {
   const [failed, setFailed] = useState(false)
+  const cardTop = 0.12 + (0.42 - 0.12) * strapLength
   return (
     <div
-      className="absolute top-0 flex h-full -translate-x-1/2 items-start justify-center pt-6"
+      className="absolute top-0 flex h-full -translate-x-1/2 items-start justify-center"
       style={{ left: ANCHOR_X[anchor] }}
       aria-hidden="true"
     >
-      <div className="lanyard-sway flex flex-col items-center">
-        <div className="h-28 w-3 rounded-sm bg-[#111]" />
+      <div className="lanyard-sway flex h-full flex-col items-center">
+        <div
+          className="w-3 shrink-0 rounded-sm bg-[#111]"
+          style={{ height: `calc(${cardTop * 100}% - 1.25rem)` }}
+        />
         <div className="-mt-1 h-4 w-8 rounded-sm bg-gradient-to-b from-[#e5e5ea] to-[#a1a1a6]" />
         {failed ? (
-          <div className="mt-1 flex aspect-[2/3] w-56 flex-col justify-end rounded-2xl border border-line bg-white p-5 text-left text-ink shadow-2xl">
+          <div
+            style={{ height: `${size * 100}%` }}
+            className="mt-1 flex aspect-[2/3] flex-col justify-end rounded-2xl border border-line bg-white p-5 text-left text-ink shadow-2xl"
+          >
             <span className="font-display text-lg font-semibold leading-tight">Matheus Nascimento</span>
             <span className="font-mono text-xs text-ink-2">@cloudbymcn</span>
           </div>
         ) : (
           <img
-            src={FRONT}
+            src={FRONT_SMALL}
+            fetchPriority="high"
             alt=""
-            width={1024}
-            height={1440}
+            width={480}
+            height={675}
             decoding="async"
             onError={() => setFailed(true)}
-            className="mt-1 w-56 rounded-2xl border border-line bg-white shadow-2xl"
+            style={{ height: `${size * 100}%` }}
+            className="mt-1 w-auto rounded-2xl border border-line bg-white shadow-2xl"
           />
         )}
       </div>
     </div>
   )
+}
+
+/**
+ * Quando montar o crachá 3D (three.js ~560 KB): nunca antes do LCP.
+ * Desktop com mouse: depois do load + idle. Toque: só na primeira interação (o placeholder
+ * estático segura o hero; carregar three num celular no boot derruba TBT/LCP).
+ */
+function useDeferredStart() {
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) return whenIdle(() => setReady(true))
+    const events = ['pointerdown', 'touchstart', 'scroll', 'keydown'] as const
+    const go = () => {
+      events.forEach((e) => window.removeEventListener(e, go))
+      setReady(true)
+    }
+    events.forEach((e) => window.addEventListener(e, go, { once: true, passive: true }))
+    return () => events.forEach((e) => window.removeEventListener(e, go))
+  }, [])
+  return ready
 }
 
 /**
@@ -84,16 +128,21 @@ export function LanyardStage({
 }) {
   const reduced = useSyncExternalStore(subscribeReducedMotion, prefersReducedMotion, () => true)
   const [lowEnd] = useState(isLowEnd)
+  const ready = useDeferredStart()
   const { plainBand, ...look } = settings
 
   return (
     <div className="relative h-full w-full">
       {/* absolute: o canvas do Lanyard se redimensiona pelo container; com altura auto ele cresce em loop */}
       <div className={`absolute inset-0 ${passThrough ? 'pointer-events-none' : ''}`}>
-        {reduced || lowEnd ? (
-          <LanyardPlaceholder anchor={anchor} />
+        {reduced || lowEnd || !ready ? (
+          <LanyardPlaceholder anchor={anchor} size={settings.size} strapLength={settings.strapLength} />
         ) : (
-          <Suspense fallback={<LanyardPlaceholder anchor={anchor} />}>
+          <Suspense
+            fallback={
+              <LanyardPlaceholder anchor={anchor} size={settings.size} strapLength={settings.strapLength} />
+            }
+          >
             <Lanyard
               {...look}
               frontImage={FRONT}

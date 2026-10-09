@@ -17,11 +17,13 @@
     />
     <meta property="og:image" content="https://cloudbymcn.com/og.png" />
     <meta property="og:url" content="https://cloudbymcn.com/" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- LCP do hero: cartão estático (o 3D carrega depois). Fontes = system stack, zero webfont. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      as="image"
+      href="/lanyard/card-front-480.webp"
+      type="image/webp"
+      fetchpriority="high"
     />
   </head>
   <body>

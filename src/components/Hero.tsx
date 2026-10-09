@@ -14,6 +14,9 @@ const desktopQuery = '(min-width: 768px)'
 // fundo three.js decorativo: chunk separado, só desktop e depois do load (ImmersiveSlot)
 const loadBackdrop = () => import('./three/HeroBackdrop')
 
+// mobile: canvas de 70svh no topo; escala o size pro cartão dar ~45% da tela (0.45 / 0.70 ≈ 0.64)
+const MOBILE_SIZE_SCALE = 0.64 / 0.42
+
 function subscribeDesktop(cb: () => void) {
   const mq = window.matchMedia(desktopQuery)
   mq.addEventListener('change', cb)
@@ -43,19 +46,19 @@ export function Hero() {
       <ImmersiveSlot load={loadBackdrop} className="absolute inset-0 z-0" />
 
       {/* SPEC §0-bis: o canvas cobre a dobra inteira por cima do texto; só o cartão pega ponteiro */}
-      <div className="pointer-events-none absolute inset-x-0 top-[var(--nav-h)] z-10 h-[500px] md:inset-0 md:h-auto">
+      <div className="pointer-events-none absolute inset-x-0 top-[var(--nav-h)] z-10 h-[70svh] md:inset-0 md:h-auto">
         {/* key: trocar layout ou ligar o Intro remonta o crachá (a animação de entrada só roda na montagem) */}
         <LanyardStage
           key={`${desktop ? 'd' : 'm'}-${lanyard.intro}`}
           anchor={desktop ? 'right' : 'center'}
-          settings={lanyard}
+          settings={desktop ? lanyard : { ...lanyard, size: Math.min(0.9, lanyard.size * MOBILE_SIZE_SCALE) }}
           passThrough
         />
       </div>
       <LanyardControls value={lanyard} onChange={setLanyard} />
 
       <div className="relative z-0 mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center px-6 md:grid-cols-2 md:px-8">
-        <div className="pb-16 pt-[500px] md:py-24">
+        <div className="pb-16 pt-[calc(70svh-var(--nav-h)+1rem)] md:py-24">
           {/* entrada em máscara linha a linha; o resto sobe em fade logo depois */}
           <MaskText lines={['Cloud by MCN']} as="p" className="text-sm font-medium text-ink-2" />
           <MaskText
