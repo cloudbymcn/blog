@@ -1,30 +1,36 @@
 import { useRef, type ReactNode } from 'react'
 
-/** Magnet: o filho é puxado levemente na direção do cursor. */
-export function Magnet({ children, strength = 0.25 }: { children: ReactNode; strength?: number }) {
-  const ref = useRef<HTMLSpanElement>(null)
+const fine = '(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)'
 
-  function onMove(e: React.PointerEvent) {
-    const el = ref.current
-    if (!el || e.pointerType !== 'mouse') return
+/**
+ * Botão magnético: o filho é puxado na direção do cursor e volta com mola ao sair.
+ * A área de captura passa 12px da borda (padding + margem negativa), como em apple.com.
+ */
+export function Magnet({ children, strength = 0.2 }: { children: ReactNode; strength?: number }) {
+  const inner = useRef<HTMLSpanElement>(null)
+
+  function onMove(e: React.PointerEvent<HTMLSpanElement>) {
+    const el = inner.current
+    if (!el || e.pointerType !== 'mouse' || !window.matchMedia(fine).matches) return
     const r = el.getBoundingClientRect()
     const x = (e.clientX - (r.left + r.width / 2)) * strength
     const y = (e.clientY - (r.top + r.height / 2)) * strength
-    el.style.transform = `translate(${x}px, ${y}px)`
+    el.style.transition = 'transform 0.2s ease-out'
+    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`
   }
 
   function onLeave() {
-    if (ref.current) ref.current.style.transform = ''
+    const el = inner.current
+    if (!el) return
+    el.style.transition = 'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)'
+    el.style.transform = ''
   }
 
   return (
-    <span
-      ref={ref}
-      onPointerMove={onMove}
-      onPointerLeave={onLeave}
-      className="inline-block transition-transform duration-300 ease-out"
-    >
-      {children}
+    <span onPointerMove={onMove} onPointerLeave={onLeave} className="-m-3 inline-block p-3">
+      <span ref={inner} className="inline-block will-change-transform">
+        {children}
+      </span>
     </span>
   )
 }

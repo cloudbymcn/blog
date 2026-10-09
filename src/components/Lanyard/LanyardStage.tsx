@@ -3,8 +3,8 @@ import { LANYARD_DEFAULTS, type LanyardSettings } from './settings'
 
 const Lanyard = lazy(() => import('./Lanyard'))
 
-// temporário até a Lente entregar o card-front claro (SPEC §0-bis): foto P&B sobre branco
-const FRONT = '/lanyard/card-front-temp.webp'
+// cartão v3 da Lente (SPEC §0-bis): foto, logo e @cloudbymcn sobre branco
+const FRONT = '/lanyard/card-front.png'
 
 const reducedMotionQuery = '(prefers-reduced-motion: reduce)'
 

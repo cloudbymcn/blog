@@ -6,6 +6,7 @@ import { LanyardStage } from './Lanyard/LanyardStage'
 import { LANYARD_DEFAULTS } from './Lanyard/settings'
 import { MaskText } from './ui/MaskText'
 import { CountUp } from './ui/CountUp'
+import { Magnet } from './ui/Magnet'
 
 const desktopQuery = '(min-width: 768px)'
 
@@ -71,18 +72,22 @@ export function Hero() {
             Cloud, com foco em IA, escalabilidade e sistemas distribuídos.
           </p>
           <div className="fade-up mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: '460ms' }}>
-            <Link
-              to="/projetos"
-              className="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-white transition-opacity hover:opacity-90"
-            >
-              Ver projetos <span aria-hidden="true">›</span>
-            </Link>
-            <a
-              href="#contato"
-              className="glass inline-flex items-center rounded-full px-5 py-2.5 text-[15px] font-medium text-accent transition-colors hover:bg-white"
-            >
-              Falar comigo
-            </a>
+            <Magnet>
+              <Link
+                to="/projetos"
+                className="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-white transition-opacity hover:opacity-90"
+              >
+                Ver projetos <span aria-hidden="true">›</span>
+              </Link>
+            </Magnet>
+            <Magnet>
+              <a
+                href="#contato"
+                className="glass inline-flex items-center rounded-full px-5 py-2.5 text-[15px] font-medium text-accent transition-colors hover:bg-white"
+              >
+                Falar comigo
+              </a>
+            </Magnet>
           </div>
           <dl
             style={{ animationDelay: '540ms' }}
@@ -92,7 +97,7 @@ export function Hero() {
               <div key={s.label}>
                 <dt className="sr-only">{s.label}</dt>
                 <dd className="font-display text-3xl font-semibold tracking-[-0.02em]">
-                  <CountUp to={s.value} />
+                  <CountUp to={s.value} delay={540} />
                 </dd>
                 <dd className="mt-1 text-xs leading-snug text-ink-2">{s.label}</dd>
               </div>
