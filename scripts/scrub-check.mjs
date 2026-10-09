@@ -7,8 +7,10 @@ const IGNORED_FILES = new Set([path.normalize('docs/SPEC-FRONTEND-V2.md')])
 function isIgnored(relPath) {
   const norm = path.normalize(relPath)
   if (IGNORED_FILES.has(norm)) return true
-  if (norm.startsWith(path.normalize('docs/lighthouse-report')) || norm.startsWith('docs\\lighthouse-report')) return true
-  if (norm.startsWith(path.normalize('docs/qa-screenshots')) || norm.startsWith('docs\\qa-screenshots')) return true
+  if (norm.startsWith(path.normalize('docs/lighthouse-report')) || norm.startsWith('docs\\lighthouse-report'))
+    return true
+  if (norm.startsWith(path.normalize('docs/qa-screenshots')) || norm.startsWith('docs\\qa-screenshots'))
+    return true
   if (norm.startsWith(path.normalize('docs/qa')) || norm.startsWith('docs\\qa')) return true
   return false
 }
