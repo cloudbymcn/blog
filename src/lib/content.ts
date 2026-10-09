@@ -1,5 +1,6 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import index from 'virtual:projects-index' // só frontmatter (scripts/vite/projects-index.ts)
+import { CERTS } from './certs'
 import { isAwsService } from './stack'
 
 export type Category = 'cloud' | 'integracoes' | 'ia' | 'produtos' | 'ferramentas'
@@ -71,5 +72,5 @@ export const featured = projects.filter((p) => p.tier === 'A').slice(0, 6)
 export const stats = {
   projects: projects.length,
   awsServices: new Set(projects.flatMap((p) => p.stack).filter(isAwsService)).size,
-  certifications: 3,
+  certifications: CERTS.length,
 }
