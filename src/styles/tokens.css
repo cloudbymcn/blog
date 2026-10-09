@@ -1,0 +1,17 @@
+:root {
+  --bg: #09090b;
+  --bg-2: #121214;
+  --ink: #f4f4f5;
+  --ink-2: #a1a1aa;
+  --ink-3: #71717a;
+  --accent: #38bdf8;
+  --accent-2: #f59e0b;
+  --ring: rgba(56, 189, 248, 0.35);
+  --line: rgba(244, 244, 245, 0.08);
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --nav-h: 64px;
+}

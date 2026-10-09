@@ -1,0 +1,9 @@
+dist
+node_modules
+legacy
+posts
+assets
+public
+package-lock.json
+*.mdx
+docs

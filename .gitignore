@@ -17,3 +17,10 @@ desktop.ini
 *.tmp
 *.bak
 *.log
+
+# Build
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
