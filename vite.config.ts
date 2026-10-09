@@ -8,11 +8,13 @@ import remarkGfm from 'remark-gfm'
 import rehypeSlug from 'rehype-slug'
 import rehypeShiki from '@shikijs/rehype'
 import { projectsIndex } from './scripts/vite/projects-index'
+import { staticPages } from './scripts/vite/static-pages'
 
 export default defineConfig({
   base: '/',
   plugins: [
     projectsIndex(),
+    staticPages(),
     {
       enforce: 'pre',
       ...mdx({

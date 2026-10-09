@@ -15,6 +15,37 @@ function affectsIndex(file: string) {
   )
 }
 
+export interface ProjectEntry extends Record<string, unknown> {
+  file: string
+  slug: string
+  image?: string
+  coverInBody: boolean
+}
+
+/** Lê o frontmatter de cada MDX (também usado pelo static-pages no build). */
+export function readProjects(
+  dir: string,
+  publicDir: string,
+  onFile?: (path: string) => void,
+): ProjectEntry[] {
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.mdx'))
+    .map((file) => {
+      const path = join(dir, file)
+      onFile?.(path)
+      const src = readFileSync(path, 'utf8')
+      const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(src)
+      const meta = (m ? parse(m[1]) : {}) as Record<string, unknown>
+      const slug = typeof meta.slug === 'string' ? meta.slug : file.replace(/\.mdx$/, '')
+      const image = existsSync(join(publicDir, 'projects', slug, 'cover.webp'))
+        ? `/projects/${slug}/cover.webp`
+        : undefined
+      // o SVG de arquitetura já aparece no corpo? (senão a página mostra ele no topo do corpo)
+      const coverInBody = typeof meta.cover === 'string' && src.split(meta.cover).length > 2
+      return { ...meta, file, slug, image, coverInBody }
+    })
+}
+
 /**
  * Exporta só o frontmatter de src/content/projects/*.mdx.
  * Assim o índice (home, /projetos) não puxa o corpo dos MDX pro bundle principal;
@@ -37,22 +68,7 @@ export function projectsIndex(): Plugin {
     },
     load(id) {
       if (id !== RESOLVED) return
-      const entries = readdirSync(dir)
-        .filter((f) => f.endsWith('.mdx'))
-        .map((file) => {
-          const path = join(dir, file)
-          this.addWatchFile(path)
-          const src = readFileSync(path, 'utf8')
-          const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(src)
-          const meta = (m ? parse(m[1]) : {}) as Record<string, unknown>
-          const slug = typeof meta.slug === 'string' ? meta.slug : file.replace(/\.mdx$/, '')
-          const image = existsSync(join(publicDir, 'projects', slug, 'cover.webp'))
-            ? `/projects/${slug}/cover.webp`
-            : undefined
-          // o SVG de arquitetura já aparece no corpo? (senão a página mostra ele no topo do corpo)
-          const coverInBody = typeof meta.cover === 'string' && src.split(meta.cover).length > 2
-          return { ...meta, file, image, coverInBody }
-        })
+      const entries = readProjects(dir, publicDir, (path) => this.addWatchFile(path))
       return `export default ${JSON.stringify(entries)}`
     },
     configureServer(server) {
