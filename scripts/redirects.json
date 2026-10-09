@@ -8,7 +8,7 @@
   { "from": "/posts/sentinela-finops-bedrock.html", "to": "/projetos/finops-security-bedrock" },
   { "from": "/posts/dungeonai-rpg-bedrock.html", "to": "/projetos/dungeonai" },
   { "from": "/posts/serravans-frota-sst.html", "to": "/projetos/gestao-frota-ocr" },
-  { "from": "/posts/mailbox-cleaner-mrm.html", "to": "/projetos/mailbox-cleaner-m365" },
+  { "from": "/posts/mailbox-cleaner-mrm.html", "to": "/projetos" },
   { "from": "/posts/integracao-api-aws.html", "to": "/projetos/api-segura-banco-privado" },
   { "from": "/posts/otimizacao-mp4.html", "to": "/projetos/entrega-video-mediaconvert" },
   { "from": "/posts/TEMPLATE.html", "to": "/projetos" }
