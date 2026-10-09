@@ -7,6 +7,19 @@ Esta espec é a fonte da verdade. Dúvida que a espec não resolve → perguntar
 
 ---
 
+## 0-bis. Direção visual REVISADA (2026-10-09, decisão do Matheus — sobrepõe tudo que contradiz abaixo)
+
+Referência: vídeo do David Haz do Lanyard rebuilt do React Bits (crachá holográfico sobre fundo branco). O site tem que parecer isso:
+
+- **Fundo branco** (`#ffffff`, seções alternando com `#f5f5f7` estilo Apple). Sem grão, sem spotlight, sem fundo quase preto. Modo escuro NÃO é prioridade.
+- **Tipografia Apple**: `-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif`. Títulos com `letter-spacing: -0.02em`, peso 600, tamanhos grandes e muito respiro. Nada de Space Grotesk. Mono só em labels pequenos.
+- **Glass**: cards, nav e chips com `background: rgba(255,255,255,.6)`, `backdrop-filter: blur(20px) saturate(180%)`, borda `1px solid rgba(0,0,0,.06)`, sombra suave `0 8px 30px rgba(0,0,0,.06)`, raio 20-24px. Nav fixa translúcida igual apple.com.
+- **Cores**: texto `#1d1d1f`, secundário `#6e6e73`, linhas `rgba(0,0,0,.08)`, acento único `#0071e3` (azul Apple) só em links/botões. Âmbar fora.
+- **Lanyard (hero)**: `cardColor="#ffffff"`, `finish="holographic"`, `metal="silver"`, `strapColor="#111111"`, `cornerRadius=0.3`, `size≈0.6`, `gravity=1`, `breeze=0.5`, `intro`, `interactive`. Cartão = foto do Matheus em P&B com fundo removido sobre branco, topo com logo pequeno à esquerda e `@cloudbymcn` à direita (igual ao vídeo). Strap preto com texto branco repetido.
+- **Hero**: Lanyard centralizado ocupando a dobra inteira sobre branco, só nome + uma linha + "Try dragging" discreto embaixo. Sem blocos pesados ao lado.
+- **Scroll pra baixo = projetos**: grid minimalista de cards glass (cover, título, uma linha, chips de stack), 3 colunas em desktop, 1 em mobile, muito espaço em branco entre seções. Sobre/contato vêm depois, curtos.
+- Tokens em `tokens.css` devem ser trocados pra esse esquema; §1 item "fundo quase preto" e §12 tokens escuros ficam obsoletos.
+
 ## 0. Decisão de fundo
 
 O site atual é HTML/CSS/JS puro, sem build. O componente **Lanyard** do React Bits é **React + three.js** (sem versão vanilla). Logo: a v2 é um app React com build estático. Reescrita 100%, sem aproveitar CSS/JS antigos. O **conteúdo** dos 11 posts atuais é aproveitado (migrado), o visual não.
