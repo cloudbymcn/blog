@@ -1,0 +1,29 @@
+---
+title: "Conciliação de NFS-e entre API fiscal e ERP"
+slug: conciliacao-nfse
+summary: "Ferramenta web que cruza as notas de serviço emitidas contra a empresa (via API fiscal) com o que já foi lançado no ERP e devolve só a lista do que falta lançar."
+category: integracoes
+tier: B
+date: 2026-09-23
+stack: ["AWS Lambda", "API Gateway", "CloudFront", "S3", "SAM", "Firebird", "React", "Node.js"]
+metrics:
+  - { label: "lista a lançar", before: "2 Excel na mão", after: "1 clique" }
+  - { label: "ruído", before: "68 falsos pendentes", after: "só os reais" }
+cover: /projects/conciliacao-nfse/architecture.svg
+---
+
+Todo mês, a operadora fiscal comparava dois Excel: as notas de serviço (NFS-e) recebidas, exportadas de uma plataforma de API fiscal, e as notas já lançadas no ERP legado. O que sobrava era a lista "a lançar". Era lento e cheio de falso positivo.
+
+<Figure src="/projects/conciliacao-nfse/architecture.svg" alt={"A operadora acessa um front React com Cloudscape pelo CloudFront. As chamadas em /api passam por API Gateway com JWT até uma Lambda Node na VPC, que lê as notas lançadas no Firebird do ERP, busca as notas emitidas na API fiscal no padrão ABRASF com cache de 15 minutos e passa tudo por um motor de conciliação que vai do casamento exato ao fuzzy."} />
+
+**Motor em camadas.** Casamento por CNPJ do prestador + número da nota, em ordem: exato → prefixo municipal (cada prefeitura numera de um jeito) → divergência de valor → suspeita de erro de digitação → **a lançar**. Cada nota sai com o status (lançada, a lançar, divergência de valor, suspeita de número) e o que casou no ERP, então a operadora confere só o que tem dúvida.
+
+**Fonte certa importa.** Lendo o Firebird direto, em vez do Excel exportado, o "a lançar" caiu de 68 notas (ruído de filtro do Excel) para as poucas realmente pendentes.
+
+**Detalhes:** notas da API fiscal ficam em cache por 15 min no S3 (o ERP é consultado sempre); `refresh=1` ignora o cache. Acesso por senha única que vira JWT, com comparação timing-safe e bloqueio de 15 min após 5 tentativas erradas. O build com esbuild só empacota o grafo de imports, então `.env` nunca vai para a Lambda; segredos entram como parâmetros do SAM.
+
+<Callout type="info">
+
+A API fiscal só tem notas a partir da data em que o CNPJ foi incluído nela. O histórico completo continua vindo do ERP.
+
+</Callout>

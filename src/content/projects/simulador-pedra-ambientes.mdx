@@ -1,0 +1,103 @@
+---
+title: "Simulador de pedra natural em ambientes com IA generativa"
+slug: simulador-pedra-ambientes
+summary: "O cliente envia a foto da própria cozinha, escolhe uma chapa e o Gemini devolve a imagem com a pedra aplicada nas bancadas, preservando luz, perspectiva e piso."
+category: ia
+tier: A
+date: 2026-06-22
+stack: ["Next.js", "React", "TypeScript", "Tailwind", "Gemini"]
+metrics:
+  - { label: "visualizar a pedra", before: "imaginação", after: "foto do próprio espaço" }
+  - { label: "resolução", before: "~1K", after: "até 4K" }
+cover: /projects/simulador-pedra-ambientes/architecture.svg
+---
+
+Vender chapa de mármore ou granito tem um problema clássico: o cliente vê uma chapa de 3 metros encostada no pátio e precisa imaginar como ela fica na bancada da cozinha dele. Os simuladores tradicionais usam ambientes 3D genéricos, com máscaras desenhadas à mão para cada superfície. Funcionam, mas não são a cozinha do cliente.
+
+Com modelos de edição de imagem, a pergunta mudou: dá para pegar **a foto real do ambiente do cliente** e trocar só as superfícies de pedra, mantendo todo o resto?
+
+<Figure src="/projects/simulador-pedra-ambientes/architecture.svg" alt={"O cliente envia a foto do ambiente para o front Next.js, que redimensiona a imagem e junta a textura escolhida no catálogo ou enviada pelo usuário. A rota de API em Node aplica rate limit e manda foto e textura ao Gemini, pedindo resolução 1K, 2K ou 4K. As texturas do catálogo vêm por um proxy same-origin em /api/img, de modo que o host de origem dos assets só é visto pelo servidor."} caption={"Duas imagens entram, uma imagem editada sai."} />
+
+## Fluxo em 3 passos
+
+<Steps>
+<Step n={1}>
+
+**Ambiente:** foto do próprio espaço (upload) ou um ambiente pronto do catálogo (cozinha, banheiro, sala, hall, área externa).
+
+</Step>
+<Step n={2}>
+
+**Material:** chapa do catálogo, com busca, ou **a textura da sua própria chapa** (uma foto dela).
+
+</Step>
+<Step n={3}>
+
+**Resultado:** imagem gerada, com download direto, compartilhamento pela Web Share API (com fallback) e galeria de recentes.
+
+</Step>
+</Steps>
+
+A interface é responsiva e foi pensada primeiro para o celular, que é onde o vendedor mostra o resultado ao cliente. Há versão em português, inglês e espanhol.
+
+## O prompt faz o trabalho pesado
+
+O Gemini recebe **duas imagens**: a foto do ambiente e a textura da chapa. A instrução, em inglês, é longa e específica:
+
+```text
+Identify stone-surface candidates in the first image (countertops, islands,
+vanity tops, accent walls, fireplace surrounds, splashbacks, shower walls,
+table tops) and REPLACE only those surfaces with the texture from the second image.
+
+CRITICAL — DO NOT MODIFY THE FLOOR under any circumstance, even if the floor
+is made of stone. The floor must remain pixel-identical to the original photo.
+```
+
+Depois vêm as regras de realismo: preservar luz, sombras, reflexos, perspectiva e profundidade de campo; não tocar em armários, móveis, eletrodomésticos, janelas e pessoas; aplicar a textura com escala e direção de veio realistas (book-match se houver emenda visível); respeitar o perfil da borda, a espessura e o acabamento (polido ou levigado); sem legenda, marca d'água ou borda.
+
+<Callout type="info">
+
+**Por que a regra do piso é gritada.** Piso de porcelanato ou de pedra é, para o modelo, uma superfície de pedra tão óbvia quanto a bancada. Sem uma proibição explícita, com a exceção escrita ("even if the floor is made of stone"), ele tende a trocar tudo. Para quem vende bancada, piso trocado invalida a simulação.
+
+</Callout>
+
+## Detalhes de engenharia
+
+<Card title="Redimensionar no navegador">
+
+A foto do celular pode ter 12 MP. Antes de enviar, o front redimensiona e converte para base64. A rota recusa foto acima de ~7,5 MB e textura acima de ~4 MB com 413 e mensagem clara, em vez de deixar a chamada ao modelo estourar.
+
+</Card>
+
+<Card title="Resolução sob demanda">
+
+1K, 2K ou 4K via `imageConfig.imageSize`. Alguns modelos e contas rejeitam esse parâmetro; nesse caso, a rota tenta de novo sem ele e cai no padrão (~1K), em vez de falhar. A resolução maior pode ficar atrás de um plano pago.
+
+</Card>
+
+<Card title="O host dos assets nunca aparece no navegador">
+
+Texturas e ambientes prontos vêm de um host de imagens. O navegador só fala com `/api/img`, um proxy same-origin; o endereço real é variável de ambiente lida só pelo servidor. Isso evita CORS e não expõe a origem dos arquivos. O `materialId` é validado com regex antes de virar caminho.
+
+</Card>
+
+<Card title="Rate limit simples">
+
+6 renders por minuto por IP, em memória. Para uma demonstração é suficiente e protege a chave da API contra abuso óbvio. Em produção, o próximo passo seria um contador compartilhado.
+
+</Card>
+
+## Sem AWS, de propósito
+
+Este é um dos poucos projetos do portfólio sem AWS. O requisito era rodar em qualquer host Node (Vercel ou self-host) com uma única variável obrigatória, a chave da API. A rota usa runtime Node, não Edge, porque a geração pode levar dezenas de segundos (`maxDuration = 60`).
+
+<Metrics>
+<Metric value="2" label="imagens de entrada (ambiente + chapa)" />
+<Metric value="1K–4K" label="resolução de saída" />
+<Metric value="3" label="idiomas (PT, EN, ES)" />
+<Metric value="1" label="variável obrigatória" />
+</Metrics>
+
+## O que aprendi
+
+Edição de imagem por instrução é boa em "troque X mantendo Y" quando X e Y são descritos sem ambiguidade. O trabalho de produto foi escrever a lista do que **não** pode mudar, e testar com fotos reais de cliente, que nunca têm a luz bonita dos ambientes de catálogo.

@@ -1,0 +1,100 @@
+---
+title: "Novidades da AWS traduzidas para PT-BR, todo dia, por menos de US$ 2/mês"
+slug: novidades-aws-ptbr
+summary: "Site estático que lê o feed de anúncios da AWS, traduz e categoriza cada item com Claude no Bedrock e publica no S3. Um cron, uma Lambda, zero servidor."
+category: ia
+tier: A
+date: 2026-05-04
+stack: ["AWS Lambda", "EventBridge", "Bedrock (Claude)", "DynamoDB", "S3", "Python", "PowerShell"]
+metrics:
+  - { label: "idioma", before: "inglês", after: "PT-BR" }
+  - { label: "organização", before: "feed corrido", after: "15 categorias" }
+cover: /projects/novidades-aws-ptbr/architecture.svg
+---
+
+A AWS publica dezenas de anúncios por dia no *What's New*. Eu lia em inglês, pulava metade e perdia coisa importante no meio de "now available in the Asia Pacific (Jakarta) Region". Para colegas que não leem inglês com conforto, o feed simplesmente não existe.
+
+A ideia foi pequena de propósito: todo dia de manhã, um site estático com os anúncios novos já traduzidos, resumidos e separados por categoria. Sem servidor, sem banco relacional, sem painel administrativo.
+
+<Figure src="/projects/novidades-aws-ptbr/architecture.svg" alt={"O EventBridge dispara uma Lambda em Python todo dia às 08:00 BRT. A Lambda lê o RSS do What's New da AWS, consulta o DynamoDB para pular itens já processados, manda só os novos para o Claude Haiku no Bedrock traduzir e categorizar em JSON, passa o HTML gerado por um sanitizador com allowlist de tags e publica o índice e os posts num bucket S3 configurado como site estático."} caption={"Cron → Lambda → LLM → HTML estático."} />
+
+## O fluxo
+
+<Steps>
+<Step n={1}>
+
+**EventBridge** dispara a Lambda às 08:00 BRT (`cron(0 11 * * ? *)` em UTC). O horário é um parâmetro do template.
+
+</Step>
+<Step n={2}>
+
+A **Lambda (Python 3.12)** lê o RSS oficial e, para cada item, tenta buscar o corpo completo da página do anúncio. O resumo do RSS sozinho costuma ser curto demais para uma boa tradução.
+
+</Step>
+<Step n={3}>
+
+**DynamoDB** guarda o `guid` de cada item já processado, com TTL de 30 dias. Item visto não volta para o LLM. É isso que mantém o custo perto de zero: no dia a dia, só os anúncios novos são traduzidos.
+
+</Step>
+<Step n={4}>
+
+**Claude Haiku no Bedrock** recebe título, resumo e corpo e devolve JSON com `title_pt`, `summary_pt`, `tldr`, `category`, `tags` e `body_html`.
+
+</Step>
+<Step n={5}>
+
+O HTML passa por um **sanitizador** e a Lambda gera o índice (agrupado por dia e categoria) e uma página por anúncio, publicados no **S3** como site estático.
+
+</Step>
+</Steps>
+
+## O prompt é o produto
+
+A tradução precisa ser útil, não literal. O prompt pede uma estrutura fixa, usando só as seções que se aplicam:
+
+```text
+1. O que mudou        — 1-2 parágrafos explicando o anúncio
+2. Por que importa    — impacto prático
+3. Principais recursos — bullets, se houver
+4. Disponibilidade    — regiões e preços, se mencionados
+5. Como começar       — passos resumidos, se mencionados
+```
+
+E três regras que fizeram diferença:
+
+- **Nomes de serviço, siglas e comandos ficam no original.** "Amazon S3" não vira "Armazenamento Simples da Amazon".
+- **Não invente fatos.** Se a informação não está no texto fonte, não entra. Para anúncio técnico, uma frase inventada sobre preço ou região é pior que uma tradução ruim.
+- **Uma categoria entre 15 fixas** (Compute, Storage, Database, AI/ML, Serverless…) e 2 a 5 tags com nomes de serviço. A lista fechada mantém o índice navegável.
+
+## Saída de LLM é entrada não confiável
+
+O modelo devolve HTML que vai direto para uma página pública. Isso é, na prática, conteúdo de terceiro.
+
+<Callout type="warn">
+
+**Allowlist, não blocklist.** O prompt já pede só `p`, `h2`–`h4`, `ul`, `ol`, `li`, `strong`, `em`, `code` e `blockquote`, sem links nem imagens. Mesmo assim, o sanitizador remove blocos `script` e `style` inteiros e reescreve qualquer tag permitida **sem atributos**. Tag fora da lista simplesmente some. Nada de `onerror`, `href` ou `style` passa, mesmo que o modelo erre.
+
+</Callout>
+
+O parse do JSON também é defensivo: o modelo às vezes devolve o objeto embrulhado em cerca de código ou com um prefixo `json`. A Lambda tira isso e extrai o primeiro objeto válido.
+
+Se a tradução de um item falha, ele é publicado com o resumo original em inglês, na categoria "Outros", e o resto do lote segue. O item também fica marcado como visto, então não volta para o LLM todo dia. É um trade-off consciente: nenhum loop de custo, ao preço de alguns itens em inglês se o Bedrock falhar na hora do cron.
+
+## Operação
+
+Tudo é um template CloudFormation (bucket, política pública de leitura, tabela, role com `bedrock:InvokeModel`, função e regra agendada) e um `deploy.ps1` que empacota, sobe e, com `-RunNow`, já invoca a primeira execução. Trocar de modelo é mudar um parâmetro.
+
+A primeira carga processa o feed inteiro (~65 itens). Na primeira tentativa, sem o acesso ao modelo habilitado na região, quase tudo caiu no fallback. Lição registrada no README: conferir *Model access* no Bedrock antes do primeiro deploy.
+
+<Metrics>
+<Metric value="< US$ 2" label="custo estimado por mês" />
+<Metric value="1" label="Lambda, sem servidor" />
+<Metric value="15" label="categorias fixas" />
+<Metric value="30 dias" label="TTL da deduplicação" />
+</Metrics>
+
+<Card title="Por que Haiku e não um modelo maior">
+
+Traduzir e reestruturar um anúncio curto com regras claras é tarefa de modelo pequeno. O ganho de qualidade de um modelo maior não aparece no resultado, e o custo multiplica. O ID do modelo é parâmetro: dá para trocar por uma versão mais nova sem tocar no código.
+
+</Card>

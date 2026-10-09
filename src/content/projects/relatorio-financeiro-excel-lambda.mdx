@@ -1,0 +1,31 @@
+---
+title: "Relatório financeiro diário em Excel via Lambda + SES"
+slug: relatorio-financeiro-excel-lambda
+summary: "Uma Lambda consulta o ERP toda manhã, gera um .xlsx formatado com ~74 mil linhas de contas a pagar e receber e envia por e-mail um resumo com link de download."
+category: cloud
+tier: B
+date: 2026-05-29
+stack: ["AWS Lambda", "EventBridge", "Firebird", "Secrets Manager", "S3", "SES", "SAM", "Python"]
+metrics:
+  - { label: "relatório", before: "sob demanda", after: "08:00, todo dia" }
+  - { label: "planilha", before: "CSV cru", after: ".xlsx formatado" }
+cover: /projects/relatorio-financeiro-excel-lambda/architecture.svg
+---
+
+O financeiro precisa da posição consolidada de contas a pagar e a receber, que mora num ERP legado em Firebird. Agora ela chega por e-mail às 08:00, numa planilha pronta para filtrar.
+
+<Figure src="/projects/relatorio-financeiro-excel-lambda/architecture.svg" alt={"O EventBridge dispara às 08:00 uma Lambda em Python dentro da VPC. Ela lê as credenciais no Secrets Manager, consulta cerca de 74 mil linhas no Firebird do ERP, gera uma planilha xlsx de cerca de 15 MB, salva no S3 com lifecycle de 90 dias e envia pelo SES um e-mail com o resumo e um link presigned válido por 7 dias."} />
+
+**Como funciona:** EventBridge dispara a Lambda (Python 3.12, `openpyxl`, 2 GB de memória) na mesma VPC do Firebird. O driver `firebirdsql` é Python puro, sem binário nativo. A consulta cobre ~17 meses de movimentação.
+
+**A planilha é o produto.** Aba *Resumo* com cards de KPI e totais a receber (verde) e a pagar (vermelho). Aba *Detalhe* com cabeçalho congelado, AutoFilter, colunas agrupadas por assunto, rótulos em português, datas como data de verdade e moeda em `R$ #.##0,00`. Códigos internos viram texto: `R` → "Receber", `D` → "Débito".
+
+**Por que link e não anexo:** com ~15 MB, o anexo caberia no limite do SES, mas pesaria em algumas caixas. S3 + URL presigned de 7 dias deixa o e-mail leve e a retenção controlada pela lifecycle do bucket.
+
+<Callout type="info">
+
+**Banco legado tem bytes quebrados.** Há registros com caracteres inválidos em `WIN1252`; sem tratamento, um único registro derruba a execução inteira. A conexão decodifica com `errors="replace"`: um caractere estranho na planilha é melhor que relatório nenhum.
+
+</Callout>
+
+Execução típica: ~7 minutos, ~74 mil linhas, deploy com SAM.
