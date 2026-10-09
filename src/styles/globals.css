@@ -179,12 +179,9 @@ html::-webkit-scrollbar {
   transform: scale(1.04) translate(calc(var(--mx, 0) * -8px), calc(var(--my, 0) * -8px));
 }
 
-/* concave carousel: snap de 500ms ease-out; reflexo esmaecendo pra baixo */
+/* concave carousel: posição animada em JS (rAF: deslize, inércia, mola); reflexo esmaecendo pra baixo */
 .concave-card {
   transform-style: preserve-3d;
-  transition:
-    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 

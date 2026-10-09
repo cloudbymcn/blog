@@ -51,7 +51,7 @@ function redirectHtml(to: string) {
 }
 
 /**
- * Build: (1) dist/<rota>/index.html pra /projetos, /sobre, /contato e cada /projetos/<slug>, com
+ * Build: (1) dist/<rota>/index.html pra /projetos, /contato e cada /projetos/<slug>, com
  * title/description/og/canonical da rota (crawler de rede social não roda JS; e o GitHub Pages
  * passa a responder 200 nessas rotas); (2) dist/404.html com noindex (fallback da SPA);
  * (3) redirects de scripts/redirects.json ({from,to}[]) como HTML com refresh + canonical + replace.
