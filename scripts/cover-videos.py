@@ -9,7 +9,9 @@ Uso:
 videos.tsv: slug<TAB>url[<TAB>modo]. Modo:
   framed            vídeo gerado a partir do cover.webp COM moldura: recorta a área interna
   crop=x0,y0,x1,y1  recorte em frações do quadro (ex.: tirar barra lateral/toolbar de print de app)
+  start=S           começa o loop em S segundos (loop = min(4, duração - S - 0,45))
   (vazio)           imagem crua, preenche a janela com crop central
+Opções combinam com ";" (ex.: crop=0.1,0,0.9,0.9;start=1).
 Arquivo local já baixado: tmp/covers-gen/videos/<slug>.mp4 (pula o download).
 """
 
@@ -77,24 +79,26 @@ def probe(src: Path) -> tuple[float, float, int, int]:
 
 
 def build_filter(dur: float, fps: float, mode: str) -> tuple[str, float]:
-    loop = min(LOOP, dur - XF - 0.05)
+    opts = dict(o.split("=", 1) if "=" in o else (o, "") for o in mode.split(";") if o)
+    start = float(opts.get("start", 0))  # pula o começo (ex.: IA "recarregando" a tela)
+    loop = min(LOOP, dur - start - XF - 0.05)
     if loop < 2:
         raise ValueError(f"vídeo curto demais ({dur:.2f}s)")
     pre = f"fps={fps:g}"
     box = None
-    if mode == "framed":  # área interna relativa do cover 1600x1000
+    if "framed" in opts:  # área interna relativa do cover 1600x1000
         box = (WIN[0] / 1600, (WIN[1] + BAR) / 1000, WIN[2] / 1600, WIN[3] / 1000)
-    elif mode.startswith("crop="):
-        box = tuple(map(float, mode[5:].split(",")))
+    elif "crop" in opts:
+        box = tuple(map(float, opts["crop"].split(",")))
     if box:
         x0, y0, x1, y1 = box
         pre += f",crop=iw*{x1 - x0:.5f}:ih*{y1 - y0:.5f}:iw*{x0:.5f}:ih*{y0:.5f}"
-    # saída[t] = src[t+XF]; nos últimos XF s entra src[0..XF] em fade -> o último frame emenda no primeiro
+    # saída[t] = src[S+XF+t]; nos últimos XF s entra src[S..S+XF] em fade -> o último frame emenda no primeiro
     graph = (
         f"[0:v]{pre},scale={VW}:{VH}:force_original_aspect_ratio=increase:flags=lanczos,"
         f"crop={VW}:{VH},setsar=1,format=yuv420p,split[a][b];"
-        f"[a]trim=0:{XF},setpts=PTS-STARTPTS[head];"
-        f"[b]trim={XF}:{XF + loop},setpts=PTS-STARTPTS[body];"
+        f"[a]trim={start}:{start + XF},setpts=PTS-STARTPTS[head];"
+        f"[b]trim={start + XF}:{start + XF + loop},setpts=PTS-STARTPTS[body];"
         f"[body][head]xfade=transition=fade:duration={XF}:offset={loop - XF}[lp];"
         f"[lp]pad={W}:{H}:{VX}:{VY}:white[p];"
         f"[p][1:v]overlay=0:0:shortest=1,format=yuv420p[v]"
