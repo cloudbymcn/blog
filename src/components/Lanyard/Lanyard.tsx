@@ -39,6 +39,8 @@ export interface LanyardProps {
   breeze?: number;
   interactive?: boolean;
   intro?: boolean;
+  /** [forja] canvas não bloqueia a página: só o cartão captura ponteiro (hit test via raycast). */
+  passThrough?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -64,6 +66,7 @@ interface Settings {
   breeze: number;
   interactive: boolean;
   intro: boolean;
+  passThrough: boolean;
 }
 
 interface Images {
@@ -888,6 +891,7 @@ const Lanyard = ({
   breeze = 0.5,
   interactive = true,
   intro = true,
+  passThrough = false,
   className = '',
   style
 }: LanyardProps) => {
@@ -917,7 +921,8 @@ const Lanyard = ({
       elasticity,
       breeze,
       interactive,
-      intro
+      intro,
+      passThrough
     };
   });
 
@@ -1412,6 +1417,58 @@ const Lanyard = ({
     canvas.addEventListener('lostpointercapture', onPointerUp);
     canvas.addEventListener('touchstart', onTouchStart, { passive: false });
 
+    // [forja] passThrough: canvas cobre a dobra por cima do texto mas só o cartão recebe ponteiro.
+    // Fora do cartão o canvas fica pointer-events: none e os cliques caem nos links/botões embaixo.
+    const passThrough = settingsRef.current!.passThrough;
+    const setCatch = (on: boolean) => {
+      const value = on ? 'auto' : 'none';
+      if (canvas.style.pointerEvents !== value) canvas.style.pointerEvents = value;
+    };
+    // elementos marcados (painel de ajustes, nav) ficam por cima do canvas: o cartão não rouba o clique
+    const blocked = (event: Event) =>
+      event.target instanceof Element && !!event.target.closest('[data-lanyard-block]');
+    const overCard = (event: Point) => {
+      const rect = canvas.getBoundingClientRect();
+      if (
+        event.clientX < rect.left ||
+        event.clientX > rect.right ||
+        event.clientY < rect.top ||
+        event.clientY > rect.bottom
+      )
+        return false;
+      toPointer(event);
+      return !!pickCard();
+    };
+    const onWindowMove = (event: PointerEvent) => {
+      if (sim.grab || event.pointerType === 'touch') return;
+      setCatch(settingsRef.current!.interactive && !blocked(event) && overCard(event));
+    };
+    // toque não tem hover: o pointerdown chega no elemento de baixo, então repassa pro cartão se acertou
+    const onWindowDown = (event: PointerEvent) => {
+      if (event.target === canvas || blocked(event) || !settingsRef.current!.interactive || !overCard(event))
+        return;
+      setCatch(true);
+      event.stopPropagation();
+      onPointerDown(event);
+    };
+    const onWindowTouch = (event: TouchEvent) => {
+      if (event.target === canvas || blocked(event) || event.touches.length !== 1) return;
+      if (!settingsRef.current!.interactive) return;
+      if (overCard(event.touches[0])) event.preventDefault();
+    };
+    const onRelease = () => {
+      if (!sim.grab && !hovering) setCatch(false);
+    };
+    if (passThrough) {
+      setCatch(false);
+      window.addEventListener('pointermove', onWindowMove, true);
+      window.addEventListener('pointerdown', onWindowDown, true);
+      window.addEventListener('touchstart', onWindowTouch, { capture: true, passive: false });
+      canvas.addEventListener('pointerup', onRelease);
+      canvas.addEventListener('pointerleave', onRelease);
+      canvas.addEventListener('lostpointercapture', onRelease);
+    }
+
     const resize = () => {
       view.width = Math.max(1, container.clientWidth);
       view.height = Math.max(1, container.clientHeight);
@@ -1449,6 +1506,12 @@ const Lanyard = ({
       canvas.removeEventListener('pointercancel', onPointerUp);
       canvas.removeEventListener('lostpointercapture', onPointerUp);
       canvas.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('pointermove', onWindowMove, true);
+      window.removeEventListener('pointerdown', onWindowDown, true);
+      window.removeEventListener('touchstart', onWindowTouch, true);
+      canvas.removeEventListener('pointerup', onRelease);
+      canvas.removeEventListener('pointerleave', onRelease);
+      canvas.removeEventListener('lostpointercapture', onRelease);
       [bodyMesh, frontMesh, backMesh, ring, clampMesh, eyelet, band].forEach(mesh => mesh.geometry?.dispose());
       [frontMaterial, backMaterial, edgeMaterial, metalMaterial, bandMaterial].forEach(material => material.dispose());
       [frontTexture, backTexture, strapTexture, grain, weave].forEach(texture => texture.dispose());
@@ -1459,7 +1522,11 @@ const Lanyard = ({
   }, []);
 
   return (
-    <div ref={containerRef} className={`relative w-full h-full overflow-hidden ${className}`.trim()} style={style} />
+    <div
+      ref={containerRef}
+      className={`relative w-full h-full overflow-hidden ${className}`.trim()}
+      style={passThrough ? { pointerEvents: 'none', ...style } : style}
+    />
   );
 };
 

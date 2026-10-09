@@ -1,8 +1,10 @@
 import { lazy, Suspense, useState, useSyncExternalStore } from 'react'
+import { LANYARD_DEFAULTS, type LanyardSettings } from './settings'
 
 const Lanyard = lazy(() => import('./Lanyard'))
 
-const FRONT = '/lanyard/card-front.png'
+// temporário até a Lente entregar o card-front claro (SPEC §0-bis): foto P&B sobre branco
+const FRONT = '/lanyard/card-front-temp.webp'
 
 const reducedMotionQuery = '(prefers-reduced-motion: reduce)'
 
@@ -29,17 +31,26 @@ function isLowEnd(): boolean {
 }
 
 /** Cartão estático com balanço CSS. Usado como fallback do Suspense e em reduced-motion/GPU fraca. */
-export function LanyardPlaceholder() {
+type Anchor = 'left' | 'center' | 'right'
+
+// mesmas posições do Lanyard (ANCHORS), pro placeholder pender do mesmo ponto
+const ANCHOR_X: Record<Anchor, string> = { left: '27%', center: '50%', right: '73%' }
+
+export function LanyardPlaceholder({ anchor = 'center' }: { anchor?: Anchor }) {
   const [failed, setFailed] = useState(false)
   return (
-    <div className="flex h-full w-full items-start justify-center pt-6" aria-hidden="true">
+    <div
+      className="absolute top-0 flex h-full -translate-x-1/2 items-start justify-center pt-6"
+      style={{ left: ANCHOR_X[anchor] }}
+      aria-hidden="true"
+    >
       <div className="lanyard-sway flex flex-col items-center">
         <div className="h-28 w-3 rounded-sm bg-[#111]" />
-        <div className="-mt-1 h-4 w-8 rounded-sm bg-gradient-to-b from-zinc-500 to-zinc-700" />
+        <div className="-mt-1 h-4 w-8 rounded-sm bg-gradient-to-b from-[#e5e5ea] to-[#a1a1a6]" />
         {failed ? (
-          <div className="mt-1 flex aspect-[2/3] w-56 flex-col justify-end rounded-2xl border border-line bg-[#f4f4f5] p-5 text-left text-zinc-900 shadow-2xl">
-            <span className="font-display text-lg font-bold leading-tight">MATHEUS NASCIMENTO</span>
-            <span className="font-mono text-xs text-zinc-600">Cloud Engineer · AWS</span>
+          <div className="mt-1 flex aspect-[2/3] w-56 flex-col justify-end rounded-2xl border border-line bg-white p-5 text-left text-ink shadow-2xl">
+            <span className="font-display text-lg font-semibold leading-tight">Matheus Nascimento</span>
+            <span className="font-mono text-xs text-ink-2">@cloudbymcn</span>
           </div>
         ) : (
           <img
@@ -49,7 +60,7 @@ export function LanyardPlaceholder() {
             height={1440}
             decoding="async"
             onError={() => setFailed(true)}
-            className="mt-1 w-56 rounded-2xl shadow-2xl"
+            className="mt-1 w-56 rounded-2xl border border-line bg-white shadow-2xl"
           />
         )}
       </div>
@@ -57,39 +68,41 @@ export function LanyardPlaceholder() {
   )
 }
 
-export function LanyardStage() {
+/**
+ * passThrough: canvas cobre a área inteira (inclusive por cima do texto) e só o cartão captura ponteiro.
+ * anchor: de onde o strap pende ('right' no desktop, com o texto à esquerda).
+ * settings: ajustes ao vivo vindos do <LanyardControls> (padrão em LANYARD_DEFAULTS).
+ */
+export function LanyardStage({
+  anchor = 'center',
+  passThrough = false,
+  settings = LANYARD_DEFAULTS,
+}: {
+  anchor?: Anchor
+  passThrough?: boolean
+  settings?: LanyardSettings
+}) {
   const reduced = useSyncExternalStore(subscribeReducedMotion, prefersReducedMotion, () => true)
   const [lowEnd] = useState(isLowEnd)
+  const { plainBand, ...look } = settings
 
   return (
-    <div className="relative h-full min-h-[520px] w-full">
+    <div className="relative h-full w-full">
       {/* absolute: o canvas do Lanyard se redimensiona pelo container; com altura auto ele cresce em loop */}
-      <div className="absolute inset-0">
+      <div className={`absolute inset-0 ${passThrough ? 'pointer-events-none' : ''}`}>
         {reduced || lowEnd ? (
-          <LanyardPlaceholder />
+          <LanyardPlaceholder anchor={anchor} />
         ) : (
-          <Suspense fallback={<LanyardPlaceholder />}>
+          <Suspense fallback={<LanyardPlaceholder anchor={anchor} />}>
             <Lanyard
+              {...look}
               frontImage={FRONT}
               backImage="/lanyard/card-back.png"
-              strapImage="/lanyard/strap.png"
+              strapImage={plainBand ? undefined : '/lanyard/strap.png'}
               imageFit="cover"
-              cardColor="#0e0e10"
               orientation="portrait"
-              finish="glossy"
-              cornerRadius={0.35}
-              size={0.62}
-              anchor="center"
-              strapLength={0.45}
-              strapColor="#111111"
-              strapWidth={0.65}
-              metal="graphite"
-              gravity={1}
-              damping={0.5}
-              elasticity={0.5}
-              breeze={0.5}
-              interactive
-              intro
+              anchor={anchor}
+              passThrough={passThrough}
             />
           </Suspense>
         )}
