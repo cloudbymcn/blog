@@ -1,0 +1,334 @@
+---
+title: "API pública para um parceiro, banco privado na VPC"
+slug: api-segura-banco-privado
+summary: "Proxy Nginx com TLS e allowlist de IPs na frente do ERP. A porta do Firebird só aceita o Security Group do proxy."
+category: integracoes
+tier: B
+date: 2026-02-12
+stack: ["EC2", "Nginx", "Firebird", "Bash"]
+metrics:
+  - { label: "portas do banco expostas", after: "0" }
+cover: /projects/api-segura-banco-privado/architecture.svg
+---
+
+## Objetivo
+
+<Callout type="info">
+
+Preparar o nosso ambiente em nuvem para receber uma API de um terceiro para fazer consultas no nosso banco de dados, isso de modo seguro e funcional. Optamos por escolher esse modelo pois teriamos controle de todo ambiente.
+
+</Callout>
+
+## Arquitetura final (visão geral)
+
+A ideia é separar "o que é público" (API) do "que é crítico" (banco). A API fica na internet, mas com acesso estritamente controlado. O banco fica dentro da VPC e só aceita conexão da VM da API.
+
+<Figure src="/projects/api-segura-banco-privado/architecture.svg" alt={"Parceiro com IP fixo chega via DNS ao proxy Nginx numa EC2 Ubuntu; o proxy encaminha /q e /status para o ERP numa EC2 Windows, que consulta o Firebird na porta 3050, liberada só para o Security Group do proxy."} />
+
+## Threat model (o que eu estava tentando evitar)
+
+-   **Exposição**: abrir a porta do banco para o mundo = convite para ataque e vazamento.
+-   **Varredura e exploração da API**: deixar 443 público = bots/scan 24/7.
+-   **Acesso administrativo indevido**: SSH público e sem restrição = brute force e tentativa de acesso.
+-   **Configuração errada de DNS/SSL**: certificado em domínio errado ou proxy ativado no Cloudflare = quebra de emissão/renovação.
+
+<Callout type="success">
+
+**Postura final de segurança**
+
+-   **SSH (22)** liberado apenas para meu IP
+-   **HTTPS (443)** liberado apenas para IPs fixos da empresa que irá acessar
+-   **Banco (3050)** liberado apenas para a EC2 da API (Security Group como source)
+-   **Banco nunca público**
+
+</Callout>
+
+## Passo a passo
+
+Abaixo está a sequência correta para você repetir sem retrabalho. O artigo vai até o ponto em que a infraestrutura está pronta, **antes** de instalar a API do parceiro (uma plataforma externa que precisava consultar o ERP).
+
+### 0) Convenções e dados anonimizados
+
+-   Domínio fictício: `api.example.com`
+-   IP público da EC2: `ELASTIC_IP`
+-   IPs fixos do parceiro a serem liberados: `IP_PARCEIRO_1/32`, `IP_PARCEIRO_2/32`, `IP_PARCEIRO_3/32`
+-   Porta do banco: `3050` (Firebird)
+
+<Step n={"1"}>
+
+### Criar a EC2 Ubuntu (servidor da API)
+
+1.  AWS Console → EC2 → **Launch instance**
+2.  Nome: `api-parceiro-proxy`
+3.  AMI: **Ubuntu Server 24.04 LTS**
+4.  Instance type: `t3.micro` (ajuste conforme carga)
+5.  Network: **mesma VPC** do servidor do banco
+6.  Subnet: **pública** (para receber HTTPS)
+7.  Auto-assign public IP: **Enabled**
+
+</Step>
+
+<Step n={"2"}>
+
+### Criar a Key Pair (.pem) para acesso SSH
+
+Para acessar com segurança, criei uma chave dedicada. Em ambiente corporativo, evite compartilhar a chave "padrão" com terceiros. Se o parceiro precisar acesso, o ideal é criar um usuário e chave exclusivos (ou você executar os comandos).
+
+1.  Na criação da instância: **Create new key pair**
+2.  Tipo: **RSA**
+3.  Formato: **.pem**
+4.  Salvar em local seguro
+
+</Step>
+
+<Step n={"3"}>
+
+### Security Group inicial (bootstrap)
+
+No início, eu preciso instalar pacotes, validar HTTP e emitir SSL. Então criei um SG temporário.
+
+```
+Inbound (temporário):
+- SSH 22  → meu IP (/32)
+- HTTP 80 → 0.0.0.0/0 (validação Let's Encrypt)
+- HTTPS 443 → 0.0.0.0/0 (testes iniciais)
+```
+
+<Callout type="info">
+
+**Por que HTTP 80 fica aberto no começo?** O Let's Encrypt (HTTP-01) precisa validar o host em 80. Depois, você mantém 80 só para redirect ou fecha, dependendo do desenho.
+
+</Callout>
+
+</Step>
+
+<Step n={"4"}>
+
+### Elastic IP (IP fixo)
+
+1.  EC2 → **Elastic IPs** → Allocate Elastic IP
+2.  Selecionar o Elastic IP → Actions → **Associate** → escolher a EC2
+
+**Caso não tenha IPs elásticos sobrando pode usar o privado mas saiba que se reiniciar a instância o IP irá mudar e você tem que se atentar a isso.**
+
+</Step>
+
+<Step n={"5"}>
+
+### DNS no Cloudflare (subdominio → IP)
+
+```
+Type: A
+Name: api
+Content: ELASTIC_IP
+Proxy: DNS only (cinza)
+```
+
+</Step>
+
+<Step n={"6"}>
+
+### Validar DNS
+
+```
+nslookup api.example.com
+```
+
+É necessário ver o IP sendo resolvido.
+
+</Step>
+
+<Step n={"7"}>
+
+### Acessar EC2 via SSH e atualizar
+
+Você tem 2 opções a primeira é gerar a chave .ppk a partir da chave .pem e a outra é o modo abaixo. Ambos via PuTTY.
+
+```bash
+ssh -i api-access-key.pem ubuntu@ELASTIC_IP
+sudo apt update
+sudo apt upgrade -y
+```
+
+</Step>
+
+<Step n={"8"}>
+
+### Instalar Nginx
+
+```bash
+sudo apt install nginx -y
+sudo systemctl enable nginx
+sudo systemctl start nginx
+sudo systemctl status nginx --no-pager
+```
+
+</Step>
+
+<Step n={"9"}>
+
+### Emitir SSL (Let's Encrypt)
+
+```bash
+sudo systemctl stop nginx
+sudo apt install certbot -y
+sudo certbot certonly --standalone -d api.example.com
+sudo ls -la /etc/letsencrypt/live/api.example.com/
+sudo systemctl start nginx
+```
+
+</Step>
+
+<Step n={"10"}>
+
+### Configurar Nginx com HTTPS + endpoints preparados
+
+### Nginx config (sites-available)
+
+```bash
+server {
+  listen 80;
+  server_name api.example.com;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl http2;
+  server_name api.example.com;
+
+  ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+
+  location /status { proxy_pass http://127.0.0.1:3000/status; }
+  location /q      { proxy_pass http://127.0.0.1:3000/q; }
+
+  location / {
+    return 200 "OK - HTTPS ativo. Aguardando deploy da API.\n";
+    add_header Content-Type text/plain;
+  }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/api-parceiro /etc/nginx/sites-enabled/api-parceiro
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+</Step>
+
+<Step n={"11"}>
+
+### Descobrir porta do banco
+
+```
+netstat -ano | findstr LISTENING
+```
+
+</Step>
+
+<Step n={"12"}>
+
+### Liberar PORTA no SG da instância do BANCO só para o SG da EC2 da API
+
+```
+Type: Custom TCP
+Port: 3050
+Source: Security Group da EC2 API (sg-api-parceiro-proxy)
+```
+
+</Step>
+
+<Step n={"13"}>
+
+### Fechar o SG da API (estado final): liberar só os IPs do parceiro
+
+Você vai remover todos os ips que estavam liberados e deixam somente o SSH pra você e os IPs requisitados pela empresa.
+
+```
+SSH 22   → meu IP (/32)
+HTTPS 443 → IPs fixos do parceiro (/32)
+```
+
+</Step>
+
+## Validações e testes antes do deploy da API
+
+| Teste | Comando / Ação | Resultado esperado |
+| --- | --- | --- |
+| **DNS** | `nslookup api.example.com` | Resolve para o Elastic IP correto |
+| **HTTPS** | Abrir: `https://api.example.com` | Certificado válido, resposta 200 |
+| **Conectividade EC2 → Banco** | `nc -zv IP_PRIVADO_DO_BANCO 3050` | Connection succeeded |
+
+## Decisões de design (por que fiz assim)
+
+<Card title={"Por que EC2 Linux para a API?"}>
+
+Porque eu preciso de um ponto controlado para expor HTTPS e aplicar política de rede (allowlist) sem tocar direto no servidor do ERP. Linux + Nginx = simples, barato, previsível e fácil de auditar.
+
+</Card>
+
+<Card title={"Por que Nginx na frente?"}>
+
+Nginx me dá TLS confiável, logs, reverse proxy e flexibilidade para publicar apenas os endpoints necessários (`/status` e `/q`), mantendo a aplicação atrás de uma porta interna.
+
+</Card>
+
+<Card title={"Por que Let's Encrypt?"}>
+
+Resolve SSL de forma prática e padronizada. Em produção, o mais importante é ser válido e renovável sem manual.
+
+</Card>
+
+<Card title={"Por que allowlist por IP?"}>
+
+É o requisito. E é uma defesa direta contra varredura/ataque: mesmo que o domínio seja público, ninguém fora da lista chega na API.
+
+</Card>
+
+<Card title={"Por que liberar o banco só para o SG da API?"}>
+
+Isso elimina exposição acidental. A porta `3050` do Firebird fica aberta apenas para o "identificador" da VM da API (Security Group), não para a internet e nem para sub-redes inteiras.
+
+</Card>
+
+<Card title={"Por que abrir \"pro mundo\" no começo e depois fechar?"}>
+
+Durante bootstrap (instalar Nginx/Certbot, validar DNS/HTTP-01, testar TLS), é comum abrir temporariamente. Mas a regra é: **abrir só o mínimo, por pouco tempo, e fechar imediatamente**. O estado final tem que ser restrito.
+
+</Card>
+
+## O que faltava do parceiro
+
+-   Pacote da API (ou Docker) e instruções
+-   Porta interna que a API usa (para ajustar proxy)
+-   Parâmetros/segredos (string de conexão, user read-only, etc.)
+
+<Callout type="warn">
+
+Melhor cenário: você executa os comandos enviados. Se for necessário acesso, crie usuário/chave dedicados (não compartilhe sua key principal).
+
+</Callout>
+
+## Lições aprendidas
+
+-   Ping não prova HTTPS. DNS + 443 + certificado provam.
+-   Proxy Cloudflare pode afetar emissão/renovação (planeje).
+-   SG como source exige mesma VPC.
+-   Bootstrap aberto é temporário e tem que virar "estado final restrito".
+
+## Checklist final para produção
+
+| Categoria | Item |
+| --- | --- |
+| **Rede & DNS** | Domínio resolve para Elastic IP correto |
+| **Rede & DNS** | DNS only durante SSL (se usando HTTP-01) |
+| **Segurança** | 443 só para IPs do parceiro |
+| **Segurança** | 22 só para seu IP |
+| **Segurança** | 3050 só para SG da EC2 API |
+| **HTTPS** | Certificado válido |
+| **HTTPS** | `nginx -t` sem erro |
+| **Deploy** | Nginx preparado para `/status` e `/q` |
+| **Deploy** | Conectividade com banco testada |
+
+Observação: todos os IPs/nomes/domínios neste artigo foram anonimizados.

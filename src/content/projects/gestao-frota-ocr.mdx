@@ -1,0 +1,718 @@
+---
+title: "SaaS de frota com OCR de cupom fiscal"
+slug: gestao-frota-ocr
+summary: "Multi-tenant para oficinas de frota terceirizada: checklist com 5 fotos, OCR do cupom de abastecimento e alerta de manutenção preventiva."
+category: produtos
+tier: B
+date: 2026-05-26
+stack: ["Next.js", "PWA", "SST", "TypeScript", "AWS Lambda", "API Gateway", "DynamoDB", "Cognito", "S3", "SES", "OCR", "Bedrock (Claude)"]
+metrics:
+  - { label: "foto → formulário", before: "digitação", after: "~3 s" }
+  - { label: "acerto do OCR", after: "~92%" }
+cover: /projects/gestao-frota-ocr/architecture.svg
+---
+
+## O contexto
+
+Esse projeto começou de um problema bem do mundo real: oficinas mecânicas que prestam serviço de frota terceirizada (uma sai e leva 7-10 vans de cliente, faz manutenção, devolve) precisam de três coisas que planilha Excel não resolve:
+
+1.  **Conferência diária** de cada veículo (5 fotos + odômetro + observações) feita por um motorista no celular, no pátio.
+2.  **Abastecimento rastreado**: cada vez que o veículo enche tanque, motorista bate foto do cupom fiscal. Sistema lendo cupom é _muito_ melhor que motorista digitando valor a mão.
+3.  **Manutenção preventiva**: avisar o dono da oficina ANTES do veículo precisar — "vai bater 30 dias ou 500km, está na hora da revisão".
+
+A primeira cliente é uma oficina de frota terceirizada no ES.
+
+O ponto chave da arquitetura: **multi-tenant desde dia 1**. Uma instalação da AWS Lambda, um Cognito User Pool, mas cada oficina vê apenas a sua frota. Custo de adicionar um novo cliente: criar registro de tenant + convidar admin. Zero infra nova.
+
+## Arquitetura
+
+```text
+  ┌─────────────────────────────────────┐
+  │  Next.js 15 PWA (apps/web)          │
+  │   • App Router                      │
+  │   • Tailwind + shadcn/ui            │
+  │   • Workbox PWA                     │
+  │   • Camera capture                  │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  SST Nextjs (CloudFront + Lambda)   │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  API Gateway HTTP v2                │
+  │   • throttling 50/s, burst 100      │
+  │   • CORS                            │
+  └──────────────────┬──────────────────┘
+                     ▼
+  ┌─────────────────────────────────────┐
+  │  Lambda (ANY /{proxy+})             │
+  │  apps/api/src/index.handler         │
+  │  19 módulos de rotas               │
+  └─┬─────┬─────┬─────┬─────┬───────────┘
+    ▼     ▼     ▼     ▼     ▼
+  Cognito  S3   DDB  Textract Bedrock
+                     Location Service
+
+  ┌─────────────────────────────────────┐
+  │  Cron: maintenance-check (13h UTC)  │
+  │  alerta antes do prazo              │
+  └─────────────────────────────────────┘
+```
+
+### Stack
+
+| Camada | Serviço |
+| --- | --- |
+| Frontend | Next.js 15 (App Router) + Tailwind + shadcn/ui + PWA |
+| Backend | AWS Lambda + API Gateway HTTP v2 (via SST v3) |
+| Auth | Amazon Cognito (custom attrs: tenantId, role) |
+| DB | DynamoDB single-table (2 GSIs) |
+| Storage | S3 (lifecycle 30d STD\_IA, 180d GLACIER\_IR) |
+| E-mail | Amazon SES |
+| OCR | Amazon Textract (AnalyzeExpense + DetectDocumentText) |
+| Geocoding | Amazon Location Service (Esri) |
+| AI | Bedrock (Sonnet 4.5 / Haiku 4.5) pra resumos |
+| IaC | SST v3 (Ion) sobre Pulumi/AWS provider |
+
+## SST v3 (Ion): IaC em TypeScript
+
+Optei por SST sobre CDK ou Terraform porque o projeto já tinha Next.js, então o stack do dev era TypeScript de qualquer jeito. SST v3 (codenome "Ion") é uma reescrita sobre Pulumi com tooling muito superior à v2 (que era CDK puro).
+
+<details>
+<summary>sst.config.ts — resources principais (clique para expandir)</summary>
+
+```typescript
+/// <reference path="./.sst/platform/config.d.ts" />
+
+export default $config({
+  app(input) {
+    return {
+      name: "frota",
+      removal: input?.stage === "prod" ? "retain" : "remove",
+      home: "aws",
+      providers: { aws: { region: "us-east-1" } },
+    };
+  },
+  async run() {
+    // ─── S3 bucket de fotos com lifecycle ──────────────────
+    const photosBucket = new sst.aws.Bucket("Photos", {
+      versioning: true,
+      cors: {
+        allowOrigins: ["*"],
+        allowMethods: ["GET", "PUT", "POST"],
+        allowHeaders: ["*"],
+        maxAge: "1 hour",
+      },
+      transform: {
+        bucket: (args) => {
+          args.lifecycleRules = [
+            {
+              id: "archive-old-photos",
+              enabled: true,
+              transitions: [
+                { days: 30, storageClass: "STANDARD_IA" },
+                { days: 180, storageClass: "GLACIER_IR" },
+              ],
+            },
+          ];
+        },
+      },
+    });
+
+    // ─── DynamoDB single-table com 2 GSIs ──────────────────
+    const table = new sst.aws.Dynamo("Data", {
+      fields: {
+        pk: "string", sk: "string",
+        gsi1pk: "string", gsi1sk: "string",
+        gsi2pk: "string", gsi2sk: "string",
+      },
+      primaryIndex: { hashKey: "pk", rangeKey: "sk" },
+      globalIndexes: {
+        gsi1: { hashKey: "gsi1pk", rangeKey: "gsi1sk" },
+        gsi2: { hashKey: "gsi2pk", rangeKey: "gsi2sk" },
+      },
+      transform: {
+        table: (args) => {
+          args.pointInTimeRecovery = { enabled: true };
+        },
+      },
+    });
+
+    // ─── Cognito com custom attributes ─────────────────────
+    const userPool = new sst.aws.CognitoUserPool("Users", {
+      usernames: ["email"],
+      transform: {
+        userPool: {
+          schemas: [
+            {
+              name: "tenantId",
+              attributeDataType: "String",
+              mutable: true,
+              stringAttributeConstraints: { minLength: "1", maxLength: "64" },
+            },
+            {
+              name: "role",
+              attributeDataType: "String",
+              mutable: true,
+              stringAttributeConstraints: { minLength: "1", maxLength: "16" },
+            },
+          ],
+          passwordPolicy: {
+            minimumLength: 10,
+            requireLowercase: true,
+            requireNumbers: true,
+            requireUppercase: true,
+          },
+        },
+      },
+    });
+
+    // ─── Location Service ──────────────────────────────────
+    const placeIndex = new aws.location.PlaceIndex("Places", {
+      indexName: `frota-${$app.stage}-places`,
+      dataSource: "Esri",
+      dataSourceConfiguration: { intendedUse: "SingleUse" },
+    });
+
+    // ... continua com api, web, cron
+  },
+});
+```
+
+</details>
+
+<Callout type="success">
+
+**SST `link` elimina IAM boilerplate.** Quando você declara `link: [table, photosBucket]` na Lambda, o SST inject as permissões certas (least-privilege) e seta env vars com os nomes/ARNs. Você não escreve uma policy IAM à mão pra acessar resources do próprio stack.
+
+</Callout>
+
+### Throttling no API Gateway
+
+API Gateway HTTP v2 já tem throttle global, mas eu configurei explícito pra dar headroom:
+
+<details>
+<summary>API config — throttling (clique para expandir)</summary>
+
+```typescript
+const api = new sst.aws.ApiGatewayV2("Api", {
+  cors: {
+    allowOrigins: ["*"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE"],
+    allowHeaders: ["*"],
+  },
+  transform: {
+    stage: {
+      defaultRouteSettings: {
+        throttlingRateLimit: 50,   // 50 req/s sustained
+        throttlingBurstLimit: 100, // 100 req em burst
+      },
+    },
+  },
+});
+
+api.route("ANY /{proxy+}", {
+  handler: "apps/api/src/index.handler",
+  link: [table, photosBucket],
+  environment: { /* ... */ },
+  permissions: [
+    { actions: ["ses:SendEmail"], resources: ["*"] },
+    { actions: ["textract:AnalyzeExpense", "textract:DetectDocumentText"], resources: ["*"] },
+    { actions: ["geo:SearchPlaceIndexForPosition"], resources: [placeIndex.indexArn] },
+    // ... Cognito admin actions, Bedrock invoke
+  ],
+});
+```
+
+</details>
+
+50/s é suficiente até ~30 oficinas simultâneas. Subir é trocar duas linhas.
+
+## Multi-tenant: `tenantId` em tudo
+
+A peça mais importante do design. O `tenantId` é um atributo custom do Cognito injetado no JWT. **Toda** consulta no DynamoDB tem ele como prefixo da PK, isolando os tenants por design.
+
+<details>
+<summary>middleware de auth + tenant (clique para expandir)</summary>
+
+```typescript
+// apps/api/src/lib/auth.ts
+import { jwtVerify, createRemoteJWKSet } from "jose";
+
+const JWKS = createRemoteJWKSet(
+  new URL(`https://cognito-idp.us-east-1.amazonaws.com/${process.env.USER_POOL_ID}/.well-known/jwks.json`)
+);
+
+export interface UserContext {
+  userId: string;
+  email: string;
+  tenantId: string;
+  role: "admin" | "driver";
+}
+
+export async function authenticate(event: APIGatewayProxyEventV2): Promise<UserContext> {
+  const token = event.headers.authorization?.replace("Bearer ", "");
+  if (!token) throw new HttpError(401, "missing token");
+
+  const { payload } = await jwtVerify(token, JWKS, {
+    issuer: `https://cognito-idp.us-east-1.amazonaws.com/${process.env.USER_POOL_ID}`,
+    audience: process.env.USER_POOL_CLIENT_ID,
+  });
+
+  const tenantId = payload["custom:tenantId"] as string;
+  const role = payload["custom:role"] as string;
+  if (!tenantId) throw new HttpError(403, "user without tenant");
+
+  return {
+    userId: payload.sub!,
+    email: payload.email as string,
+    tenantId,
+    role: role as "admin" | "driver",
+  };
+}
+```
+
+</details>
+
+### Padrão de chave no DynamoDB
+
+```bash
+PK                              SK                          tipo
+─────────────────────────────────────────────────────────────────────
+TENANT#<tenant-id>              METADATA                    Tenant
+TENANT#<tenant-id>              CUSTOMER#<customer-id>     Cliente da oficina
+TENANT#<tenant-id>              VEHICLE#<plate>            Veículo
+TENANT#<tenant-id>              DRIVER#<driver-id>          Motorista
+TENANT#<tenant-id>              CHECKIN#<yyyymmdd>#<id>   Conferência diária
+TENANT#<tenant-id>              FUELING#<timestamp>        Abastecimento
+TENANT#<tenant-id>              MAINT#<timestamp>          Manutenção
+TENANT#<tenant-id>              FINE#<due-date>            Multa
+TENANT#<tenant-id>              NOTE#<vehicle>#<ts>        Observação por veículo
+```
+
+Como toda PK começa com `TENANT#`, queries do tenant batem na mesma partition, fica super-rápido e barato.
+
+### GSI1 e GSI2: respondendo perguntas inversas
+
+-   **GSI1 (gsi1pk-gsi1sk)**: invertido por entidade. Ex: ver tudo de uma _placa específica_ entre vários tenants — não vai acontecer no app de cliente, mas no admin global do SaaS sim.
+-   **GSI2 (gsi2pk-gsi2sk)**: ordenado por data global. Ex: "últimos abastecimentos de hoje em todos os tenants" pra debugging.
+
+## OCR de cupom fiscal: Amazon Textract
+
+Esse foi o "wow" do projeto. Motorista enche tanque, bate uma foto do cupom no balcão do posto, sistema lê _valor pago_ e _litros_ automaticamente. Tempo entre foto e form preenchido: ~3 segundos.
+
+Usei o `AnalyzeExpense` do Textract, que é específico pra cupons/notas:
+
+<details>
+<summary>apps/api/src/routes/ocr.ts — OCR de cupom (clique para expandir)</summary>
+
+```typescript
+import { TextractClient, AnalyzeExpenseCommand } from "@aws-sdk/client-textract";
+
+const textract = new TextractClient({});
+
+interface CupomResult {
+  total: number | null;
+  litros: number | null;
+  data: string | null;
+  posto: string | null;
+  confidence: number;
+}
+
+export async function analyzeCupom(bucket: string, key: string): Promise<CupomResult> {
+  const resp = await textract.send(new AnalyzeExpenseCommand({
+    Document: {
+      S3Object: { Bucket: bucket, Name: key },
+    },
+  }));
+
+  const fields = resp.ExpenseDocuments?.[0]?.SummaryFields ?? [];
+  const lineItems = resp.ExpenseDocuments?.[0]?.LineItemGroups?.[0]?.LineItems ?? [];
+
+  // 1. Total pago: campo "TOTAL"
+  const totalField = fields.find((f) =>
+    f.Type?.Text === "TOTAL" || f.Type?.Text === "AMOUNT_PAID"
+  );
+  const total = parseBrazilCurrency(totalField?.ValueDetection?.Text);
+
+  // 2. Litros: heurística nos line items (procura "L" ou "Litros")
+  let litros: number | null = null;
+  for (const item of lineItems) {
+    for (const f of item.LineItemExpenseFields ?? []) {
+      const txt = f.ValueDetection?.Text ?? "";
+      const match = txt.match(/(\d+[.,]?\d*)\s*L(itros)?$/i);
+      if (match) {
+        litros = parseFloat(match[1].replace(",", "."));
+        break;
+      }
+    }
+    if (litros) break;
+  }
+
+  // 3. Data: campo INVOICE_RECEIPT_DATE
+  const dataField = fields.find((f) => f.Type?.Text === "INVOICE_RECEIPT_DATE");
+  const data = dataField?.ValueDetection?.Text ?? null;
+
+  // 4. Nome do posto: VENDOR_NAME
+  const postoField = fields.find((f) => f.Type?.Text === "VENDOR_NAME");
+  const posto = postoField?.ValueDetection?.Text ?? null;
+
+  // 5. Confiança média dos campos lidos
+  const conf = [totalField, dataField, postoField]
+    .map((f) => f?.ValueDetection?.Confidence ?? 0)
+    .filter((c) => c > 0);
+  const confidence = conf.length ? conf.reduce((a, b) => a + b, 0) / conf.length : 0;
+
+  return { total, litros, data, posto, confidence };
+}
+
+function parseBrazilCurrency(s?: string): number | null {
+  if (!s) return null;
+  // "R$ 312,45" → 312.45
+  const clean = s.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(clean);
+  return isNaN(n) ? null : n;
+}
+```
+
+</details>
+
+<Callout type="info">
+
+**Por que `AnalyzeExpense` e não `DetectDocumentText` + regex?** AnalyzeExpense já tem o modelo treinado pra entender "TOTAL" / "VENDOR" / "DATE" mesmo em cupons brasileiros. Custa ~$0.01 por página vs $0.0015 do DetectDocumentText, mas a qualidade do parse é muito superior. Para 200 cupons/mês, fica $2.
+
+</Callout>
+
+### Fluxo completo: foto → OCR → form pré-preenchido
+
+<details>
+<summary>fluxo completo (clique para expandir)</summary>
+
+```typescript
+// apps/api/src/routes/fuelings.ts (POST /fuelings/parse-receipt)
+
+export async function parseReceipt(event: APIGatewayProxyEventV2) {
+  const user = await authenticate(event);
+  const { uploadKey } = JSON.parse(event.body ?? "{}");
+
+  // Valida que o usuário dono do tenant subiu esse upload
+  if (!uploadKey.startsWith(`tenants/${user.tenantId}/uploads/`)) {
+    throw new HttpError(403, "upload alheio");
+  }
+
+  // 1. OCR via Textract
+  const cupom = await analyzeCupom(process.env.PHOTOS_BUCKET!, uploadKey);
+
+  // 2. Se confiança baixa, marca pra revisão humana
+  const needsReview = cupom.confidence < 80;
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      ...cupom,
+      needsReview,
+      pre_filled: !needsReview,
+    }),
+  };
+}
+```
+
+</details>
+
+<Callout type="warn">
+
+**Confiança \< 80%** força a UI a mostrar warning amarelo. Motorista vê "confirme valores", deve digitar ou corrigir. Sem isso, OCR ruim virava abastecimento de R$ 0,00 ou 312 litros (em vez de 31,2).
+
+</Callout>
+
+## Checklist diário: 5 fotos + odômetro
+
+Quando o motorista entra no veículo de manhã, ele faz um _checklist_ obrigatório antes de poder dirigir:
+
+1.  Foto da frente
+2.  Foto da traseira
+3.  Foto da lateral direita
+4.  Foto da lateral esquerda
+5.  Foto do odômetro (com leitura confirmada)
+
+Cada foto é uploaded via Presigned URL direto pro S3, sem passar pelo Lambda. O Lambda apenas _registra_ o checkin no DynamoDB após os 5 uploads.
+
+<details>
+<summary>presigned upload sequence (clique para expandir)</summary>
+
+```typescript
+// POST /uploads/presign
+export async function presignUpload(event: APIGatewayProxyEventV2) {
+  const user = await authenticate(event);
+  const { kind, fileName, contentType } = JSON.parse(event.body ?? "{}");
+  // kind = "checkin" | "fueling" | "maintenance"
+
+  const key = `tenants/${user.tenantId}/uploads/${kind}/${randomUUID()}-${fileName}`;
+
+  const cmd = new PutObjectCommand({
+    Bucket: process.env.PHOTOS_BUCKET,
+    Key: key,
+    ContentType: contentType,
+    Metadata: {
+      uploaded_by: user.userId,
+      tenant: user.tenantId,
+    },
+  });
+
+  const url = await getSignedUrl(s3, cmd, { expiresIn: 300 });
+  return { statusCode: 200, body: JSON.stringify({ url, key }) };
+}
+```
+
+</details>
+
+<Callout type="danger">
+
+**Sempre prefixe upload key com `tenants/<id>/`.** Esse é o gate principal de isolamento multi-tenant. Em qualquer rota que lê do bucket, valido que a key começa com o tenant do usuário. Sem isso, um tenant maliciosamente bem informado conseguiria pedir Presigned URL pra ler upload de outro tenant.
+
+</Callout>
+
+## Geocoding com Amazon Location Service
+
+Quando motorista termina o expediente, marca "encerrar dia" e o sistema captura latitude/longitude do navegador. Eu uso Location Service pra transformar coordenada em _endereço legível_ (geocoding reverso), que vai no relatório.
+
+<details>
+<summary>apps/api/src/lib/geo.ts — reverse geocoding (clique para expandir)</summary>
+
+```typescript
+import { LocationClient, SearchPlaceIndexForPositionCommand }
+  from "@aws-sdk/client-location";
+
+const loc = new LocationClient({});
+
+export async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const resp = await loc.send(new SearchPlaceIndexForPositionCommand({
+    IndexName: process.env.PLACE_INDEX_NAME,
+    Position: [lng, lat],     // [longitude, latitude]
+    MaxResults: 1,
+  }));
+
+  const place = resp.Results?.[0]?.Place;
+  if (!place) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+  // Monta endereço curto
+  const parts = [
+    place.AddressNumber && place.Street ? `${place.Street}, ${place.AddressNumber}` : place.Street,
+    place.Municipality,
+    place.Region,
+  ].filter(Boolean);
+
+  return parts.join(" · ");
+}
+```
+
+</details>
+
+<Callout type="info">
+
+**Esri (data source) e `SingleUse`.** O Place Index foi configurado com `intendedUse: "SingleUse"`, não "Storage". Diferença de licença: SingleUse pode ser usado em apps end-user de mapa interativo, mas _não_ persistido. Eu não salvo a string do endereço — salvo apenas lat/lng e faço reverse on-demand. Fica legal com o termo Esri.
+
+</Callout>
+
+## Cron diário: alerta de manutenção preventiva
+
+Toda manhã (10h BRT = 13h UTC), uma Lambda separada roda pra avisar admins sobre veículos chegando perto da manutenção:
+
+<details>
+<summary>sst.config.ts — cron (clique para expandir)</summary>
+
+```typescript
+new sst.aws.Cron("MaintenanceCheck", {
+  schedule: "cron(0 13 * * ? *)",   // 13h UTC todo dia
+  job: {
+    handler: "apps/api/src/alerts/maintenance-check.handler",
+    link: [table],
+    environment: {
+      TABLE_NAME: table.name,
+      SES_FROM: process.env.SES_FROM_EMAIL ?? "no-reply@example.com",
+    },
+    permissions: [{ actions: ["ses:SendEmail"], resources: ["*"] }],
+  },
+});
+```
+
+</details>
+
+<details>
+<summary>maintenance-check.ts — lógica do alerta (clique para expandir)</summary>
+
+```typescript
+// Lê todos os veículos de todos os tenants
+// Para cada um, calcula:
+//   - dias desde última manutenção
+//   - km percorridos desde última manutenção
+// Se atingiu 80% do limite (30 dias ou 500km), entra na lista de alerta.
+
+export async function handler() {
+  const allVehicles = await scanAllVehicles();   // single scan, ~hundreds
+
+  // Agrupa por tenant pra enviar 1 email por oficina
+  const alertsByTenant = new Map<string, Vehicle[]>();
+
+  for (const v of allVehicles) {
+    const lastMaint = await getLastMaintenance(v.tenantId, v.plate);
+    if (!lastMaint) continue;
+
+    const daysSince = (Date.now() - lastMaint.ts) / 86400000;
+    const kmSince = v.odometer - lastMaint.odometer;
+
+    if (daysSince >= 24 || kmSince >= 400) {  // 80% de 30d / 500km
+      if (!alertsByTenant.has(v.tenantId)) alertsByTenant.set(v.tenantId, []);
+      alertsByTenant.get(v.tenantId)!.push({
+        ...v,
+        daysSince: Math.floor(daysSince),
+        kmSince,
+      });
+    }
+  }
+
+  // Envia email pra cada tenant
+  for (const [tenantId, alerts] of alertsByTenant) {
+    const tenant = await getTenant(tenantId);
+    if (!tenant.alertEmail) continue;
+
+    await ses.send(new SendEmailCommand({
+      Source: process.env.SES_FROM,
+      Destination: { ToAddresses: [tenant.alertEmail] },
+      Message: {
+        Subject: { Data: `${alerts.length} veículo(s) precisam de manutenção` },
+        Body: { Html: { Data: renderAlertHtml(alerts) } },
+      },
+    }));
+  }
+}
+```
+
+</details>
+
+## Bedrock: resumo automático de manutenção
+
+Quando um motorista escreve uma observação no app ("freio fazendo barulho ao parar, principalmente em descida"), o admin vê no painel. Mas são dezenas de observações por dia, e o admin precisa priorizar.
+
+Adicionei um endpoint `POST /vehicle-notes/summarize` que usa Bedrock Haiku 4.5 pra gerar resumo executivo dos últimos N dias:
+
+<details>
+<summary>summarize com tool use (clique para expandir)</summary>
+
+```typescript
+const SUMMARIZE_PROMPT = `Você recebe observações de motoristas sobre veículos.
+Categorize cada observação em: critico | atencao | normal.
+Gere um resumo executivo apontando os 3 principais problemas que exigem
+ação imediata. Linguagem direta, sem floreio.`;
+
+export async function summarizeNotes(notes: VehicleNote[]) {
+  const resp = await bedrock.send(new InvokeModelCommand({
+    modelId: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    body: JSON.stringify({
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 2000,
+      system: SUMMARIZE_PROMPT,
+      messages: [{
+        role: "user",
+        content: `Observações:\n\n${notes.map(n => `[${n.plate}] ${n.text}`).join("\n")}`,
+      }],
+      tools: [{
+        name: "save_summary",
+        input_schema: {
+          type: "object",
+          properties: {
+            critical_count: { type: "number" },
+            top_issues: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  plate: { type: "string" },
+                  problem: { type: "string" },
+                  recommended_action: { type: "string" },
+                },
+              },
+            },
+            summary: { type: "string" },
+          },
+          required: ["critical_count", "top_issues", "summary"],
+        },
+      }],
+      tool_choice: { type: "tool", name: "save_summary" },
+    }),
+  }));
+  // ... parsing
+}
+```
+
+</details>
+
+<Callout type="success">
+
+**Quando vale usar Bedrock vs só classificar?** Pra 5-10 observações/dia, o admin lê tudo. Pra 50+, ele começa a pular — e justo aí perde o crítico. Resumir com LLM é barato ($0.005 por chamada) e devolve cog. carga gerencial.
+
+</Callout>
+
+## S3 lifecycle: ~70% de economia em fotos antigas
+
+Cada checkin tem 5 fotos de ~3MB. Em 30 dias o bucket cresceu ~50GB. Defini lifecycle agressiva:
+
+| Idade | Storage class | Custo $/GB-mês |
+| --- | --- | --- |
+| 0-30 dias | STANDARD | $0.023 |
+| 30-180 dias | STANDARD\_IA | $0.0125 |
+| 180+ dias | GLACIER\_IR | $0.004 |
+
+GLACIER\_IR (Glacier Instant Retrieval) restaura em milissegundos — importante porque admin às vezes precisa ver foto antiga sem espera. Só o storage é mais barato.
+
+<Callout type="warn">
+
+**Cuidado com versionamento + lifecycle.** Habilitei versionamento no bucket. Sem lifecycle separada pras versões antigas, elas ficam em STANDARD pra sempre. Adicionei rule: `noncurrent_version_transition` 7 dias → GLACIER\_IR, 30 dias → delete. Pra fotos de cupom fiscal isso não tem problema legal (não é documento fiscal nosso, é do posto).
+
+</Callout>
+
+## Problemas que tive em produção
+
+### 1\. Textract latency em foto grande
+
+Cupom fotografado em 4K (12MB) levava 8-12s no Textract. Comprimir no cliente antes de upload (canvas redimensionado para 1920px de largura) reduziu pra ~2s. Trade-off: 1% dos cupons ficavam ilegíveis. Para esses casos, motorista clica "tirar foto melhor".
+
+### 2\. iOS PWA + Safari + Cognito refresh token
+
+iOS Safari deleta IndexedDB e cookies da PWA se "não usar por 7 dias". Motorista voltava da segunda passou semana, login expirava. Solução: persistir refreshToken em `navigator.credentials` (Credential Management API) quando disponível. Funciona em Android; iOS ainda esquece. Aceitei o trade-off (login manual a cada 7 dias inativos é aceitável).
+
+### 3\. Cognito Admin API throttle
+
+Convidar 20 motoristas de uma vez via `AdminCreateUser` batia em throttle (~5 req/s). Adicionei delay de 250ms entre chamadas. Pra batches maiores, considerar SQS pra enfileirar.
+
+### 4\. Multi-tenant CORS no S3
+
+Bucket de fotos com `allowOrigins: ["*"]` é muito permissivo. Mudei pra lista explícita dos domínios dos tenants. Quando a oficina piloto passou a usar domínio próprio, tive que adicionar entrada na lista. Solução longa: gerar CORS dinâmico via Lambda@Edge baseado em tabela DynamoDB.
+
+### 5\. Bedrock cross-region inference profile + LinkedIn API
+
+Não relacionado, mas serviu de lição: tentei chamar Bedrock de uma Lambda que estava com Reserved Concurrency = 1. Cold start + retry exponencial = 30s. Removi reserved concurrency, tudo normalizou.
+
+## Resultados
+
+<Metrics>
+  <Metric value={"~$12"} label={"Custo mensal AWS"} />
+  <Metric value={"3s"} label={"Foto cupom → form preenchido"} />
+  <Metric value={"19"} label={"Módulos de rotas"} />
+  <Metric value={"~92%"} label={"Acerto OCR Textract"} />
+  <Metric value={"~70%"} label={"Economia S3 lifecycle"} />
+  <Metric value={"1"} label={"Lambda & 1 deploy"} />
+</Metrics>
+
+## Conclusão
+
+<Callout type="success">
+
+**O que destrava esse stack pra produto comercial pequeno:** SST v3 reduz IaC de centenas de linhas Terraform pra TypeScript legível; Textract resolve OCR sem treinar modelo; DynamoDB single-table com 2 GSIs é suficiente pra 95% das queries; Cognito com custom attributes faz multi-tenant sem custo extra. Pra um time pequeno construindo SaaS B2B, vale demais.
+
+</Callout>
+
+O próximo passo é abrir como produto para outras oficinas. A multi-tenancia já está pronta — o que falta é landing page, billing (Stripe ou AWS Marketplace), e onboarding self-service. Cada nova oficina é _zero infra_, só um registro novo na tabela.
+
+Se você está pensando em construir SaaS pequeno na AWS sem time grande, esse modelo SST + Lambda + DynamoDB single-table + Cognito multi-tenant é o caminho mais barato pra chegar em produto vendi-vel.

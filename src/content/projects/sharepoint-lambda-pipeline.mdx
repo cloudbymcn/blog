@@ -1,0 +1,813 @@
+---
+title: "Pentaho + Jenkins → Lambda: pátio sincronizado em 4 segundos"
+slug: sharepoint-lambda-pipeline
+summary: "ETL de 20 steps num servidor on-premise trocado por Power Automate → API Gateway → Lambda, com fallback agendado e nenhuma credencial em texto puro."
+category: integracoes
+tier: A
+date: 2026-03-31
+stack: ["AWS Lambda", "API Gateway", "EventBridge", "Secrets Manager", "SharePoint/Graph API", "Firebird", "Python"]
+metrics:
+  - { label: "latência", before: "10 min", after: "~4 s" }
+  - { label: "servidores on-prem", before: "1", after: "0" }
+cover: /projects/sharepoint-lambda-pipeline/architecture.svg
+---
+
+Na Pedra Viva Rochas, os operadores de pátio registram a localização de blocos de mármore e granito usando um app Power Apps que grava dados em uma lista do SharePoint. Essas informações — estiva, bloco, cavalete — precisam chegar ao ERP legado que roda sobre Firebird para que logística e corte tenham visibilidade em tempo real.
+
+Durante anos, essa sincronização dependia de um servidor corporativo rodando **Jenkins** + **Pentaho Data Integration (PDI)**. Um job agendado a cada 10 minutos executava um arquivo `.ktr` com 20 steps: lia a lista do SharePoint via API, transformava os dados e gravava no Firebird. Funcionava — até não funcionar.
+
+Este post documenta como substituí esse pipeline inteiro por uma arquitetura serverless na AWS usando Lambda, API Gateway, EventBridge e Power Automate — eliminando a dependência do servidor on-premise e reduzindo a latência de 10 minutos para aproximadamente 4 segundos.
+
+## 1\. O Problema
+
+O pipeline Jenkins+PDI tinha 5 problemas críticos que eu precisei resolver:
+
+| Problema | Impacto |
+| --- | --- |
+| **Latência de 10 minutos** | O job era agendado a cada 10 min. No melhor caso, 10 min de atraso. No pior, 20 min (se o job anterior ainda estivesse rodando). Operador registra localização no pátio e a equipe de corte só enxerga depois. |
+| **SPOF on-premise** | O Jenkins rodava em um único servidor corporativo. Se a máquina reiniciasse, se o serviço caísse, se a rede interna tivesse problema — sincronização zero. E ninguém era notificado. |
+| **Credenciais em texto puro** | O arquivo `.ktr` do Pentaho armazenava as credenciais do Azure AD (client\_id, client\_secret) e do Firebird (SYSDBA/senha) em **plain text** dentro do XML. Qualquer pessoa com acesso ao servidor podia ler. |
+| **Erros silenciosos** | O PDI usava steps do tipo _Dummy_ para engolir erros. Se a API do SharePoint retornasse 401 ou o Firebird rejeitasse um INSERT, o job terminava com “sucesso”. Sem log, sem alerta, sem rastro. |
+| **Timestamp hardcoded** | O filtro de “última sincronização” dentro do KTR usava um campo fixo que nunca era atualizado automaticamente. Na prática, o pipeline fazia full scan toda vez — ou pior, perdia registros entre janelas. |
+
+<Callout type="danger">
+
+**Risco real:** credenciais em plain text em um arquivo .ktr significam que qualquer usuário com acesso ao servidor (ou ao repositório de jobs) tem acesso total ao Azure AD e ao banco Firebird. Esse foi o ponto que mais me preocupou.
+
+</Callout>
+
+## 2\. Arquitetura Antiga
+
+Antes da migração, o fluxo era este:
+
+<Figure src="/projects/sharepoint-lambda-pipeline/diagram-1.svg" alt={"Arquitetura antiga: Power Apps grava na lista do SharePoint; a cada 10 minutos um Jenkins num servidor corporativo roda um job Pentaho de 20 steps que grava no Firebird do ERP."} caption={"Antes: cron de 10 min num servidor on-premise."} />
+
+O pipeline inteiro dependia de um único servidor corporativo sempre ligado, sempre acessível e sempre funcional. Uma bomba-relógio.
+
+## 3\. A Solução
+
+Desenhei dois caminhos de execução complementares:
+
+-   **Tempo real (event-driven):** quando o operador salva no Power Apps, um fluxo no Power Automate dispara imediatamente um HTTP POST para o API Gateway da AWS, que invoca a Lambda de forma assíncrona. A Lambda busca os dados no SharePoint e grava no Firebird. Latência: ~4 segundos.
+-   **Fallback (scheduler):** um EventBridge Scheduler roda 1x por hora e invoca a mesma Lambda de sincronização. Isso garante que, mesmo se o Power Automate falhar ou algum item for editado diretamente no SharePoint, o Firebird se mantém atualizado.
+
+<Figure src="/projects/sharepoint-lambda-pipeline/diagram-2.svg" alt={"Arquitetura nova com dois caminhos: em tempo real, Power Automate faz POST no API Gateway, que chama uma Lambda wrapper, que invoca a Lambda de sync de forma assíncrona; como fallback, o EventBridge Scheduler chama a mesma Lambda de sync uma vez por hora. A sync grava no Firebird."} caption={"Depois: evento em tempo real + fallback horário."} />
+
+<Metrics>
+  <Metric value={"~4s"} label={"Latência real-time"} />
+  <Metric value={"~R$5"} label={"Custo mensal"} />
+  <Metric value={"0"} label={"Servidores on-premise"} />
+  <Metric value={"100%"} label={"Erros rastreáveis"} />
+</Metrics>
+
+## 4\. Serviços Utilizados
+
+Para quem não está familiarizado com AWS, aqui vai o papel de cada serviço:
+
+| Serviço | O que faz nesta arquitetura |
+| --- | --- |
+| **AWS Lambda (2 funções)** | Executa código sem servidor. A _wrapper_ recebe o request e dispara a _sync_ de forma assíncrona. A _sync_ busca dados no SharePoint e grava no Firebird. Pense em “funções que rodam sob demanda sem precisar de servidor”. |
+| **API Gateway (HTTP API)** | Cria um endpoint HTTPS público que o Power Automate pode chamar. Recebe o POST e roteia para a Lambda wrapper. Pense em “porta de entrada para a nuvem”. |
+| **EventBridge Scheduler** | Agenda execuções periódicas (como um cron na nuvem). Roda 1x/hora como fallback. Pense em “despertador serverless”. |
+| **Secrets Manager** | Armazena credenciais (Azure AD, Firebird) de forma criptografada. A Lambda busca em runtime — nunca ficam em código. Pense em “cofre digital de senhas”. |
+| **CloudWatch + SNS** | CloudWatch coleta logs e métricas. SNS envia alertas por e-mail quando algo falha. Pense em “monitoramento + sirene”. |
+| **Lambda Layers** | Pacote compartilhado de dependências Python (firebirdsql, requests). Evita incluir as libs no código de cada Lambda. Pense em “pasta de bibliotecas compartilhadas”. |
+| **VPC + NAT Gateway** | A Lambda roda dentro da rede privada (VPC) para acessar o Firebird. O NAT Gateway dá acesso à internet para chamar a API do SharePoint. Pense em “rede privada com saída controlada para a internet”. |
+| **Power Automate** (Microsoft) | Ferramenta low-code da Microsoft. Detecta novos itens no SharePoint e faz HTTP POST para a AWS. Pense em “IFTTT corporativo”. |
+
+## 5\. Implementação Passo a Passo
+
+Foram 8 etapas. Cada uma inclui os comandos CLI ou configurações que utilizei.
+
+### Etapa 1 — Secrets Manager
+
+Primeiro, movi as credenciais que estavam em plain text no arquivo `.ktr` para o Secrets Manager. Criei dois secrets separados: um para o Azure AD (usado para autenticar na API do SharePoint) e outro para o Firebird.
+
+<details>
+<summary>Criar secrets do Azure AD e Firebird (clique para expandir)</summary>
+
+```bash
+# Secret do Azure AD (SharePoint)
+aws secretsmanager create-secret \
+  --name "sharepoint/prod/azuread" \
+  --description "Credenciais OAuth do Azure AD para API SharePoint" \
+  --secret-string '{
+    "tenant_id": "SEU_TENANT_ID",
+    "client_id": "SEU_CLIENT_ID",
+    "client_secret": "SEU_CLIENT_SECRET",
+    "site_id": "SEU_SITE_ID",
+    "list_id": "SEU_LIST_ID"
+  }'
+
+# Secret do Firebird
+aws secretsmanager create-secret \
+  --name "firebird/prod/credentials" \
+  --description "Credenciais do Firebird (ERP legado)" \
+  --secret-string '{
+    "host": "FIREBIRD_HOST",
+    "port": "3050",
+    "database": "/dados/ERP.FDB",
+    "user": "SYSDBA",
+    "password": "SUA_SENHA_FIREBIRD"
+  }'
+```
+
+</details>
+
+<Callout type="info">
+
+**Dica:** Use nomes com path (`sharepoint/prod/...`) para organizar por ambiente. Facilita policies IAM com wildcard (`sharepoint/prod/*`).
+
+</Callout>
+
+### Etapa 2 — IAM Role (Least Privilege)
+
+Criei uma IAM Role exclusiva para as Lambdas, seguindo o princípio de least privilege: só pode ler os dois secrets específicos, escrever logs e criar interfaces de rede na VPC. Nada mais.
+
+<details>
+<summary>Trust Policy — quem pode assumir a role (clique para expandir)</summary>
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+</details>
+
+<details>
+<summary>Inline Policy — permissões da role (clique para expandir)</summary>
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SecretsAccess",
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": [
+        "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:sharepoint/prod/*",
+        "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:firebird/prod/*"
+      ]
+    },
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:ACCOUNT_ID:*"
+    },
+    {
+      "Sid": "VPCNetworkInterfaces",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateNetworkInterface",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DeleteNetworkInterface"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "InvokeSyncLambda",
+      "Effect": "Allow",
+      "Action": ["lambda:InvokeFunction"],
+      "Resource": "arn:aws:lambda:us-east-1:ACCOUNT_ID:function:sharepoint-firebird-sync"
+    }
+  ]
+}
+```
+
+</details>
+
+<details>
+<summary>Comandos CLI para criar a role (clique para expandir)</summary>
+
+```bash
+# Criar a role
+aws iam create-role \
+  --role-name "lambda-sharepoint-firebird-role" \
+  --assume-role-policy-document file://trust-policy.json
+
+# Anexar policy de VPC (managed policy da AWS)
+aws iam attach-role-policy \
+  --role-name "lambda-sharepoint-firebird-role" \
+  --policy-arn "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+
+# Criar inline policy
+aws iam put-role-policy \
+  --role-name "lambda-sharepoint-firebird-role" \
+  --policy-name "sharepoint-firebird-access" \
+  --policy-document file://inline-policy.json
+```
+
+</details>
+
+### Etapa 3 — Lambda Layer (dependências Python)
+
+As Lambdas precisam de dois pacotes Python: `firebirdsql` (driver puro para Firebird) e `requests` (para chamar a API do SharePoint). Empacotei ambos em um Lambda Layer compartilhado.
+
+<Callout type="warn">
+
+**Atenção:** o pacote `firebirdsql` é pure Python — não tem dependências binárias, então funciona direto no Lambda. Se você precisasse de `fdb` (que depende de `libfbclient`), teria que compilar para Linux x86\_64 ou usar um container image. No meu caso, `firebirdsql` resolveu.
+
+</Callout>
+
+<details>
+<summary>Criar e publicar o Lambda Layer (clique para expandir)</summary>
+
+```bash
+# Criar diretório com estrutura obrigatória do Lambda
+mkdir -p lambda-layer/python
+
+# Instalar dependências para a plataforma do Lambda
+pip install firebirdsql requests \
+  -t lambda-layer/python \
+  --platform manylinux2014_x86_64 \
+  --only-binary=:all: \
+  --python-version 3.12
+
+# Empacotar
+cd lambda-layer
+zip -r ../sharepoint-firebird-layer.zip python/
+
+# Publicar o Layer
+aws lambda publish-layer-version \
+  --layer-name "sharepoint-firebird-deps" \
+  --description "firebirdsql + requests para integração SharePoint-Firebird" \
+  --zip-file fileb://../sharepoint-firebird-layer.zip \
+  --compatible-runtimes python3.12 \
+  --compatible-architectures x86_64
+```
+
+</details>
+
+<Callout type="info">
+
+**Dica:** como `firebirdsql` e `requests` são pure Python, o `--only-binary=:all:` pode falhar para eles. Se isso acontecer, remova essa flag e instale normalmente com `pip install firebirdsql requests -t lambda-layer/python`. Funciona igual no Lambda.
+
+</Callout>
+
+### Etapa 4 — Lambda Principal (sync)
+
+Esta é a Lambda que faz o trabalho pesado: busca o token OAuth no Azure AD, consulta a lista do SharePoint via Microsoft Graph API, valida cada item e grava no Firebird com `UPDATE OR INSERT`. Ela substitui os 20 steps do Pentaho.
+
+<details>
+<summary>lambda_function.py completo (clique para expandir)</summary>
+
+```python
+import json
+import logging
+import boto3
+import requests
+import firebirdsql
+from datetime import datetime
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+secrets_client = boto3.client("secretsmanager")
+
+# ──── Helpers ────
+
+def get_secret(secret_name: str) -> dict:
+    """Busca um secret no Secrets Manager e retorna como dict."""
+    resp = secrets_client.get_secret_value(SecretId=secret_name)
+    return json.loads(resp["SecretString"])
+
+def get_access_token(tenant_id: str, client_id: str, client_secret: str) -> str:
+    """Obtém token OAuth2 do Azure AD (client credentials flow)."""
+    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    payload = {
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "scope": "https://graph.microsoft.com/.default"
+    }
+    resp = requests.post(url, data=payload, timeout=10)
+    resp.raise_for_status()
+    return resp.json()["access_token"]
+
+def fetch_sharepoint_items(token: str, site_id: str, list_id: str) -> list:
+    """Busca todos os itens da lista SharePoint via Microsoft Graph API."""
+    url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_id}/items"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Prefer": "HonorNonIndexedQueriesWarningMayFailRandomly"
+    }
+    params = {"$expand": "fields", "$top": "5000"}
+
+    all_items = []
+    while url:
+        resp = requests.get(url, headers=headers, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        all_items.extend(data.get("value", []))
+        url = data.get("@odata.nextLink")
+        params = None  # nextLink já inclui os params
+    return all_items
+
+def validate(fields: dict) -> tuple:
+    """Valida campos obrigatórios. Retorna (is_valid, error_msg)."""
+    estiva = fields.get("ESTIVA")
+    bloco = fields.get("BLOCO")
+    cavalete = fields.get("CODIGOCAVALETE")
+
+    if not estiva or str(estiva).strip() == "":
+        return False, "ESTIVA vazio ou ausente"
+    if not bloco or str(bloco).strip() == "":
+        return False, "BLOCO vazio ou ausente"
+    if not cavalete or str(cavalete).strip() == "":
+        return False, "CODIGOCAVALETE vazio ou ausente"
+    return True, None
+
+# ──── Handler ────
+
+def lambda_handler(event, context):
+    """Handler principal — substitui os 20 steps do Pentaho."""
+    start_time = datetime.utcnow()
+
+    logger.info(json.dumps({
+        "action": "sync_start",
+        "source": event.get("source", "manual"),
+        "timestamp": start_time.isoformat()
+    }))
+
+    # 1. Buscar credenciais
+    az_secret = get_secret("sharepoint/prod/azuread")
+    fb_secret = get_secret("firebird/prod/credentials")
+
+    # 2. Obter token OAuth
+    token = get_access_token(
+        tenant_id=az_secret["tenant_id"],
+        client_id=az_secret["client_id"],
+        client_secret=az_secret["client_secret"]
+    )
+
+    # 3. Buscar itens do SharePoint
+    items = fetch_sharepoint_items(
+        token=token,
+        site_id=az_secret["site_id"],
+        list_id=az_secret["list_id"]
+    )
+
+    logger.info(json.dumps({
+        "action": "sharepoint_fetch",
+        "items_count": len(items)
+    }))
+
+    # 4. Conectar ao Firebird e gravar
+    conn = firebirdsql.connect(
+        host=fb_secret["host"],
+        port=int(fb_secret["port"]),
+        database=fb_secret["database"],
+        user=fb_secret["user"],
+        password=fb_secret["password"],
+        charset="UTF8"
+    )
+    cursor = conn.cursor()
+
+    stats = {"inserted": 0, "updated": 0, "skipped": 0, "errors": 0}
+
+    for item in items:
+        fields = item.get("fields", {})
+        is_valid, error_msg = validate(fields)
+
+        if not is_valid:
+            stats["skipped"] += 1
+            logger.warning(json.dumps({
+                "action": "validation_skip",
+                "item_id": item.get("id"),
+                "reason": error_msg
+            }))
+            continue
+
+        try:
+            # Converter datetime do SharePoint para formato Firebird
+            modified = fields.get("Modified", "")
+            if modified:
+                # SharePoint retorna ISO 8601: 2026-03-30T14:30:00Z
+                dt = datetime.fromisoformat(modified.replace("Z", "+00:00"))
+                modified_fb = dt.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                modified_fb = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+            cursor.execute("""
+                UPDATE OR INSERT INTO LOCALIZAAI (
+                    ESTIVA, BLOCO, CODIGOCAVALETE,
+                    DESCRICAO, MODIFICADO, ORIGEM
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                MATCHING (BLOCO, CODIGOCAVALETE)
+            """, (
+                str(fields.get("ESTIVA", "")).strip().upper(),
+                str(fields.get("BLOCO", "")).strip().upper(),
+                str(fields.get("CODIGOCAVALETE", "")).strip().upper(),
+                str(fields.get("DESCRICAO", "")).strip(),
+                modified_fb,
+                "SHAREPOINT"
+            ))
+            stats["updated"] += 1
+
+        except Exception as e:
+            stats["errors"] += 1
+            logger.error(json.dumps({
+                "action": "db_write_error",
+                "item_id": item.get("id"),
+                "error": str(e),
+                "fields": {
+                    "ESTIVA": fields.get("ESTIVA"),
+                    "BLOCO": fields.get("BLOCO"),
+                    "CODIGOCAVALETE": fields.get("CODIGOCAVALETE")
+                }
+            }))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    elapsed = (datetime.utcnow() - start_time).total_seconds()
+
+    result = {
+        "action": "sync_complete",
+        "duration_seconds": round(elapsed, 2),
+        "items_processed": len(items),
+        "stats": stats
+    }
+    logger.info(json.dumps(result))
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps(result)
+    }
+```
+
+</details>
+
+<details>
+<summary>Deploy da Lambda sync (clique para expandir)</summary>
+
+```bash
+# Empacotar
+cd lambda-sync
+zip -r ../sharepoint-firebird-sync.zip lambda_function.py
+
+# Criar a função
+aws lambda create-function \
+  --function-name "sharepoint-firebird-sync" \
+  --runtime python3.12 \
+  --handler lambda_function.lambda_handler \
+  --role "arn:aws:iam::ACCOUNT_ID:role/lambda-sharepoint-firebird-role" \
+  --zip-file fileb://../sharepoint-firebird-sync.zip \
+  --timeout 120 \
+  --memory-size 256 \
+  --layers "arn:aws:lambda:us-east-1:ACCOUNT_ID:layer:sharepoint-firebird-deps:1" \
+  --vpc-config SubnetIds=subnet-XXXXXXXX,SecurityGroupIds=sg-XXXXXXXX \
+  --environment 'Variables={LOG_LEVEL=INFO}'
+```
+
+</details>
+
+### Etapa 5 — API Gateway + Lambda Wrapper (padrão async)
+
+Aqui está um problema que eu descobri na prática: o **API Gateway tem timeout máximo de 29 segundos**. Se a Lambda sync demorar mais (leitura de 5000 itens + gravação no Firebird), o API Gateway retorna 504 para o Power Automate — que interpreta como erro e tenta de novo.
+
+A solução: criei uma **Lambda wrapper** que recebe o request, invoca a Lambda sync de forma assíncrona (`InvocationType='Event'`) e retorna 202 Accepted imediatamente. O API Gateway responde em milissegundos, e o trabalho pesado acontece em background.
+
+<Figure src="/projects/sharepoint-lambda-pipeline/diagram-3.svg" alt={"Sem wrapper, a Lambda de sync leva cerca de 45 segundos e o API Gateway devolve 504 após 29 segundos. Com wrapper, a Lambda responde 202 em cerca de 200 ms e a sync roda em background."} caption={"O padrão wrapper contorna o limite de 29 s do API Gateway."} />
+
+<details>
+<summary>Código da Lambda wrapper (5 linhas) (clique para expandir)</summary>
+
+```python
+import json
+import boto3
+
+lambda_client = boto3.client("lambda")
+
+def lambda_handler(event, context):
+    """Wrapper: invoca a Lambda sync de forma assíncrona e retorna 202."""
+    lambda_client.invoke(
+        FunctionName="sharepoint-firebird-sync",
+        InvocationType="Event",  # async — não espera resposta
+        Payload=json.dumps({"source": "api-gateway"})
+    )
+    return {
+        "statusCode": 202,
+        "body": json.dumps({"message": "Sincronização iniciada"})
+    }
+```
+
+</details>
+
+<details>
+<summary>Deploy da Lambda wrapper + API Gateway (clique para expandir)</summary>
+
+```bash
+# Empacotar a wrapper
+cd lambda-wrapper
+zip -r ../sharepoint-firebird-wrapper.zip lambda_function.py
+
+# Criar a Lambda wrapper (não precisa de VPC nem Layer)
+aws lambda create-function \
+  --function-name "sharepoint-firebird-wrapper" \
+  --runtime python3.12 \
+  --handler lambda_function.lambda_handler \
+  --role "arn:aws:iam::ACCOUNT_ID:role/lambda-sharepoint-firebird-role" \
+  --zip-file fileb://../sharepoint-firebird-wrapper.zip \
+  --timeout 10 \
+  --memory-size 128
+
+# Criar o API Gateway HTTP
+aws apigatewayv2 create-api \
+  --name "sharepoint-firebird-api" \
+  --protocol-type HTTP \
+  --target "arn:aws:lambda:us-east-1:ACCOUNT_ID:function:sharepoint-firebird-wrapper"
+
+# Dar permissão para o API Gateway invocar a wrapper
+aws lambda add-permission \
+  --function-name "sharepoint-firebird-wrapper" \
+  --statement-id "apigateway-invoke" \
+  --action "lambda:InvokeFunction" \
+  --principal "apigateway.amazonaws.com" \
+  --source-arn "arn:aws:execute-api:us-east-1:ACCOUNT_ID:API_ID/*"
+```
+
+</details>
+
+<Card title={"Por que HTTP API e não REST API?"}>
+
+O API Gateway HTTP é mais barato (~70% menos), mais rápido (menor latência) e suficiente para este caso. REST API só faz sentido se eu precisasse de features avançadas como API keys, request validation ou caching — que não preciso aqui.
+
+</Card>
+
+### Etapa 6 — EventBridge Scheduler (fallback)
+
+O caminho real-time depende do Power Automate funcionar. Se ele falhar, ou se alguém editar um item diretamente no SharePoint (sem passar pelo Power Apps), o dado não chega ao Firebird. Por isso criei um fallback: EventBridge Scheduler invoca a Lambda sync 1x por hora.
+
+<details>
+<summary>Criar role dedicada + scheduler (clique para expandir)</summary>
+
+```bash
+# 1. Criar role dedicada para o EventBridge Scheduler
+# (EventBridge Scheduler precisa de sua própria role — não usa a role da Lambda)
+
+# Trust policy para o scheduler
+cat > scheduler-trust.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "scheduler.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name "eventbridge-sharepoint-scheduler-role" \
+  --assume-role-policy-document file://scheduler-trust.json
+
+# Policy que permite invocar apenas a Lambda sync
+cat > scheduler-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["lambda:InvokeFunction"],
+      "Resource": "arn:aws:lambda:us-east-1:ACCOUNT_ID:function:sharepoint-firebird-sync"
+    }
+  ]
+}
+EOF
+
+aws iam put-role-policy \
+  --role-name "eventbridge-sharepoint-scheduler-role" \
+  --policy-name "invoke-sync-lambda" \
+  --policy-document file://scheduler-policy.json
+
+# 2. Criar o schedule (1x por hora)
+aws scheduler create-schedule \
+  --name "sharepoint-firebird-hourly-sync" \
+  --schedule-expression "rate(1 hour)" \
+  --flexible-time-window '{"Mode": "OFF"}' \
+  --target '{
+    "Arn": "arn:aws:lambda:us-east-1:ACCOUNT_ID:function:sharepoint-firebird-sync",
+    "RoleArn": "arn:aws:iam::ACCOUNT_ID:role/eventbridge-sharepoint-scheduler-role",
+    "Input": "{\"source\": \"eventbridge-scheduler\"}"
+  }'
+```
+
+</details>
+
+<Callout type="info">
+
+**Por que 1x/hora e não 10 min?** O caminho primário já é real-time. O scheduler é só rede de segurança. 1x/hora é suficiente para capturar edições diretas e custa menos. Se eu precisasse de consistência mais agressiva, bastaria mudar para `rate(10 minutes)`.
+
+</Callout>
+
+### Etapa 7 — Power Automate (trigger Microsoft)
+
+No lado Microsoft, configurei um fluxo no Power Automate que dispara toda vez que um item é criado ou modificado na lista do SharePoint. O fluxo faz uma única coisa: HTTP POST para o endpoint do API Gateway.
+
+**Configuração do trigger:**
+
+-   **Trigger:** “When an item is created or modified” (conector SharePoint)
+-   **Site:** site da Pedra Viva Rochas
+-   **Lista:** LocalizaAI (mesma lista que o app Power Apps usa)
+
+**Ação:** HTTP POST
+
+<details>
+<summary>JSON do Code View (Power Automate) (clique para expandir)</summary>
+
+```json
+{
+  "type": "OpenApiConnection",
+  "inputs": {
+    "method": "POST",
+    "uri": "https://API_ID.execute-api.us-east-1.amazonaws.com/",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "source": "power-automate",
+      "item_id": "@{triggerOutputs()?['body/ID']}",
+      "list": "LocalizaAI",
+      "action": "@{triggerOutputs()?['body/{VersionNumber}']}"
+    }
+  }
+}
+```
+
+</details>
+
+<Callout type="info">
+
+**Nota:** O Power Automate não precisa enviar os dados do item no body — a Lambda sync busca tudo diretamente na API do SharePoint. O POST serve apenas como _sinal_ de que algo mudou. Isso simplifica o fluxo e evita problemas de dados incompletos no trigger.
+
+</Callout>
+
+### Etapa 8 — CloudWatch Alarm + SNS
+
+Com o pipeline antigo, erros eram silenciosos. Com a nova arquitetura, configurei alarmes para que eu seja notificado por e-mail se algo falhar.
+
+<details>
+<summary>Criar tópico SNS + inscrição + alarme (clique para expandir)</summary>
+
+```bash
+# 1. Criar tópico SNS
+aws sns create-topic \
+  --name "sharepoint-firebird-alerts"
+
+# 2. Inscrever e-mail (confirme na caixa de entrada)
+aws sns subscribe \
+  --topic-arn "arn:aws:sns:us-east-1:ACCOUNT_ID:sharepoint-firebird-alerts" \
+  --protocol email \
+  --notification-endpoint "alertas@example.com"
+
+# 3. Criar alarme — dispara se houver 1+ erros em 5 minutos
+aws cloudwatch put-metric-alarm \
+  --alarm-name "sharepoint-firebird-sync-errors" \
+  --alarm-description "Alerta quando a Lambda sync reporta erros" \
+  --metric-name "Errors" \
+  --namespace "AWS/Lambda" \
+  --statistic "Sum" \
+  --period 300 \
+  --threshold 1 \
+  --comparison-operator "GreaterThanOrEqualToThreshold" \
+  --evaluation-periods 1 \
+  --dimensions Name=FunctionName,Value=sharepoint-firebird-sync \
+  --alarm-actions "arn:aws:sns:us-east-1:ACCOUNT_ID:sharepoint-firebird-alerts" \
+  --treat-missing-data "notBreaching"
+```
+
+</details>
+
+Quando a Lambda roda com sucesso, o log no CloudWatch fica assim:
+
+<details>
+<summary>Exemplo de log JSON estruturado (clique para expandir)</summary>
+
+```json
+{
+  "action": "sync_complete",
+  "duration_seconds": 3.87,
+  "items_processed": 342,
+  "stats": {
+    "inserted": 0,
+    "updated": 342,
+    "skipped": 5,
+    "errors": 0
+  }
+}
+```
+
+</details>
+
+<Callout type="info">
+
+**Dica:** Logs estruturados em JSON permitem criar **CloudWatch Insights queries** poderosas. Por exemplo: `fields @timestamp, action, stats.errors | filter action = "sync_complete" and stats.errors > 0` mostra rapidamente todas as execuções com erro.
+
+</Callout>
+
+## 6\. Resultados
+
+#### Antes (Jenkins + PDI)
+
+-   Latência: ~10 minutos (cron)
+-   1 servidor on-premise dedicado
+-   Credenciais em plain text
+-   Zero rastreabilidade de erros
+
+#### Depois (Lambda Serverless)
+
+-   Latência: ~4 segundos (event-driven)
+-   0 servidores (100% serverless)
+-   Secrets Manager (criptografado)
+-   100% dos erros rastreáveis
+
+<CostCompare>
+  <CostBar label={"Antes (servidor dedicado)"} value={"Servidor + licenças"} pct={100} variant="old" />
+  <CostBar label={"Depois (Serverless)"} value={"~R$5/mês"} pct={10} variant="new" />
+</CostCompare>
+
+| Métrica | Antes (Jenkins + PDI) | Depois (Lambda Serverless) |
+| --- | --- | --- |
+| **Latência** | ~10 minutos (cron) | ~4 segundos (event-driven) |
+| **Servidores on-premise** | 1 (Jenkins corporativo) | 0 (100% serverless) |
+| **Custo mensal** | Servidor dedicado + licenças | ~R$5/mês (Lambda + API GW + EventBridge) |
+| **Rastreabilidade de erros** | Zero (Dummy steps engolem erros) | 100% (logs JSON + alarmes SNS) |
+| **Credenciais** | Plain text em .ktr | Secrets Manager (criptografado, auditado) |
+| **Dependência de rede local** | Total (servidor corporativo) | Nenhuma (AWS gerencia tudo) |
+
+## 7\. Decisões de Design
+
+<Card title={"Por que Lambda e não ECS/Fargate?"}>
+
+A execução dura ~4 segundos, roda poucas vezes por hora e não precisa de estado persistente. Lambda é o serviço certo para workloads curtos e esporádicos. ECS/Fargate faria sentido se eu precisasse de processos long-running ou containers customizados — mas aqui seria overengineering.
+
+</Card>
+
+<Card title={"Por que o padrão wrapper (async invoke)?"}>
+
+O API Gateway tem timeout máximo de 29 segundos. Mesmo que minha Lambda sync normalmente termine em ~4s, em picos (5000+ itens no SharePoint ou Firebird lento) ela pode ultrapassar 29s. O padrão wrapper garante que o API Gateway **sempre** responde rápido (202), e o trabalho pesado acontece em background sem risco de timeout.
+
+</Card>
+
+<Card title={"Por que Power Automate e não webhook do SharePoint?"}>
+
+O SharePoint Online suporta webhooks nativos, mas eles têm limitações: notificam que _algo mudou_ na lista (sem dizer o quê), exigem um endpoint de validação e têm retry logic próprio que pode conflitar com o do Lambda. Power Automate é mais simples de configurar, mais visível para o time (interface gráfica) e já fazia parte do licenciamento Microsoft 365 da empresa.
+
+</Card>
+
+<Card title={"Por que scheduler 1x/hora e não 10 min?"}>
+
+O caminho primário (Power Automate → API Gateway → Lambda) já é real-time. O scheduler existe apenas como fallback para edições diretas no SharePoint ou falhas no Power Automate. 1x/hora é mais do que suficiente para esse cenário e mantém o custo baixo. Se a empresa precisar de consistência mais agressiva no futuro, basta alterar o `rate()`.
+
+</Card>
+
+## 8\. Lições Aprendidas
+
+1.  **Audite o arquivo .ktr antes de migrar.** Eu abri o XML do Pentaho e encontrei credenciais em plain text, lógica de retry escondida em steps de “Dummy” e um campo de timestamp que nunca era atualizado. Sem essa auditoria, teria replicado bugs na nova arquitetura.
+2.  **Inspecione a estrutura do banco antes de escrever SQL.** A tabela `LOCALIZAAI` no Firebird tinha campos com nomes diferentes do que o SharePoint usava (ex: `CODIGOCAVALETE` vs `CodigoCavalete`). Firebird é case-sensitive em identificadores quoted. Precisei mapear campo a campo.
+3.  **Conversão de datetime SharePoint → Firebird.** O SharePoint retorna datas em ISO 8601 com “Z” (UTC). O Firebird espera `YYYY-MM-DD HH:MM:SS` sem timezone. Parece trivial, mas o Pentaho fazia essa conversão silenciosamente — no Python, eu precisei tratar explícitamente.
+4.  **API Gateway tem timeout de 29 segundos.** Isso não está em negrito na documentação da AWS — mas é um limite hard que não pode ser alterado. Descobri quando o Power Automate começou a reportar falhas intermitentes. O padrão wrapper resolveu.
+5.  **EventBridge Scheduler precisa de sua própria IAM Role.** Diferente do EventBridge Rules (que pode usar resource-based policies), o Scheduler exige uma role explícita com trust policy para `scheduler.amazonaws.com`. Perdi tempo achando que poderia reutilizar a role da Lambda.
+
+## 9\. Checklist de Implementação
+
+Resumo de todos os passos para replicar esta arquitetura:
+
+-   ☐ Auditar arquivo .ktr do Pentaho (credenciais, lógica, timestamp)
+-   ☐ Mapear campos SharePoint ↔ Firebird (nomes, tipos, case sensitivity)
+-   ☐ Criar secrets no Secrets Manager (Azure AD + Firebird)
+-   ☐ Criar IAM Role com least privilege (secrets + logs + VPC + invoke)
+-   ☐ Criar Lambda Layer com `firebirdsql` + `requests`
+-   ☐ Desenvolver e testar Lambda sync (busca SharePoint + grava Firebird)
+-   ☐ Desenvolver Lambda wrapper (async invoke pattern)
+-   ☐ Criar API Gateway HTTP apontando para a wrapper
+-   ☐ Configurar EventBridge Scheduler (1x/hora, role dedicada)
+-   ☐ Criar fluxo no Power Automate (trigger SharePoint → HTTP POST)
+-   ☐ Configurar CloudWatch Alarm + SNS (alerta por e-mail)
+-   ☐ Testar caminho real-time (Power Apps → SharePoint → Power Automate → AWS → Firebird)
+-   ☐ Testar caminho fallback (EventBridge Scheduler → Lambda sync → Firebird)
+-   ☐ Validar logs estruturados no CloudWatch Insights
+-   ☐ Desativar job Jenkins antigo
+-   ☐ Monitorar por 1 semana antes de remover o pipeline PDI

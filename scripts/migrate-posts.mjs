@@ -6,22 +6,25 @@
 // Deps (só para rodar a migração, não entram no bundle):
 //   npm i -D turndown turndown-plugin-gfm linkedom
 //
-// O corpo é convertido automaticamente; o frontmatter vem de scripts/migrate-posts.meta.json
-// (curado à mão: slug novo, categoria, tier, stack normalizada, métricas, resumo).
+// O corpo é convertido automaticamente; o frontmatter vem de um JSON curado à mão (env META)
+// com slug novo, categoria, tier, stack normalizada, métricas e resumo, indexado pelo nome do
+// post antigo. Esse JSON e o pós-processamento de anonimização (SPEC §8) ficaram fora do repo
+// de propósito: os dois citam os nomes reais que estão sendo removidos.
 // Componentes MDX gerados: Callout, Metrics/Metric, Steps/Step, Card, CostCompare/CostBar,
 // Instruction, Figure. Ver contrato na nota de status do time.
 
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync } from 'node:fs'
-import { join, basename, dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join, basename, resolve } from 'node:path'
 import TurndownService from 'turndown'
 import { gfm } from 'turndown-plugin-gfm'
 import { parseHTML } from 'linkedom'
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const ROOT = process.cwd()
 const outArg = process.argv.indexOf('--out')
 const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : ROOT
-const META = JSON.parse(readFileSync(join(ROOT, 'scripts/migrate-posts.meta.json'), 'utf8'))
+const META = JSON.parse(
+  readFileSync(process.env.META || join(ROOT, 'scripts/migrate-posts.meta.json'), 'utf8'),
+)
 
 const attr = (v) => `{${JSON.stringify(v.replace(/\s+/g, ' ').trim())}}`
 const block = (s) => `\n\n${s.trim()}\n\n`
@@ -43,6 +46,13 @@ function makeTurndown(ctx) {
 
   const cls = (n) => (n.getAttribute && n.getAttribute('class')) || ''
   const has = (n, c) => n.nodeName === 'DIV' && cls(n).split(/\s+/).includes(c)
+
+  // Turndown dá prioridade à regra adicionada por último, então o fallback vem primeiro.
+  // Wrappers sem semântica: só passa o conteúdo.
+  td.addRule('unwrap', {
+    filter: (n) => n.nodeName === 'DIV',
+    replacement: (content) => block(content),
+  })
 
   td.addRule('fencedLang', {
     filter: (n) => n.nodeName === 'PRE' && n.firstChild && n.firstChild.nodeName === 'CODE',
@@ -71,7 +81,7 @@ function makeTurndown(ctx) {
   })
 
   td.addRule('metrics', {
-    filter: (n) => n.nodeName === 'DIV' && n.querySelector && n.querySelector(':scope > .metric-card'),
+    filter: (n) => n.nodeName === 'DIV' && Array.from(n.childNodes).some((c) => has(c, 'metric-card')),
     replacement: (_c, n) => {
       const items = [...n.querySelectorAll('.metric-card')].map((m) => {
         const v = m.querySelector('.metric-value')?.textContent || ''
@@ -83,7 +93,7 @@ function makeTurndown(ctx) {
   })
 
   td.addRule('stats', {
-    filter: (n) => n.nodeName === 'DIV' && n.querySelector && n.querySelector(':scope > .stat'),
+    filter: (n) => n.nodeName === 'DIV' && Array.from(n.childNodes).some((c) => has(c, 'stat')),
     replacement: (_c, n) => {
       const items = [...n.querySelectorAll('.stat')].map((m) => {
         const v = m.querySelector('.stat-value')?.textContent || ''
@@ -94,22 +104,37 @@ function makeTurndown(ctx) {
     },
   })
 
+  // títulos lidos pelo pai; o próprio nó some do corpo
+  td.addRule('titles', {
+    filter: (n) =>
+      has(n, 'step-num') ||
+      has(n, 'card-title') ||
+      (has(n, 't') && n.parentNode && has(n.parentNode, 'print')) ||
+      n.nodeName === 'SUMMARY',
+    replacement: () => '',
+  })
+
   td.addRule('step', {
     filter: (n) => has(n, 'step'),
-    replacement: (_c, n) => {
+    replacement: (content, n) => {
       const num = n.querySelector('.step-num')?.textContent.trim() || ''
-      const body = td.turndown(n.querySelector('.step-content')?.innerHTML || '')
-      return block(`<Step n={${JSON.stringify(num)}}>\n\n${body.trim()}\n\n</Step>`)
+      return block(`<Step n={${JSON.stringify(num)}}>
+
+${content.trim()}
+
+</Step>`)
     },
   })
 
   td.addRule('card', {
     filter: (n) => has(n, 'card'),
-    replacement: (_c, n) => {
-      const t = n.querySelector('.card-title')
-      const title = t ? t.textContent : ''
-      if (t) t.remove()
-      return block(`<Card title=${attr(title)}>\n\n${td.turndown(n.innerHTML).trim()}\n\n</Card>`)
+    replacement: (content, n) => {
+      const title = n.querySelector('.card-title')?.textContent || ''
+      return block(`<Card title=${attr(title)}>
+
+${content.trim()}
+
+</Card>`)
     },
   })
 
@@ -131,16 +156,21 @@ function makeTurndown(ctx) {
 
   td.addRule('instruction', {
     filter: (n) => has(n, 'print'),
-    replacement: (_c, n) => {
+    replacement: (content, n) => {
       const t = n.querySelector('.t')?.textContent || ''
-      const d = td.turndown(n.querySelector('.d')?.innerHTML || '')
-      return block(`<Instruction title=${attr(t)}>\n\n${d.trim()}\n\n</Instruction>`)
+      return block(`<Instruction title=${attr(t)}>
+
+${content.trim()}
+
+</Instruction>`)
     },
   })
 
   td.addRule('figure', {
     filter: (n) =>
-      has(n, 'diagram-container') || n.nodeName === 'IMG' || n.nodeName === 'svg' || n.nodeName === 'SVG',
+      has(n, 'diagram-container') ||
+      ((n.nodeName === 'IMG' || n.nodeName.toLowerCase() === 'svg') &&
+        !n.parentNode?.closest?.('.diagram-container')),
     replacement: (_c, n) => {
       const cap = n.querySelector?.('.diagram-caption')?.textContent || ''
       const svg = n.nodeName.toLowerCase() === 'svg' ? n : n.querySelector?.('svg')
@@ -171,20 +201,15 @@ function makeTurndown(ctx) {
 
   td.addRule('details', {
     filter: 'details',
-    replacement: (_c, n) => {
-      const s = n.querySelector('summary')
-      const summary = s ? td.turndown(s.innerHTML).replace(/\n+/g, ' ').trim() : 'Detalhes'
-      if (s) s.remove()
-      return block(
-        `<details>\n<summary>${summary}</summary>\n\n${td.turndown(n.innerHTML).trim()}\n\n</details>`,
-      )
-    },
-  })
+    replacement: (content, n) => {
+      const summary = (n.querySelector('summary')?.textContent || 'Detalhes').replace(/\s+/g, ' ').trim()
+      return block(`<details>
+<summary>${summary}</summary>
 
-  // wrappers sem semântica: só passa o conteúdo
-  td.addRule('unwrap', {
-    filter: (n) => n.nodeName === 'DIV',
-    replacement: (content) => block(content),
+${content.trim()}
+
+</details>`)
+    },
   })
 
   return td
@@ -214,10 +239,9 @@ function frontmatter(m) {
       lines.push(`  - { ${parts.join(', ')} }`)
     }
   }
-  lines.push(`cover: ${m.cover || `/projects/${m.slug}/cover.svg`}`)
+  lines.push(`cover: ${m.cover || `/projects/${m.slug}/architecture.svg`}`)
   if (m.repo) lines.push(`repo: ${m.repo}`)
   if (m.live) lines.push(`live: ${m.live}`)
-  if (m.legacy) lines.push(`legacy: /posts/${m.legacy}.html`)
   lines.push('---')
   return lines.join('\n')
 }
@@ -239,7 +263,7 @@ function convert(file) {
 
   for (const [from, to] of meta.replace || []) body = body.split(from).join(to)
 
-  const mdx = `${frontmatter({ ...meta, legacy })}\n\n${body}\n`
+  const mdx = `${frontmatter(meta)}\n\n${body}\n`
   const contentDir = join(OUT, 'src/content/projects')
   const pubDir = join(OUT, 'public/projects', meta.slug)
   mkdirSync(contentDir, { recursive: true })

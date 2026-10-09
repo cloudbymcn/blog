@@ -1,0 +1,387 @@
+---
+title: "ETL legado de cotação do dólar migrado para Lambda por R$ 3/mês"
+slug: ptax-lambda-terraform
+summary: "Pentaho + Jenkins num EC2 24/7 viraram uma Lambda agendada, com Terraform, Secrets Manager e alerta por e-mail. Janela dinâmica e idempotente."
+category: cloud
+tier: A
+date: 2026-03-31
+stack: ["AWS Lambda", "EventBridge", "Secrets Manager", "Terraform", "GitHub Actions", "Firebird", "Python"]
+metrics:
+  - { label: "custo/mês", before: "R$ 200", after: "R$ 3" }
+  - { label: "código", before: "500+ linhas XML", after: "~100 linhas Python" }
+cover: /projects/ptax-lambda-terraform/architecture.svg
+repo: https://github.com/cloudbymcn/bcb-ptax-ingestion
+---
+
+## Contexto
+
+Eu trabalho em uma empresa do setor de exportação. Todos os dias, o time financeiro precisa da cotação do dólar (PTAX) atualizada no ERP para precificação de contratos. A fonte oficial é a API pública do Banco Central do Brasil.
+
+O pipeline antigo fazia isso: um arquivo `.ktr` do Pentaho Data Integration, agendado no Jenkins rodando em um EC2, consultava a API do BCB, transformava o retorno e gravava no Firebird (o banco legado do ERP). Funcionou durante anos — até que um dia parou silenciosamente. Ninguém foi notificado. O financeiro só percebeu quando os preços começaram a sair errados.
+
+Esse foi o gatilho para eu reescrever tudo do zero em uma arquitetura serverless.
+
+## Os gargalos
+
+Mapeei os problemas do pipeline antigo lado a lado com o que eu queria na nova arquitetura:
+
+#### Antes (Jenkins + Pentaho)
+
+-   Senha hardcoded em XML (plain text no .ktr)
+-   Sem alertas de falha — erros silenciosos
+-   Janela fixa de 5 dias úteis (hardcoded)
+-   EC2 rodando 24/7 para um job de 5 segundos/dia
+-   Race condition na geração de PK
+-   Timeout de 50 minutos configurado no Jenkins
+-   500+ linhas de XML no arquivo .ktr
+
+#### Depois (Lambda + EventBridge)
+
+-   Secrets Manager + KMS (credenciais criptografadas)
+-   SNS envia e-mail em qualquer erro ou sucesso
+-   Janela dinâmica via `MAX(DATA)` no banco
+-   Serverless — Lambda roda só quando necessário
+-   PK sequencial calculada no código
+-   Timeout de 60 segundos (execução real: ~5s)
+-   ~100 linhas de Python legível
+
+## Arquitetura
+
+O fluxo completo da nova solução:
+
+<Figure src="/projects/ptax-lambda-terraform/architecture.svg" alt={"EventBridge Scheduler dispara a Lambda de segunda a sexta às 18:05; a Lambda, dentro da VPC, lê credenciais no Secrets Manager, consulta a API PTAX do Banco Central e grava no Firebird do ERP; o resultado sai por SNS e os logs vão para o CloudWatch."} />
+
+## Serviços utilizados
+
+Cada serviço e por que ele está na arquitetura:
+
+| Serviço | Função | Por que este e não outro |
+| --- | --- | --- |
+| **AWS Lambda** | Executa o código Python que consulta a API do BCB e grava no Firebird | Workload de ~5s/dia. Pagar EC2 24/7 para isso é desperdício. Lambda cobra por milissegundo. |
+| **EventBridge Scheduler** | Agenda a execução da Lambda (seg-sex, 18:05 BRT) | Suporta timezone nativo (America/Sao\_Paulo). CloudWatch Events não suporta. |
+| **Secrets Manager** | Armazena credenciais do Firebird criptografadas com KMS | Rotação automática, audit trail, zero plain text. |
+| **CloudWatch** | Logs estruturados e métricas de cada execução | Integração nativa com Lambda. Sem setup extra. |
+| **SNS** | Envia e-mail com resultado de cada execução (sucesso ou erro) | Simples, barato, integra direto com Lambda via SDK. |
+| **IAM** | Roles e policies de least privilege para a Lambda | A Lambda só acessa os recursos que precisa. Nada mais. |
+
+<Callout type="info">
+
+**Classificação CloudOps** Este projeto se enquadra como _CloudOps_: migração de workload legado para a nuvem com foco em automação, observabilidade e redução de custo operacional. Não é um projeto novo — é a modernização de algo que já existia e precisava funcionar melhor.
+
+</Callout>
+
+## Implementação passo a passo
+
+<Step n={"1"}>
+
+#### Engenharia reversa do pipeline Pentaho
+
+O arquivo `.ktr` original tinha mais de 500 linhas de XML. Abri no Spoon (editor visual do Pentaho) e mapeei cada step. Na prática, o pipeline fazia apenas 4 operações úteis: (1) conectar no Firebird, (2) consultar a API do BCB, (3) transformar o JSON, (4) inserir no banco. O resto era boilerplate XML, tratamento de erro inútil (steps _Dummy_) e configurações de conexão duplicadas.
+
+</Step>
+
+<Step n={"2"}>
+
+#### Reescrita em Python (~100 linhas)
+
+Reescrevi as 4 operações em Python puro. A diferença principal: em vez de uma janela fixa de 5 dias, eu consulto `MAX(DATA)` no banco para saber a última cotação gravada e busco apenas o que falta. Isso torna o pipeline idempotente — posso rodar quantas vezes quiser sem duplicar dados.
+
+<details>
+<summary>lambda_handler.py (clique para expandir)</summary>
+
+```python
+import json
+import os
+import logging
+from datetime import datetime, timedelta
+
+import firebirdsql
+import boto3
+import urllib.request
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+sns = boto3.client("sns")
+sm = boto3.client("secretsmanager")
+
+SNS_TOPIC_ARN = os.environ["SNS_TOPIC_ARN"]
+SECRET_NAME = os.environ["SECRET_NAME"]
+FB_DATABASE = os.environ["FB_DATABASE"]
+
+BCB_URL = (
+    "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/"
+    "odata/CotacaoDolarPeriodo(dataInicial=@di,dataFinalCotacao=@df)"
+    "?@di='{start}'&@df='{end}'"
+    "&$format=json&$orderby=dataHoraCotacao%20asc"
+)
+
+def lambda_handler(event, context):
+    """Pipeline PTAX: 7 passos sequenciais."""
+
+    # 1. Buscar credenciais no Secrets Manager
+    secret = json.loads(
+        sm.get_secret_value(SecretId=SECRET_NAME)["SecretString"]
+    )
+    logger.info("Credenciais obtidas do Secrets Manager")
+
+    # 2. Conectar no Firebird
+    conn = firebirdsql.connect(
+        host=secret["host"],
+        port=int(secret["port"]),
+        database=FB_DATABASE,
+        user=secret["user"],
+        password=secret["password"],
+        charset="UTF8",
+    )
+    cur = conn.cursor()
+    logger.info("Conectado ao Firebird")
+
+    # 3. Obter estado atual (ultima data + proximo ID)
+    cur.execute("SELECT MAX(DATA) FROM COTACAO_DOLAR")
+    last_date = cur.fetchone()[0]
+
+    cur.execute("SELECT MAX(ID) FROM COTACAO_DOLAR")
+    max_id = cur.fetchone()[0] or 0
+
+    start = (last_date + timedelta(days=1)).strftime("%m-%d-%Y") if last_date else "01-01-2024"
+    end = datetime.now().strftime("%m-%d-%Y")
+    logger.info(f"Janela dinamica: {start} ate {end}")
+
+    # 4. Consultar API PTAX do BCB
+    url = BCB_URL.format(start=start, end=end)
+    with urllib.request.urlopen(url, timeout=15) as resp:
+        data = json.loads(resp.read().decode())
+
+    rows = data.get("value", [])
+    logger.info(f"API retornou {len(rows)} cotacoes")
+
+    # 5. Inserir novas cotacoes
+    inserted = 0
+    for row in rows:
+        max_id += 1
+        dt = datetime.strptime(
+            row["dataHoraCotacao"][:10], "%Y-%m-%d"
+        ).date()
+        cur.execute(
+            "INSERT INTO COTACAO_DOLAR (ID, DATA, COMPRA, VENDA) VALUES (?, ?, ?, ?)",
+            (max_id, dt, row["cotacaoCompra"], row["cotacaoVenda"]),
+        )
+        inserted += 1
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    logger.info(f"{inserted} cotacoes inseridas")
+
+    # 6. Notificar via SNS
+    msg = f"PTAX pipeline OK: {inserted} cotacoes inseridas ({start} a {end})"
+    sns.publish(TopicArn=SNS_TOPIC_ARN, Subject="PTAX Pipeline", Message=msg)
+
+    # 7. Retornar resultado
+    return {
+        "statusCode": 200,
+        "body": json.dumps({
+            "inserted": inserted,
+            "window": {"start": start, "end": end},
+        }),
+    }
+```
+
+</details>
+
+</Step>
+
+<Step n={"3"}>
+
+#### Testes locais com pytest
+
+Escrevi 9 testes unitários cobrindo os cenários críticos: API retornando vazio, API retornando dados válidos, banco sem registros anteriores (cold start), tratamento de erros de conexão, e validação do payload SNS. Todos rodando com mocks — sem depender de infra real.
+
+</Step>
+
+<Step n={"4"}>
+
+#### Mapear infra existente
+
+Antes de criar qualquer recurso, inspecionei a conta AWS. Descobri que já existia um Security Group configurado para acesso ao Firebird (porta 3050) na VPC corporativa. Em vez de criar um novo, referenciei o existente no Terraform com `data.aws_security_group`. Isso evitou duplicação e conflito de regras.
+
+</Step>
+
+<Step n={"5"}>
+
+#### Terraform — Infrastructure as Code
+
+Toda a infra está em Terraform: Lambda, EventBridge Scheduler, IAM Role, Secrets Manager, SNS Topic e CloudWatch Log Group. O deploy é reproduzível e auditável.
+
+<details>
+<summary>main.tf (trechos principais) (clique para expandir)</summary>
+
+```hcl
+# ── Lambda Function ──────────────────────────────────────
+resource "aws_lambda_function" "ptax" {
+  function_name = "bcb-ptax-ingestion"
+  runtime       = "python3.12"
+  handler       = "lambda_handler.lambda_handler"
+  architectures = ["arm64"]   # Graviton — 20% mais barato
+  timeout       = 60
+  memory_size   = 128
+
+  filename         = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  role             = aws_iam_role.lambda_role.arn
+
+  vpc_config {
+    subnet_ids         = var.private_subnet_ids
+    security_group_ids = [data.aws_security_group.firebird.id]
+  }
+
+  environment {
+    variables = {
+      SECRET_NAME   = aws_secretsmanager_secret.firebird_creds.name
+      FB_DATABASE   = var.firebird_database_path
+      SNS_TOPIC_ARN = aws_sns_topic.ptax_alerts.arn
+    }
+  }
+
+  layers = [aws_lambda_layer_version.deps.arn]
+
+  depends_on = [aws_cloudwatch_log_group.ptax]
+}
+
+# ── EventBridge Scheduler ────────────────────────────────
+resource "aws_scheduler_schedule" "ptax_daily" {
+  name                = "ptax-daily-ingestion"
+  schedule_expression = "cron(5 18 ? * MON-FRI *)"  # 18:05 BRT
+
+  schedule_expression_timezone = "America/Sao_Paulo"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.ptax.arn
+    role_arn = aws_iam_role.scheduler_role.arn
+
+    retry_policy {
+      maximum_retry_attempts = 2
+    }
+  }
+}
+```
+
+</details>
+
+</Step>
+
+<Step n={"6"}>
+
+#### Deploy e teste
+
+Rodei `terraform apply` e invoquei a Lambda manualmente para validar. O primeiro resultado retornou 0 inserções porque o pipeline legado já tinha rodado naquele dia — exatamente o comportamento esperado (idempotência funcionando).
+
+<details>
+<summary>Resposta da primeira execução (clique para expandir)</summary>
+
+```json
+{
+  "statusCode": 200,
+  "body": "{\"inserted\": 0, \"window\": {\"start\": \"03-31-2026\", \"end\": \"03-31-2026\"}}"
+}
+```
+
+</details>
+
+</Step>
+
+## Decisões de arquitetura
+
+<Card title={"Por que Lambda e não ECS ou EC2?"}>
+
+O workload total é ~5 segundos por dia. Manter um container (ECS) ou uma instância (EC2) ligada 24/7 para isso seria desperdício de dinheiro e complexidade operacional. Lambda cobra por milissegundo de execução — o custo mensal é virtualmente zero.
+
+</Card>
+
+<Card title={"Por que ARM64 (Graviton)?"}>
+
+Lambda com Graviton é 20% mais barato que x86 e tem performance equivalente (ou melhor) para workloads I/O bound como este. Como eu uso apenas bibliotecas pure Python (firebirdsql, urllib), não há dependência binária que quebre em ARM.
+
+</Card>
+
+<Card title={"Por que EventBridge Scheduler e não CloudWatch Events?"}>
+
+EventBridge Scheduler suporta **timezone nativo** (`America/Sao_Paulo`). Com CloudWatch Events, eu teria que calcular o offset UTC manualmente e lidar com horário de verão. Além disso, o Scheduler tem retry policy nativo (configurei 2 tentativas).
+
+</Card>
+
+<Card title={"Por que Lambda dentro da VPC?"}>
+
+O Firebird roda em uma rede privada corporativa. A Lambda precisa estar na mesma VPC para acessar a porta 3050. O tradeoff é que Lambda em VPC precisa de NAT Gateway para acessar a internet (API do BCB) e o Secrets Manager — mas esse NAT já existia na infra.
+
+</Card>
+
+## Modelo de segurança
+
+Três camadas de proteção:
+
+<Card title={"1. Credenciais — Secrets Manager + KMS"}>
+
+As credenciais do Firebird ficam no Secrets Manager, criptografadas com uma chave KMS gerenciada pela AWS. A Lambda busca em runtime via SDK — nunca ficam em variável de ambiente, código-fonte ou repositório. Rotação automática disponível quando necessário.
+
+</Card>
+
+<Card title={"2. Rede — VPC + Security Group"}>
+
+A Lambda roda em subnets privadas da VPC corporativa. O Security Group permite apenas saída para a porta 3050 (Firebird) e HTTPS (443). Sem acesso SSH, sem portas abertas para a internet.
+
+</Card>
+
+<Card title={"3. IAM — Least Privilege"}>
+
+A IAM Role da Lambda tem permissões mínimas: `secretsmanager:GetSecretValue` apenas para o secret específico, `logs:PutLogEvents` para CloudWatch, `sns:Publish` para o tópico de alertas, e permissões de VPC networking. Nada mais.
+
+</Card>
+
+## Custo
+
+<CostCompare>
+  <CostBar label={"ANTES"} value={"R$ 200/mês"} pct={100} variant="old" />
+  <CostBar label={"DEPOIS"} value={"R$ 3/mês"} pct={10} variant="new" />
+</CostCompare>
+
+| Componente | Custo estimado/mês |
+| --- | --- |
+| **Lambda** (22 invocações/mês, ~5s cada, 128 MB ARM64) | ~R$ 0,00 (free tier) |
+| **EventBridge Scheduler** | ~R$ 0,00 (free tier) |
+| **Secrets Manager** (1 secret, ~22 chamadas) | ~R$ 2,50 |
+| **CloudWatch Logs** | ~R$ 0,10 |
+| **SNS** (22 e-mails) | ~R$ 0,00 |
+| **NAT Gateway** | Já existente (compartilhado) |
+| **Total** | **~R$ 3,00/mês** |
+
+A infraestrutura anterior custava ~R$ 200/mês (EC2 t3.medium 24/7 + licença Jenkins + manutenção). A nova custa **98,5% menos**.
+
+## O que aprendi
+
+<Card title={"1. Mapeie a infra existente antes de criar qualquer coisa"}>
+
+Eu quase criei um Security Group novo para a Lambda. Quando inspecionei a VPC, descobri que já existia um SG configurado com acesso ao Firebird. Referenciei com `data.aws_security_group` no Terraform e economizei tempo e conflitos de regras.
+
+</Card>
+
+<Card title={"2. PowerShell + JSON = armadilha"}>
+
+Durante o desenvolvimento, tentei testar a Lambda via `aws lambda invoke` no PowerShell. O retorno JSON vinha com encoding errado e aspas escapadas de forma diferente do bash. Perdi tempo até perceber que o problema não era a Lambda — era o shell. Passei a testar sempre via bash ou diretamente no console da AWS.
+
+</Card>
+
+<Card title={"3. Lambda em VPC precisa de NAT para acessar a internet"}>
+
+Quando coloquei a Lambda na VPC para acessar o Firebird, ela perdeu acesso à internet (API do BCB e Secrets Manager). Lambda em VPC roda em subnet privada — sem NAT Gateway, não sai para a internet. No meu caso, o NAT já existia, mas se não existisse seria um custo adicional (~$32/mês). Alternativa: VPC Endpoints para Secrets Manager.
+
+</Card>
+
+## Repositório
+
+Código-fonte, Terraform e testes disponíveis em: [github.com/cloudbymcn/bcb-ptax-ingestion](https://github.com/cloudbymcn/bcb-ptax-ingestion)
