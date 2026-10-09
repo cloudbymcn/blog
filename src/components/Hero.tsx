@@ -3,12 +3,16 @@ import { Link } from 'react-router'
 import { stats } from '../lib/content'
 import { LanyardControls } from './Lanyard/LanyardControls'
 import { LanyardStage } from './Lanyard/LanyardStage'
+import { ImmersiveSlot } from './three/ImmersiveSlot'
 import { LANYARD_DEFAULTS } from './Lanyard/settings'
 import { MaskText } from './ui/MaskText'
 import { CountUp } from './ui/CountUp'
 import { Magnet } from './ui/Magnet'
 
 const desktopQuery = '(min-width: 768px)'
+
+// fundo three.js decorativo: chunk separado, só desktop e depois do load (ImmersiveSlot)
+const loadBackdrop = () => import('./three/HeroBackdrop')
 
 function subscribeDesktop(cb: () => void) {
   const mq = window.matchMedia(desktopQuery)
@@ -36,6 +40,8 @@ export function Hero() {
       data-section="inicio"
       className="relative isolate flex min-h-svh flex-col overflow-hidden bg-bg pt-[var(--nav-h)]"
     >
+      <ImmersiveSlot load={loadBackdrop} className="absolute inset-0 z-0" />
+
       {/* SPEC §0-bis: o canvas cobre a dobra inteira por cima do texto; só o cartão pega ponteiro */}
       <div className="pointer-events-none absolute inset-x-0 top-[var(--nav-h)] z-10 h-[500px] md:inset-0 md:h-auto">
         {/* key: trocar layout ou ligar o Intro remonta o crachá (a animação de entrada só roda na montagem) */}
