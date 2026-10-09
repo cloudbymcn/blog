@@ -37,7 +37,7 @@ const unknownStack = new Map()
 
 for (const file of files) {
   const src = readFileSync(join(DIR, file), 'utf8')
-  const fm = src.match(/^---\n([\s\S]*?)\n---/)
+  const fm = src.match(/^---\r?\n([\s\S]*?)\r?\n---/)
   if (!fm) {
     err(file, 'sem frontmatter')
     continue
