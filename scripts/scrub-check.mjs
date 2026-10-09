@@ -28,6 +28,8 @@ const BINARY_EXTENSIONS = new Set([
   '.ttf',
   '.eot',
   '.mp4',
+  '.webm',
+  '.mov',
   '.pdf',
   '.zip',
 ])
