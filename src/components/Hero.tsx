@@ -1,12 +1,10 @@
 import { useState, useSyncExternalStore } from 'react'
 import { Link } from 'react-router'
-import { stats } from '../lib/content'
 import { LanyardControls } from './Lanyard/LanyardControls'
 import { LanyardStage } from './Lanyard/LanyardStage'
 import { ImmersiveSlot } from './three/ImmersiveSlot'
 import { LANYARD_DEFAULTS } from './Lanyard/settings'
 import { MaskText } from './ui/MaskText'
-import { CountUp } from './ui/CountUp'
 import { Magnet } from './ui/Magnet'
 
 const desktopQuery = '(min-width: 768px)'
@@ -30,12 +28,6 @@ export function Hero() {
     () => true,
   )
   const [lanyard, setLanyard] = useState(LANYARD_DEFAULTS)
-
-  const items = [
-    { value: stats.projects, label: 'projetos publicados' },
-    { value: stats.awsServices, label: 'serviços AWS usados' },
-    { value: stats.certifications, label: 'certificações AWS' },
-  ]
 
   return (
     <section
@@ -97,20 +89,6 @@ export function Hero() {
               </a>
             </Magnet>
           </div>
-          <dl
-            style={{ animationDelay: '540ms' }}
-            className="lc fade-up mt-12 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6"
-          >
-            {items.map((s) => (
-              <div key={s.label}>
-                <dt className="sr-only">{s.label}</dt>
-                <dd className="font-display text-3xl font-semibold tracking-[-0.02em]">
-                  <CountUp to={s.value} delay={540} />
-                </dd>
-                <dd className="mt-1 text-xs leading-snug text-ink-2">{s.label}</dd>
-              </div>
-            ))}
-          </dl>
         </div>
       </div>
 
