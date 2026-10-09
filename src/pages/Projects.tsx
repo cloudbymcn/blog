@@ -154,7 +154,7 @@ export function Projects() {
           <button
             type="button"
             onClick={() => setParams({}, { replace: true })}
-            className="text-accent hover:underline"
+            className="text-link hover:underline"
           >
             Limpar filtros
           </button>

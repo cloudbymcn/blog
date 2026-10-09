@@ -235,7 +235,7 @@ export function LanyardControls({
               <button
                 type="button"
                 onClick={() => onChange(LANYARD_DEFAULTS)}
-                className="text-xs font-medium text-accent hover:underline"
+                className="text-xs font-medium text-link hover:underline"
               >
                 Reset
               </button>

@@ -26,7 +26,7 @@ export function FeaturedProjects() {
         <Magnet>
           <Link
             to="/projetos"
-            className="glass inline-flex items-center gap-1 rounded-full px-6 py-3 text-[17px] font-medium text-accent transition-colors hover:bg-white"
+            className="glass inline-flex items-center gap-1 rounded-full px-6 py-3 text-[17px] font-medium text-link transition-colors hover:bg-white"
           >
             Ver todos os projetos <span aria-hidden="true">›</span>
           </Link>

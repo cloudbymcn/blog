@@ -7,7 +7,7 @@ export function NotFound() {
       <h1 className="mt-2 font-display text-4xl font-semibold tracking-[-0.02em] md:text-6xl">
         Página não encontrada
       </h1>
-      <Link to="/" className="mt-8 text-accent hover:underline">
+      <Link to="/" className="mt-8 text-link hover:underline">
         Voltar pro início
       </Link>
     </section>

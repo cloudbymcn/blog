@@ -47,7 +47,7 @@ export function Contact() {
               >
                 <svg
                   viewBox="0 0 24 24"
-                  className="size-6 shrink-0 text-ink-2 group-hover:text-accent"
+                  className="size-6 shrink-0 text-ink-2 group-hover:text-link"
                   fill="currentColor"
                   aria-hidden="true"
                 >

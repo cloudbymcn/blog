@@ -71,7 +71,7 @@ export function Project() {
 
       <header className="border-b border-line bg-bg-2">
         <div className="mx-auto max-w-6xl px-5 pb-12 pt-12 md:px-8">
-          <Link to="/projetos" className="text-sm text-accent hover:underline">
+          <Link to="/projetos" className="text-sm text-link hover:underline">
             ‹ Todos os projetos
           </Link>
           <p className="mt-8 text-sm font-medium text-ink-2">
@@ -114,7 +114,7 @@ export function Project() {
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-5 pt-12 md:px-8 lg:grid-cols-[minmax(0,1fr)_240px]">
         <section
           ref={articleRef}
-          className="prose prose-lg max-w-none prose-headings:font-display prose-headings:font-semibold prose-headings:tracking-[-0.02em] prose-headings:text-ink prose-p:text-ink/85 prose-a:text-accent prose-a:no-underline hover:prose-a:underline prose-strong:text-ink prose-code:text-ink prose-code:before:content-none prose-code:after:content-none prose-pre:rounded-2xl"
+          className="prose prose-lg max-w-none prose-headings:font-display prose-headings:font-semibold prose-headings:tracking-[-0.02em] prose-headings:text-ink prose-p:text-ink/85 prose-a:text-link prose-a:no-underline hover:prose-a:underline prose-strong:text-ink prose-code:text-ink prose-code:before:content-none prose-code:after:content-none prose-pre:rounded-2xl"
         >
           {/* com print no hero, o SVG de arquitetura vai pro corpo (se o MDX já não mostra ele) */}
           {p.image && p.cover && !p.coverInBody && (
@@ -150,7 +150,7 @@ export function Project() {
                       href={`#${t.id}`}
                       className={`-ml-px block border-l transition-colors ${t.level === 3 ? 'pl-7' : 'pl-4'} ${
                         active === t.id
-                          ? 'border-accent text-accent'
+                          ? 'border-accent text-link'
                           : 'border-transparent text-ink-2 hover:text-ink'
                       }`}
                     >
@@ -169,7 +169,7 @@ export function Project() {
                 <li key={s}>
                   <Link
                     to={`/projetos?stack=${encodeURIComponent(s)}`}
-                    className="glass flex items-center gap-1.5 rounded-full px-3 py-1 text-sm text-ink-2 hover:text-accent"
+                    className="glass flex items-center gap-1.5 rounded-full px-3 py-1 text-sm text-ink-2 hover:text-link"
                   >
                     <StackIcon name={s} className="size-3.5" />
                     {s}
@@ -186,7 +186,7 @@ export function Project() {
                   href={p.repo}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="glass rounded-full px-4 py-2.5 text-center text-sm font-medium text-accent hover:bg-white"
+                  className="glass rounded-full px-4 py-2.5 text-center text-sm font-medium text-link hover:bg-white"
                 >
                   Código no GitHub ↗
                 </a>
@@ -196,7 +196,7 @@ export function Project() {
                   href={p.live}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="glass rounded-full px-4 py-2.5 text-center text-sm font-medium text-accent hover:bg-white"
+                  className="glass rounded-full px-4 py-2.5 text-center text-sm font-medium text-link hover:bg-white"
                 >
                   Ver ao vivo ↗
                 </a>

@@ -4,8 +4,8 @@ import type { ComponentProps, ReactNode } from 'react'
 
 const CALLOUT = {
   // cores de sistema da Apple (modo claro); o fundo fica neutro, só o rótulo e a barra levam cor
-  info: { bar: 'bg-accent', label: 'Nota', color: 'text-accent' },
-  success: { bar: 'bg-[#248a3d]', label: 'Resultado', color: 'text-[#248a3d]' },
+  info: { bar: 'bg-accent', label: 'Nota', color: 'text-link' },
+  success: { bar: 'bg-[#1a7f37]', label: 'Resultado', color: 'text-[#1a7f37]' },
   warn: { bar: 'bg-[#c93400]', label: 'Atenção', color: 'text-[#c93400]' },
   danger: { bar: 'bg-[#d70015]', label: 'Cuidado', color: 'text-[#d70015]' },
 }

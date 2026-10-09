@@ -92,7 +92,7 @@ export function Hero() {
             <Magnet>
               <a
                 href="#contato"
-                className="glass inline-flex items-center rounded-full px-5 py-2.5 text-[15px] font-medium text-accent transition-colors hover:bg-white"
+                className="glass inline-flex items-center rounded-full px-5 py-2.5 text-[15px] font-medium text-link transition-colors hover:bg-white"
               >
                 Falar comigo
               </a>

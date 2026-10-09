@@ -15,7 +15,9 @@ export function MaskText({
   step?: number
 }) {
   return (
-    <Tag className={className} aria-label={lines.join(' ')}>
+    // texto real pra leitor de tela num sr-only (aria-label em <p>/<span> sem role é proibido)
+    <Tag className={className}>
+      <span className="sr-only">{lines.join(' ')}</span>
       {lines.map((line, i) => (
         <span key={i} aria-hidden="true" className="block overflow-hidden pb-[0.08em]">
           <span className="mask-up block" style={{ animationDelay: `${delay + i * step}ms` }}>
