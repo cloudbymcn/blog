@@ -33,7 +33,7 @@ export function Certs() {
                   decoding="async"
                   className="aspect-square w-full max-w-40 object-contain transition-transform duration-300 hover:-translate-y-1"
                 />
-                <span className="mt-3 font-mono text-xs text-ink-3">{c.code}</span>
+                <span className="lc mt-3 font-mono text-xs text-ink-3">{c.code}</span>
               </Reveal>
             </li>
           ))}
@@ -46,7 +46,7 @@ export function Certs() {
                 className="absolute -left-[37px] top-1.5 size-2.5 rounded-full bg-accent"
               />
               <Reveal delay={stagger(i)}>
-                <p className="text-sm font-semibold text-ink-2">{t.year}</p>
+                <p className="lc text-sm font-semibold text-ink-2">{t.year}</p>
                 <p className="mt-1 text-ink">{t.text}</p>
               </Reveal>
             </li>

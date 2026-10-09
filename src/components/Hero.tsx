@@ -60,7 +60,7 @@ export function Hero() {
       <div className="relative z-0 mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 items-center px-6 md:grid-cols-2 md:px-8">
         <div className="pb-16 pt-[calc(70svh-var(--nav-h)+1rem)] md:py-24">
           {/* entrada em máscara linha a linha; o resto sobe em fade logo depois */}
-          <MaskText lines={['Cloud by MCN']} as="p" className="text-sm font-medium text-ink-2" />
+          <MaskText lines={['Cloud by MCN']} as="p" className="lc text-sm font-medium text-ink-2" />
           <MaskText
             as="h1"
             lines={['Matheus', 'Nascimento']}
@@ -71,7 +71,7 @@ export function Hero() {
             as="p"
             lines={['Engenheiro de Infraestrutura Cloud']}
             delay={260}
-            className="mt-3 block font-display text-xl font-medium tracking-[-0.01em] text-ink-2 md:text-2xl"
+            className="lc mt-3 block font-display text-xl font-medium tracking-[-0.01em] text-ink-2 md:text-2xl"
           />
           <p
             className="fade-up mt-6 max-w-md text-[17px] leading-relaxed text-ink-2"
@@ -84,7 +84,7 @@ export function Hero() {
             <Magnet>
               <Link
                 to="/projetos"
-                className="inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-white transition-opacity hover:opacity-90"
+                className="lc inline-flex items-center gap-1.5 rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-white transition-opacity hover:opacity-90"
               >
                 Ver projetos <span aria-hidden="true">›</span>
               </Link>
@@ -92,7 +92,7 @@ export function Hero() {
             <Magnet>
               <a
                 href="#contato"
-                className="glass inline-flex items-center rounded-full px-5 py-2.5 text-[15px] font-medium text-link transition-colors hover:bg-white"
+                className="lc glass inline-flex items-center rounded-full px-5 py-2.5 text-[15px] font-medium text-link transition-colors hover:bg-white"
               >
                 Falar comigo
               </a>
@@ -100,7 +100,7 @@ export function Hero() {
           </div>
           <dl
             style={{ animationDelay: '540ms' }}
-            className="fade-up mt-12 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6"
+            className="lc fade-up mt-12 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6"
           >
             {items.map((s) => (
               <div key={s.label}>
@@ -116,7 +116,7 @@ export function Hero() {
       </div>
 
       <p
-        className="pointer-events-none absolute bottom-6 right-[27%] z-0 hidden translate-x-1/2 text-xs text-ink-3 md:block"
+        className="lc pointer-events-none absolute bottom-6 right-[27%] z-0 hidden translate-x-1/2 text-xs text-ink-3 md:block"
         aria-hidden="true"
       >
         Try dragging

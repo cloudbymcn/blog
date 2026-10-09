@@ -40,7 +40,7 @@ export function ProjectCard({ project: p }: { project: ProjectMeta }) {
         <p className="mt-2 line-clamp-1 text-[15px] text-ink-2" title={p.summary}>
           {p.summary}
         </p>
-        <ul className="mt-auto flex flex-wrap gap-1.5 pt-6">
+        <ul className="lc mt-auto flex flex-wrap gap-1.5 pt-6">
           {p.stack.slice(0, 4).map((s) => (
             <li key={s} className="rounded-full bg-black/[0.04] px-2.5 py-1 text-xs font-medium text-ink-2">
               {s}

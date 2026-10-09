@@ -68,7 +68,7 @@ export function Projects() {
         name="description"
         content="Case studies de arquitetura AWS, integrações, IA aplicada e produtos em produção."
       />
-      <p className="text-sm font-medium text-ink-2">Portfolio</p>
+      <p className="lc text-sm font-medium text-ink-2">Portfolio</p>
       <h1 className="mt-2 font-display text-5xl font-semibold tracking-[-0.02em] md:text-7xl">Projetos.</h1>
       <p className="mt-4 max-w-2xl text-ink-2">
         {projects.length} projetos: case studies completos e cards curtos. Filtre por categoria, stack ou
@@ -144,7 +144,7 @@ export function Projects() {
         )}
       </div>
 
-      <p className="mt-8 text-sm text-ink-3" aria-live="polite">
+      <p className="lc mt-8 text-sm text-ink-3" aria-live="polite">
         {list.length} {list.length === 1 ? 'projeto' : 'projetos'}
       </p>
 

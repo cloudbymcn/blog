@@ -243,7 +243,7 @@ export function ConcaveCarousel({ items, label }: { items: CarouselItem[]; label
       </div>
 
       <div className="mx-auto mt-2 max-w-xl text-center" aria-live={userPaused || paused ? 'polite' : 'off'}>
-        <p className="truncate font-display text-xl font-semibold tracking-[-0.02em] text-ink">
+        <p className="lc truncate font-display text-xl font-semibold tracking-[-0.02em] text-ink">
           {current?.title}
         </p>
         <p className="mt-1 line-clamp-1 text-[15px] text-ink-2">{current?.subtitle}</p>
@@ -260,7 +260,7 @@ export function ConcaveCarousel({ items, label }: { items: CarouselItem[]; label
             ‹
           </span>
         </button>
-        <p className="min-w-[5.5rem] text-center font-mono text-sm tabular-nums text-ink-2">
+        <p className="lc min-w-[5.5rem] text-center font-mono text-sm tabular-nums text-ink-2">
           <span className="text-ink">{pad(index + 1)}</span> / {pad(n)}
         </p>
         <button

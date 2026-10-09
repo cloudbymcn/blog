@@ -71,10 +71,10 @@ export function Project() {
 
       <header className="border-b border-line bg-bg-2">
         <div className="mx-auto max-w-6xl px-5 pb-12 pt-12 md:px-8">
-          <Link to="/projetos" className="text-sm text-link hover:underline">
+          <Link to="/projetos" className="lc text-sm text-link hover:underline">
             ‹ Todos os projetos
           </Link>
-          <p className="mt-8 text-sm font-medium text-ink-2">
+          <p className="lc mt-8 text-sm font-medium text-ink-2">
             {CATEGORIES[p.category] ?? p.category} · {formatDate(p.date)}
           </p>
           <h1 className="mt-2 max-w-4xl font-display text-4xl font-semibold leading-[1.08] tracking-[-0.02em] md:text-6xl">
@@ -85,7 +85,7 @@ export function Project() {
             <dl className="mt-8 flex flex-wrap gap-3">
               {p.metrics.map((m) => (
                 <div key={m.label} className="glass rounded-2xl px-5 py-4">
-                  <dt className="text-xs font-medium text-ink-2">{m.label}</dt>
+                  <dt className="lc text-xs font-medium text-ink-2">{m.label}</dt>
                   <dd className="mt-1">
                     <span className="text-ink-3 line-through decoration-ink-3/60">{m.before}</span>{' '}
                     <span className="font-display text-xl font-semibold tracking-[-0.02em] text-ink">
@@ -142,8 +142,8 @@ export function Project() {
         <aside className="space-y-10 lg:sticky lg:top-[calc(var(--nav-h)+2rem)] lg:self-start">
           {toc.length > 0 && (
             <nav aria-label="Nesta página" className="hidden lg:block">
-              <p className="text-xs font-semibold text-ink">Nesta página</p>
-              <ul className="mt-3 space-y-2 border-l border-line text-sm">
+              <p className="lc text-xs font-semibold text-ink">Nesta página</p>
+              <ul className="lc mt-3 space-y-2 border-l border-line text-sm">
                 {toc.map((t) => (
                   <li key={t.id}>
                     <a
@@ -163,8 +163,8 @@ export function Project() {
           )}
 
           <div>
-            <p className="text-xs font-semibold text-ink">Stack usada</p>
-            <ul className="mt-3 flex flex-wrap gap-2">
+            <p className="lc text-xs font-semibold text-ink">Stack usada</p>
+            <ul className="lc mt-3 flex flex-wrap gap-2">
               {p.stack.map((s) => (
                 <li key={s}>
                   <Link
@@ -180,7 +180,7 @@ export function Project() {
           </div>
 
           {(p.repo || p.live) && (
-            <div className="flex flex-col gap-2">
+            <div className="lc flex flex-col gap-2">
               {p.repo && (
                 <a
                   href={p.repo}

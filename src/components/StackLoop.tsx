@@ -20,7 +20,7 @@ function Loop({ items, reverse }: { items: string[]; reverse?: boolean }) {
           <li
             key={i}
             aria-hidden={i >= items.length}
-            className="glass flex items-center gap-2 rounded-full px-4 py-2 text-sm text-ink-2"
+            className="lc glass flex items-center gap-2 rounded-full px-4 py-2 text-sm text-ink-2"
           >
             <StackIcon name={name} className="size-4 text-ink" />
             {name}
@@ -42,7 +42,7 @@ export function StackLoop() {
         {(Object.entries(STACK) as [StackGroup, readonly string[]][]).map(([group, items], i) => (
           <Reveal key={group} delay={stagger(i)}>
             <h3 className="text-sm font-semibold text-ink">{group}</h3>
-            <ul className="mt-3 flex flex-wrap gap-1.5">
+            <ul className="lc mt-3 flex flex-wrap gap-1.5">
               {items.map((s) => (
                 <li key={s} className="rounded-full bg-white px-2.5 py-1 text-sm text-ink-2 ring-1 ring-line">
                   {s}

@@ -54,7 +54,7 @@ export function Contact() {
                   <path d={c.path} />
                 </svg>
                 <span className="min-w-0">
-                  <span className="block text-xs font-medium text-ink-2">{c.label}</span>
+                  <span className="lc block text-xs font-medium text-ink-2">{c.label}</span>
                   <span className="block truncate font-medium">{c.value}</span>
                 </span>
               </a>

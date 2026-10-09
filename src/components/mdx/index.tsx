@@ -15,7 +15,7 @@ export function Callout({ type = 'info', children }: { type?: keyof typeof CALLO
   return (
     <aside className="not-prose relative my-8 overflow-hidden rounded-2xl bg-bg-2 px-6 py-5">
       <span className={`absolute inset-y-0 left-0 w-1 ${c.bar}`} aria-hidden="true" />
-      <p className={`text-xs font-semibold ${c.color}`}>{c.label}</p>
+      <p className={`lc text-xs font-semibold ${c.color}`}>{c.label}</p>
       <div className="mdx-inner mt-1 text-ink-2">{children}</div>
     </aside>
   )
@@ -29,7 +29,7 @@ export function Metric({ value, label }: { value: ReactNode; label: ReactNode })
   return (
     <div className="rounded-2xl bg-bg-2 px-5 py-4">
       <p className="font-display text-3xl font-semibold tracking-[-0.02em] text-ink">{value}</p>
-      <p className="mt-1 text-xs font-medium text-ink-2">{label}</p>
+      <p className="lc mt-1 text-xs font-medium text-ink-2">{label}</p>
     </div>
   )
 }
@@ -53,7 +53,7 @@ export function Step({ n, children }: { n: number | string; children: ReactNode 
 export function Card({ title, children }: { title?: ReactNode; children: ReactNode }) {
   return (
     <div className="glass not-prose my-8 rounded-3xl px-6 py-5">
-      {title && <p className="font-display text-lg font-semibold tracking-[-0.02em] text-ink">{title}</p>}
+      {title && <p className="lc font-display text-lg font-semibold tracking-[-0.02em] text-ink">{title}</p>}
       <div className="mdx-inner mt-1 text-ink-2">{children}</div>
     </div>
   )
@@ -78,7 +78,7 @@ export function CostBar({
   return (
     <div>
       <div className="flex justify-between text-sm">
-        <span className="text-ink-2">{label}</span>
+        <span className="lc text-ink-2">{label}</span>
         <span className={variant === 'old' ? 'text-ink-2' : 'font-semibold text-ink'}>{value}</span>
       </div>
       <div className="mt-1.5 h-2 rounded-full bg-black/[0.06]">
@@ -94,7 +94,7 @@ export function CostBar({
 export function Instruction({ title, children }: { title?: ReactNode; children: ReactNode }) {
   return (
     <div className="glass not-prose my-8 overflow-hidden rounded-3xl">
-      <p className="border-b border-line px-6 py-3 text-sm font-semibold text-ink">
+      <p className="lc border-b border-line px-6 py-3 text-sm font-semibold text-ink">
         {title ?? 'Passo a passo'}
       </p>
       <div className="mdx-inner px-6 py-5 text-ink-2">{children}</div>

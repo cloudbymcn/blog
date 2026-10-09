@@ -33,8 +33,28 @@ body {
 
 h1,
 h2,
-h3 {
+h3,
+h4 {
   letter-spacing: -0.02em;
+  /* alternativas da Inter (a SF ignora): l com cauda e dígitos/letras mais abertos */
+  font-feature-settings:
+    'cv11' 1,
+    'ss01' 1;
+}
+
+/* tudo em minúsculo (Matheus): títulos, nav, botões, chips, labels, contadores, rodapé.
+   Corpo de texto e código ficam como estão; o resto usa a classe .lc */
+h1,
+h2,
+h3,
+h4,
+button,
+label,
+summary,
+header nav,
+footer,
+.lc {
+  text-transform: lowercase;
 }
 
 ::selection {

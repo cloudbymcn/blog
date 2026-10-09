@@ -100,7 +100,7 @@ function Toggle({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-xs font-medium text-ink-2">{label}</span>
+      <span className="lc text-xs font-medium text-ink-2">{label}</span>
       <button
         type="button"
         role="switch"
@@ -231,7 +231,7 @@ export function LanyardControls({
           >
             <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/15 md:hidden" aria-hidden="true" />
             <div className="flex items-center justify-between">
-              <p className="text-[15px] font-semibold tracking-[-0.01em] text-ink">Customize</p>
+              <p className="lc text-[15px] font-semibold tracking-[-0.01em] text-ink">Customize</p>
               <button
                 type="button"
                 onClick={() => onChange(LANYARD_DEFAULTS)}
