@@ -1,6 +1,7 @@
 """Covers animados: baixa os mp4 gerados a partir dos covers, faz loop de 4s com
 crossfade fim->início, enquadra na mesma moldura macOS do cover.webp e exporta
-public/projects/<slug>/cover.webm (VP9) + cover.mp4 (H.264), sem áudio.
+public/projects/<slug>/cover.webm (VP9) + cover.mp4 (H.264), sem áudio. Se o webm
+sair maior que o mp4, é descartado e fica só o mp4 (o <video> tem que tocar só com mp4).
 
 Uso:
   python scripts/cover-videos.py                 # todos de tmp/covers-gen/videos.tsv
@@ -148,6 +149,10 @@ def main() -> None:
                 crf += 2
                 size = encode(src, overlay, graph, loop, fps, out, codec, crf)
             sizes[ext] = f"{size / 1e6:.2f} MB (crf {crf})"
+        webm, mp4 = dest / "cover.webm", dest / "cover.mp4"
+        if webm.stat().st_size >= mp4.stat().st_size:  # webm sem ganho: fica só o mp4
+            webm.unlink()
+            sizes["webm"] += " -> descartado (maior que o mp4)"
         print(f"{slug}: src {sw}x{sh} {dur:.2f}s {fps:g}fps {mode or 'raw'} -> loop {loop:.2f}s | "
               + " | ".join(f"{k} {v}" for k, v in sizes.items()))
 
