@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { heroRibbonsEnabled } from '../../lib/flags'
+import { createRibbons } from './ribbons'
 import { useThreeScene } from './useThreeScene'
 
 const SHAPES = 9
@@ -32,6 +34,9 @@ export default function HeroBackdrop() {
     ({ renderer, scene, camera, pointer }) => {
       camera.position.set(0, 0, CAMERA_Z)
       const rand = rng(7)
+      // experimento: fitas de interferência atrás do crachá (flag HERO_RIBBONS / ?ribbons=0|1)
+      const ribbons = heroRibbonsEnabled() ? createRibbons() : null
+      if (ribbons) scene.add(ribbons.mesh)
       const pmrem = new THREE.PMREMGenerator(renderer)
       const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
       scene.environment = env
@@ -102,6 +107,7 @@ export default function HeroBackdrop() {
 
       return {
         update(t, dt) {
+          ribbons?.update(t, renderer)
           for (const s of shapes) {
             const { w, h } = halfExtents(s.z, camera.aspect)
             s.mesh.position.set(s.u * w, s.v * h + Math.sin(t * s.speed + s.phase) * 0.25, s.z)
