@@ -179,44 +179,27 @@ html::-webkit-scrollbar {
   transform: scale(1.04) translate(calc(var(--mx, 0) * -8px), calc(var(--my, 0) * -8px));
 }
 
-/* Signal Type (nome do hero): letreiro neon. A letra real fica no span interno (contorno de tubo
-   apagado via filtro SVG); halo e preenchimento são ::before/::after, e o JS escreve --lit/--glow/--base */
-.signal {
-  --signal-glow: #0071e3;
-}
-.signal-g {
-  --lit: 0;
-  --glow: 0;
-  --base: 1;
+/* Cipher Reveal (nome do hero): a letra real fica no fluxo e some enquanto embaralha; a máscara mostra
+   a cifra centrada e esticada (--sx) na largura da letra final, então a linha não pula */
+.cipher-g {
   position: relative;
   display: inline-block;
 }
-.signal-g > span {
-  -webkit-text-fill-color: #000;
-  filter: url(#signal-outline);
-  opacity: var(--base);
+.cipher-pending .cipher-face {
+  opacity: 0;
 }
-.signal-g::before,
-.signal-g::after {
-  content: attr(data-ch);
+.cipher-face,
+.cipher-mask {
+  transition: opacity 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.cipher-mask {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 50%;
+  white-space: pre;
   pointer-events: none;
-}
-.signal-g::before {
-  -webkit-text-fill-color: transparent;
-  text-shadow:
-    0 0 0.05em var(--signal-glow),
-    0 0 0.24em var(--signal-glow);
-  opacity: var(--glow);
-}
-.signal-g::after {
-  opacity: var(--lit);
-}
-.signal-on .signal-g {
-  --lit: 1;
-  --glow: 0.22;
-  --base: 0;
+  opacity: 0;
+  transform: translateX(-50%) scaleX(var(--sx, 1));
 }
 
 /* concave carousel: posição animada em JS (rAF: deslize, inércia, mola); reflexo esmaecendo pra baixo */
