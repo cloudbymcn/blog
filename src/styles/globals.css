@@ -115,6 +115,32 @@ h3 {
   animation: mask-up 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* card com tilt 3D (useTilt escreve --rx/--ry/--mx/--my): sombra e cover seguem o mouse */
+.tilt {
+  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition:
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.tilt:hover {
+  box-shadow: calc(var(--mx, 0) * -24px) calc(20px + var(--my, 0) * -16px) 50px rgba(0, 0, 0, 0.12);
+}
+
+.tilt.is-tilting {
+  transition-duration: 0.15s;
+}
+
+.tilt-media {
+  transform: scale(1) translate(0, 0);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tilt:hover .tilt-media {
+  transform: scale(1.04) translate(calc(var(--mx, 0) * -8px), calc(var(--my, 0) * -8px));
+}
+
 /* glass (SPEC §0-bis): cards, nav e chips */
 .glass {
   background: var(--glass-bg);
