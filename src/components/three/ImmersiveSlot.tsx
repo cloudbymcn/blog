@@ -10,6 +10,7 @@ export function ImmersiveSlot({
   media,
   delayMs = 0,
   onlyNearViewport = false,
+  allowReducedMotion = false,
   className = '',
 }: {
   load: () => Promise<{ default: ComponentType }>
@@ -19,13 +20,15 @@ export function ImmersiveSlot({
   delayMs?: number
   /** só carrega quando o slot chega perto da viewport (seções abaixo da dobra) */
   onlyNearViewport?: boolean
+  /** carrega também com reduced-motion (o componente renderiza parado) */
+  allowReducedMotion?: boolean
   className?: string
 }) {
   const [Comp, setComp] = useState<ComponentType | null>(null)
   const anchor = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!canRunImmersive() || (media && !window.matchMedia(media).matches)) return
+    if (!canRunImmersive({ allowReducedMotion }) || (media && !window.matchMedia(media).matches)) return
     let alive = true
     let cancel = () => {}
     const start = () => {
@@ -53,7 +56,7 @@ export function ImmersiveSlot({
       io?.disconnect()
       cancel()
     }
-  }, [load, media, delayMs, onlyNearViewport])
+  }, [load, media, delayMs, onlyNearViewport, allowReducedMotion])
 
   // âncora vazia pro IntersectionObserver enquanto o componente não carrega
   if (!Comp) return <div ref={anchor} className={`pointer-events-none ${className}`} aria-hidden="true" />
