@@ -34,7 +34,7 @@ export default function GlassLogo() {
       )
 
       // logo nas duas faces de um plano no miolo do cubo (a refração do vidro distorce ele ao girar)
-      const logoTexture = new THREE.TextureLoader().load('/img/logo-mcn.png')
+      const logoTexture = new THREE.TextureLoader().load('/img/logo-icon-3d.png')
       logoTexture.colorSpace = THREE.SRGBColorSpace
       logoTexture.anisotropy = 4
       const logo = new THREE.Mesh(

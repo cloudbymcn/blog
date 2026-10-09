@@ -67,10 +67,15 @@ export function Nav() {
         }`}
       >
         <Link to="/" className="flex items-center gap-2" aria-label="Cloud by MCN, início">
-          <img src="/img/logo-mcn.png" alt="" width={28} height={28} className="size-7" />
-          <span className="hidden text-sm font-semibold tracking-[-0.01em] min-[400px]:inline">
-            cloudbymcn
-          </span>
+          <img src="/img/logo-icon.svg" alt="" width={28} height={28} className="size-7" />
+          {/* wordmark 14px de altura (viewBox 572.72 x 109.07 -> ~74px); some abaixo de 400px */}
+          <img
+            src="/img/logo-wordmark.svg"
+            alt=""
+            width={74}
+            height={14}
+            className="hidden h-3.5 w-auto min-[400px]:block"
+          />
         </Link>
         <ul className="flex items-center gap-1 text-[13px]">
           {LINKS.map((l) => (
