@@ -17,6 +17,8 @@
 }
 
 html {
+  /* barra de rolagem oculta: 100vw = largura do conteúdo (carrossel de ponta a ponta sem sobra) */
+  scrollbar-width: none;
   scroll-behavior: smooth;
   scroll-padding-top: var(--nav-h);
 }
@@ -55,6 +57,10 @@ header nav,
 footer,
 .lc {
   text-transform: lowercase;
+}
+
+html::-webkit-scrollbar {
+  display: none;
 }
 
 ::selection {

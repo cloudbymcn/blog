@@ -57,7 +57,8 @@ export function Nav() {
       className={`fixed inset-x-0 top-0 z-50 border-b transition-[background-color,border-color,backdrop-filter] duration-500 ease-out ${
         scrolled
           ? 'border-line bg-white/72 backdrop-blur-[20px] backdrop-saturate-[180%]'
-          : 'border-transparent bg-white/0'
+          : // no topo: vidro leve (o strap do crachá passa por trás e o link segue legível)
+            'border-transparent bg-white/60 backdrop-blur-[12px] backdrop-saturate-[140%]'
       }`}
     >
       <nav
