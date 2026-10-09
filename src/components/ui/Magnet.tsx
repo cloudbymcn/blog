@@ -6,7 +6,16 @@ const fine = '(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no
  * Botão magnético: o filho é puxado na direção do cursor e volta com mola ao sair.
  * A área de captura passa 12px da borda (padding + margem negativa), como em apple.com.
  */
-export function Magnet({ children, strength = 0.2 }: { children: ReactNode; strength?: number }) {
+export function Magnet({
+  children,
+  strength = 0.2,
+  className = 'inline-block',
+}: {
+  children: ReactNode
+  strength?: number
+  /** display do wrapper ('block' pra ocupar a célula de um grid) */
+  className?: string
+}) {
   const inner = useRef<HTMLSpanElement>(null)
 
   function onMove(e: React.PointerEvent<HTMLSpanElement>) {
@@ -27,8 +36,8 @@ export function Magnet({ children, strength = 0.2 }: { children: ReactNode; stre
   }
 
   return (
-    <span onPointerMove={onMove} onPointerLeave={onLeave} className="-m-3 inline-block p-3">
-      <span ref={inner} className="inline-block will-change-transform">
+    <span onPointerMove={onMove} onPointerLeave={onLeave} className={`-m-3 p-3 ${className}`}>
+      <span ref={inner} className={`${className} will-change-transform`}>
         {children}
       </span>
     </span>
