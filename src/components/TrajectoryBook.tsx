@@ -65,12 +65,12 @@ function PageContent({ index }: { index: number }) {
     return (
       <div className="flex h-full flex-col justify-center">
         <p className="book-mono book-muted text-xs">trajetória</p>
-        <p className="mt-3 text-[clamp(1.75rem,3.2vw,2.75rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
+        <p className="mt-3 text-[28px] font-semibold leading-[1.05] tracking-[-0.02em] md:text-[30px] xl:text-[36px]">
           um caderno
           <br />
           de marcos.
         </p>
-        <p className="mt-4 max-w-[30ch] text-[13px] leading-relaxed text-ink-2 xl:text-sm">
+        <p className="mt-3 max-w-[30ch] text-[13px] leading-normal text-ink-2 xl:text-sm">
           certificações, estudos e o que mudou no caminho. vire a página ›
         </p>
       </div>
@@ -78,23 +78,22 @@ function PageContent({ index }: { index: number }) {
   }
   const m = MILESTONES[index - 1]
   const cert = m.cert ? CERTS.find((c) => c.code === m.cert) : undefined
+  // tamanhos fixos por faixa (spread 720 no xl, 640 até 1279, página única ~300 no mobile)
   return (
-    <div className="flex h-full flex-col justify-center">
-      <p className="book-accent text-[clamp(1.75rem,3vw,2.5rem)] font-semibold leading-none tracking-[-0.02em]">
-        {m.year}
-      </p>
-      <p className="mt-3 text-[clamp(0.95rem,1.4vw,1.15rem)] font-semibold leading-snug tracking-[-0.02em]">
-        {m.title}
-      </p>
-      <p className="mt-2 max-w-[36ch] text-[13px] font-normal leading-relaxed text-ink-2 xl:text-sm">
+    <div className="flex h-full flex-col pt-1">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="book-accent text-[32px] font-semibold leading-none tracking-[-0.02em] md:text-[34px] xl:text-[40px]">
+            {m.year}
+          </p>
+          {cert && <p className="book-mono book-muted mt-2 text-[11px]">{cert.code.toLowerCase()}</p>}
+        </div>
+        {cert && <CertBadge {...cert} className="w-[104px] shrink-0 md:w-[116px] xl:w-[150px]" />}
+      </div>
+      <p className="mt-3 text-base font-semibold leading-snug tracking-[-0.02em] xl:text-[18px]">{m.title}</p>
+      <p className="mt-2 max-w-[40ch] text-[13px] font-normal leading-normal text-ink-2 xl:text-sm">
         {m.text}
       </p>
-      {cert && (
-        <div className="mt-4 flex items-end gap-3">
-          <CertBadge {...cert} className="w-[clamp(4.5rem,7vw,7.5rem)]" />
-          <span className="book-mono book-muted pb-1 text-[11px]">{cert.code.toLowerCase()}</span>
-        </div>
-      )}
     </div>
   )
 }
@@ -103,14 +102,14 @@ function PageContent({ index }: { index: number }) {
 function Page({ index, side, children }: { index: number; side: 'left' | 'right'; children?: ReactNode }) {
   const blank = index < 0 || index >= PAGE_COUNT
   return (
-    <div className={`book-page book-page-${side} absolute inset-0 flex flex-col px-[7%] py-[6%]`}>
+    <div className={`book-page book-page-${side} absolute inset-0 flex flex-col px-[7%] py-[5%]`}>
       {!blank && (
         <>
           <div className="book-mono book-muted flex justify-between text-[11px]">
             <span>{side === 'left' ? 'by cloudbymcn' : 'trajetória'}</span>
             <span>{side === 'left' ? '' : 'v2026'}</span>
           </div>
-          <div className="min-h-0 flex-1 pt-4">{children ?? <PageContent index={index} />}</div>
+          <div className="min-h-0 flex-1 pt-3">{children ?? <PageContent index={index} />}</div>
           <p
             className={`book-mono book-muted pt-3 text-[11px] ${side === 'left' ? 'text-left' : 'text-right'}`}
           >

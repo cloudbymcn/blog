@@ -209,14 +209,14 @@ html::-webkit-scrollbar {
   font-family: var(--font-mono);
 }
 
-/* spread ~880x460 no desktop, ~760 entre 1024 e 1280 */
+/* spread ~720x380 no desktop, 640 abaixo de 1280; mobile = uma página de ~300px */
 .book-stage {
-  max-width: 880px;
+  max-width: 720px;
 }
 
 @media (max-width: 1279px) {
   .book-stage {
-    max-width: 760px;
+    max-width: 640px;
   }
 }
 
@@ -226,12 +226,12 @@ html::-webkit-scrollbar {
 }
 
 .book-spread {
-  aspect-ratio: 880 / 460;
+  aspect-ratio: 720 / 380;
 }
 
 .book-single {
   aspect-ratio: 3 / 4;
-  max-width: 420px;
+  max-width: 300px;
   margin-inline: auto;
 }
 
