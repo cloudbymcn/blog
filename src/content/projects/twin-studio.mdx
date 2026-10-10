@@ -1,0 +1,142 @@
+---
+title: "Estúdio do twin: a pedra do estoque em 20 cômodos 3D, por clique ou por frase"
+slug: twin-studio
+summary: "Aba do Digital Twin que aplica as pedras do estoque em cozinhas, banheiros e fachadas 3D, com régua visual de showroom, luz assada no Blender e um compositor que monta a cena enquanto você digita."
+category: produtos
+tier: A
+date: 2026-10-09
+stack: ["three.js", "React", "TypeScript", "Vite", "Node.js", "Python", "Gemini", "Bedrock (Nova)", "Secrets Manager"]
+metrics:
+  - { label: "troca de cômodo", before: "1,6–5 s", after: "0,4–1,2 s" }
+  - { label: "custo por spot", before: "~3 ms", after: "~0 ms" }
+cover: /projects/twin-studio/architecture.svg
+---
+
+O [Digital Twin](/projetos/digital-twin-3d) responde onde está cada chapa no pátio de uma indústria de rochas ornamentais no ES. O vendedor queria a pergunta seguinte: **como essa pedra fica numa cozinha?** A resposta costumava ser uma foto de catálogo, um render encomendado ou a imaginação do cliente.
+
+O Estúdio é uma aba do twin que aplica as pedras de verdade em ambientes 3D: cozinha gourmet com ilha, cozinhas americana e compacta, suíte, lavabo, sala, home theater, hall, escada, lavanderia, closet, home office, adega, varanda, jardim, spa, piscina e fachada. São **20 cômodos desenhados**, a pedra em escala real e uma ponte de volta para o mapa: "Ver no mapa" abre as estivas onde aquele material está agora.
+
+<Figure src="/projects/twin-studio/architecture.svg" alt={"As texturas dos materiais padrão, servidas pelo conector em WebP de 256, 1024 e 2048 pixels, e o índice diário do estoque, somente leitura, se juntam num catálogo. O catálogo alimenta os cômodos 3D em React Three Fiber com pedra PBR. A luz de cada cômodo é assada no Blender em quatro presets e entra como lightmap. O Composer transforma a frase numa receita aplicada à cena e, só para o que sobrou sem entender, consulta um LLM opcional que responde com IDs do catálogo. Da cena saem a exportação em PNG e o atalho para o mapa de materiais do twin."} caption={"O estoque decide o que aparece; a cena decide como aparece."} />
+
+## O que entra na bandeja
+
+O conector (o mesmo serviço Node.js que alimenta o resto do twin) junta duas fontes:
+
+- **Texturas dos materiais padrão**, a pasta que o marketing já mantinha. As originais têm 2–3 mil px e ~1,5 MB, então nunca vão para o navegador nem para o Git: o conector serve WebP de 256 px na bandeja, 1024 px na textura e 2048 px só no material selecionado (no máximo dois na memória, e nunca no celular).
+- **O índice diário do estoque** que o mapa de materiais já usava: chapas, m², número de locais e galpões. Nada de varredura nova no ERP.
+
+A junção é pelo nome normalizado, em três faixas: padrão com estoque, padrão sem estoque e material com estoque que só tem foto de chapa. O que não tem textura nem foto fica de fora. Nome que não bate (textura com grafia diferente do cadastro) vira pendência registrada, não chute.
+
+<Callout type="warn">
+
+**Visualização não é estoque.** A textura é a imagem do material padrão; a disponibilidade vem só do índice. Sem registro, a tela diz "Sem registro no estoque agora". E nada grava, reserva ou vende: a cena é estado de tela.
+
+</Callout>
+
+## Direção de arte: a régua do showroom
+
+O mapa do twin tem cara de maquete. O Estúdio tem régua própria, porque aqui **a pedra é o produto**.
+
+<Steps>
+<Step n={1}>
+
+**Escala e veio.** Uma chapa de ~3,2 × 1,9 m por repetição, espelhada como bookmatch. As peças têm chanfro de 3 mm e tampo de 5 cm com UV "dobrado": o veio do tampo continua pela borda e desce pela cascata da ilha, em meia-esquadria. O tampo da ilha é extrudado com o furo da cuba de embutir.
+
+</Step>
+<Step n={2}>
+
+**Pedra PBR a partir da própria foto.** Relevo e variação de brilho saem da imagem (512 px, calculados uma vez por textura). Polido é quase liso, com clearcoat; levigado é acetinado. Um ganho de albedo impede o branco de estourar e um reforço de reflexo segura as pedras escuras.
+
+</Step>
+<Step n={3}>
+
+**Reflexo feito sob medida.** O `RoomEnvironment` padrão virava uma mancha estourada na pedra polida. No lugar dele, um ambiente próprio com janela, faixa dos armários, teto e spots. Reflexo de ambiente só em pedra, metal, laca e vidro.
+
+</Step>
+<Step n={4}>
+
+**Poucas peças, bem acabadas.** Paredes com espessura, rodapé, laca com fresta e puxador perfil, cooktop de vidro apoiado no tampo, pendentes torneados, porcelanato de 1,2 m no piso com um recorte próprio por placa (sem desenho repetido pelo chão). Janela de vidro fosco como fonte de luz, sem paisagem que distraia.
+
+</Step>
+<Step n={5}>
+
+**Câmera de foto de interiores.** Altura de pessoa e verticais retas: Geral, Bancada, Ilha, Parede e Detalhe da pedra. O centro da projeção desconta o card e a bandeja (`setViewOffset`), para a pedra nunca ficar atrás da interface.
+
+</Step>
+</Steps>
+
+### Presets de luz
+
+Tone mapping neutro, para a cor da pedra não desviar, e quatro presets com transição suave: **Natural**, **Luxo** (spots quentes na pedra), **Clean** e **Noturno**. Os spots do Luxo e do Noturno não são luzes de verdade: cada luz real custava ~3 ms por quadro. Viraram "poças de luz", um desenho com mistura multiplicativa que custa praticamente nada. A sombra de contato é calculada uma vez, porque a cena é parada.
+
+## Luz assada no Blender
+
+Para os cômodos parecerem foto sem custar frame, a luz é cozida fora do navegador. O pipeline vive em `tools/studio`:
+
+<Steps>
+<Step n={1}>
+
+**Exportar a geometria real.** Um script TypeScript monta o cômodo com a mesma definição que a cena usa (`RoomDef`), sem índice, e grava um `.bin` Float32 por atributo, junto com os presets de luz da cena em tempo real.
+
+</Step>
+<Step n={2}>
+
+**Assar no Blender, em linha de comando.** Um script Python roda o Blender sem interface e, para cada preset, grava a luz difusa (direta + indireta) **sem a cor da superfície**. É isso que permite trocar a pedra na cena e a luz continuar certa. Sai também o UV do lightmap, na ordem da geometria do twin, e um manifesto.
+
+</Step>
+<Step n={3}>
+
+**Conferir antes de usar.** O manifesto guarda um checksum da geometria. Se a regra do checksum muda, outro script compara vértice a vértice (0,1 mm de tolerância) e só regrava o manifesto se tudo bater; o resto precisa ser reassado.
+
+</Step>
+</Steps>
+
+Cada cômodo leva de 7 a 18 minutos, com 48 amostras, e nada disso vai para o Git: o conector serve a saída de uma pasta local. Depois do re-bake, com o lightmap das superfícies reduzido a 512 px na GPU, os 20 cômodos ficaram dentro do orçamento: **8 a 20 draw calls, 3 a 27 mil triângulos e 16 a 57 MB de textura** cada.
+
+## O Composer: a cena muda enquanto você digita
+
+O orbe do twin (tecla `/`) dentro do Estúdio abre o Composer. A pessoa digita ou fala:
+
+> quero uma cozinha gourmet com ilha central, Alga Green na ilha e na parede, cooktop, forno torre, prato branco na mesa, fruteira na bancada e luz quente
+
+e a cena se monta a cada tecla: material com cross-fade, luz com transição, objeto entrando suave, câmera voando. Depois a edição continua na mesma barra ("troca só a parede para Nuage", "coloca um prato na mesa", "aproxima da ilha") e só o que foi citado muda.
+
+- **Parser local, determinístico**, no navegador, em menos de 1 ms. Entende quantidade ("duas taças"), cor ("prato branco"), lugar ("na mesa"), diminutivo ("vasinho"), remoção ("tira a fruteira") e começo de nome enquanto digita ("Alga G" já entra na prévia). Material ambíguo vira pergunta; material inexistente é dito e nada é aplicado.
+- **LLM opcional, só no backend e desligado por padrão.** Recebe em pedaços curtos o que sobrou sem entender e devolve **só IDs do catálogo**, que viram uma frase canônica e passam pelo mesmo parser. O chip mostra "≈" quando a decisão veio dele. Teto de US$ 1/dia e US$ 5/mês, kill switch, prazo de 4 s. Medido: ~US$ 0,00008 por pedaço, 330–710 ms.
+- **Navegação primeiro.** "Onde tem Alga Green" ou "me leva no CPD" saem do Estúdio e vão para a busca do mapa.
+
+Um corpus de frases roda a cada mudança (`composer:eval`). Na última rodada: 391 frases, 100% entendidas, 381 delas sem chamar IA.
+
+## Fluxo de showroom
+
+- **Desfazer e refazer** por frase ("volta como estava"), botão ou Ctrl+Z, com 40 passos de histórico na sessão.
+- **Quanto dá de pedra?** A área de cada superfície com pedra e o total, sempre com o aviso de que é maquete ilustrativa e que chapas não são estimadas.
+- **Exportação local, sem backend:** imagem do cômodo, ficha (imagem + dados), antes/depois e A/B lado a lado, com marca d'água "visualização ilustrativa".
+- **Pacote para vídeo:** 6 imagens, prompts em português e inglês, prompt negativo e lista de planos num zip, sem chamar API nenhuma. Pelo backend, a imagem fotorrealista sai do Gemini e o vídeo do Veo ou do Nova Reel (Bedrock), com a chave no Secrets Manager, teto próprio na aba de custos e confirmação antes de gastar.
+- **Ficha técnica** dos laudos do laboratório no "i" da pedra, e retroiluminação com a foto real da chapa acesa nas pedras translúcidas.
+
+## Performance
+
+O Estúdio carrega sob demanda (~18 KB), e o mapa fica montado e parado atrás dele. A troca de cômodo era uma tela escura de 1,6 a 5 s com tarefas de 1–1,8 s à vista. Agora congela o quadro, dissolve e monta o cômodo novo por baixo, já aquecido: **0,4 a 1,2 s, coberto**, sem nada travando. Com a cozinha cheia de objetos, 60 fps em 1920×1080 com 54 draw calls.
+
+Duas ferramentas de medição em Playwright fecham o ciclo: `studio-fps` mede FPS e GPU por vista × luz, e `studio-review` percorre vistas × materiais × luzes e gera capturas para uma checklist (escala do veio, borda, contato, luz sem estourar, pedra livre da interface, console sem erro).
+
+## Como alimenta o twin
+
+<Card title="Ida e volta com o mapa">
+
+"Ver no mapa" sai do Estúdio direto no mapa de materiais: estivas com aquele material, raio-x ligado e o aviso de precisão.
+
+</Card>
+
+<Card title="O gráfico do Estúdio levado ao mapa">
+
+A ideia da luz assada foi para o mapa sem Blender: a oclusão do terreno e do pé das paredes é calculada no navegador. O chão escurece junto dos prédios e o piso dos galpões junto das paredes, por 0,2 a 0,9 ms de GPU na vista de chegada (1920×1080).
+
+</Card>
+
+<Card title="O que eu faria diferente">
+
+Teria começado pela cena genérica (cômodo como dado) em vez de desenhar a cozinha gourmet à mão. As cozinhas americana e compacta saíram em uma fração do tempo depois que o cômodo virou um kit de superfícies, vistas e limites.
+
+</Card>

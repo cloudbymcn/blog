@@ -413,6 +413,33 @@ export const specs = {
     note: 'Dev: US$ 5/dia e US$ 50/mês. Comando de texto ~US$ 0,00008; voz de 15 s ~US$ 0,005.',
   },
 
+  'twin-studio': {
+    title: 'Estúdio do twin',
+    subtitle: 'Pedra do estoque aplicada em cômodos 3D, por clique ou por frase, com volta para o mapa.',
+    nodes: {
+      tex: { x: 115, y: 160, label: 'Texturas padrão', sub: 'WebP 256/1024/2048', kind: 'ext', w: 170 },
+      stock: { x: 115, y: 300, label: 'Índice do estoque', sub: 'diário · só leitura', kind: 'data', w: 170 },
+      join: { x: 330, y: 230, label: 'Catálogo', sub: 'padrão × estoque', kind: 'app', w: 150 },
+      bake: { x: 330, y: 430, label: 'Blender', sub: 'luz assada · 4 presets', kind: 'ext', w: 170 },
+      scene: { x: 560, y: 160, label: 'Cômodos 3D', sub: 'R3F · pedra PBR', kind: 'app', w: 160 },
+      comp: { x: 560, y: 320, label: 'Composer', sub: 'frase → receita', kind: 'app', w: 160 },
+      exp: { x: 800, y: 160, label: 'Exportação', sub: 'PNG · ficha · A/B', kind: 'user', w: 160 },
+      map: { x: 800, y: 300, label: 'Mapa de materiais', sub: 'onde está no pátio', kind: 'app', w: 180 },
+      ai: { x: 800, y: 440, label: 'LLM opcional', sub: 'só IDs do catálogo', kind: 'ai', w: 170 },
+    },
+    edges: [
+      { from: 'tex', to: 'join' },
+      { from: 'stock', to: 'join' },
+      { from: 'join', to: 'scene' },
+      { from: 'comp', to: 'scene', label: 'receita' },
+      { from: 'bake', to: 'scene', label: 'lightmap' },
+      { from: 'scene', to: 'exp' },
+      { from: 'scene', to: 'map', label: 'Ver no mapa' },
+      { from: 'comp', to: 'ai', label: 'só o que sobrou', dashed: true },
+    ],
+    note: 'Parser no navegador em < 1 ms. 20 cômodos dentro do orçamento: 8–20 draw calls cada.',
+  },
+
   'classificador-chapas-ia': {
     title: 'Classificador de chapas explicável',
     subtitle: 'Visão clássica acha as regiões; a IA olha só os recortes; o especialista decide.',
