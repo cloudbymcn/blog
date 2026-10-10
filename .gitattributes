@@ -1,0 +1,11 @@
+# LF em tudo (autocrlf do Windows + autostash reintroduziam CRLF e quebravam o prettier do npm run check)
+* text=auto eol=lf
+
+# binários explícitos
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.glb binary
+*.woff2 binary

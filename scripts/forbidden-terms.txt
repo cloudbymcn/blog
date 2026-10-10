@@ -1,0 +1,27 @@
+# Termos proibidos para verificação de anonimização (SPEC §8)
+# Linhas iniciadas com '#' e linhas em branco são ignoradas.
+
+# Empresas e sistemas legados (§8.2)
+Vitória Stone
+Vitoria Stone
+vitoriastone
+Athenas
+Sankhya
+HQbird
+LeverPro
+consultorPRO
+Arquivei
+Qive
+Mercos
+
+# Pessoas citadas nos projetos legados (§8.3)
+Sérgio
+Sergio
+Andrea
+Valdir
+Ricardo
+Guilherme
+Winnye
+Jean
+Caio
+Alvim

@@ -1,0 +1,31 @@
+---
+title: "JEV: extensão de navegador controlada por voz, com parser local + LLM"
+slug: extensao-navegador-voz
+summary: "Extensão Chrome/Edge que obedece comandos de voz em português. Um parser local resolve a maioria em menos de 1 ms; o LLM só entra para escolher entre opções fechadas."
+category: ferramentas
+tier: B
+date: 2026-10-08
+stack: ["TypeScript", "Vite", "Gemini", "JEV", "Claude Code", "Codex", "Antigravity", "Maestri", "Obsidian"]
+metrics:
+  - { label: "comando comum", before: "mouse e teclado", after: "voz, < 1 ms" }
+  - { label: "vai ao LLM", before: "áudio", after: "só a frase" }
+cover: /projects/extensao-navegador-voz/architecture.svg
+---
+
+"Rola pra baixo", "clica no primeiro vídeo", "pula dez segundos", "aba do Gmail", "abre a calculadora". Uma extensão para Chrome e Edge que obedece à voz, em português, sem tirar a mão do que você está fazendo.
+
+<Figure src="/projects/extensao-navegador-voz/architecture.svg" alt={"A voz é reconhecida pelo próprio Chrome e vira uma frase. Um parser local em português resolve a frase em menos de 1 ms e gera uma ação validada; se não entende, a frase vai para um LLM de decisão que escolhe entre opções fechadas. A ação é executada na página ou nas abas por content script, ou no Windows por um native host opcional."} />
+
+**Local primeiro.** Um parser determinístico cobre sites ("abre github ponto com"), rolagem, cliques ("mostra os números" → "sete"), abas, mídia, ditado, Gmail, zoom e leitura em voz alta, em menos de 1 ms. Ações seguras, como rolar e pausar, executam antes mesmo da pausa no fim da frase.
+
+**LLM só para o resto, e sem chute.** Frases livres ("manda essa página lá pra baixo", "abre aquele vídeo do queijo") vão a um modelo de decisão via OpenRouter, que **escolhe entre opções fechadas**: as ações conhecidas e os botões visíveis na página. Se nenhuma serve, a resposta é "não entendi". Sem chave de API, tudo funciona pelo parser local.
+
+<Callout type="info">
+
+**Privacidade por desenho.** O reconhecimento de fala é o do próprio navegador. A extensão não grava nem envia áudio e não registra o que você fala. Ao LLM vão só a frase não entendida, o site e rótulos curtos dos botões visíveis.
+
+</Callout>
+
+**Windows, opcional.** Um *native messaging host* instalado com um comando estende os comandos ao sistema: abrir apps e pastas, alternar janela, volume e bloqueio de tela.
+
+**Testes:** um corpus de frases roda nos testes unitários do parser, e o E2E com Playwright carrega a extensão de verdade no Chromium. Construída com Vite 8, TypeScript e Manifest V3.

@@ -1,0 +1,29 @@
+---
+title: "Pedidos de amostras: formulário → e-mail para a expedição"
+slug: pedidos-amostras
+summary: "App interno que padroniza pedidos de amostras de mármore e granito: formulário em etapas, preview do e-mail para a expedição e consulta ao estoque de lotes do ERP."
+category: produtos
+tier: B
+date: 2026-10-02
+stack: ["Cognito", "AWS Lambda", "Secrets Manager", "Amplify", "TypeScript", "React", "Vite", "Tailwind", "Firebird", "Claude Code", "Codex", "Antigravity", "Maestri", "Obsidian"]
+metrics:
+  - { label: "pedido de amostra", before: "e-mail livre", after: "formulário padrão" }
+  - { label: "estoque de lotes", before: "fora do app", after: "na tela" }
+cover: /projects/pedidos-amostras/architecture.svg
+---
+
+Pedido de amostra de pedra escrito em e-mail livre sai cada um num formato, e é fácil faltar acabamento, quantidade ou dado do cliente. O objetivo foi padronizar o pedido que chega na expedição.
+
+<Figure src="/projects/pedidos-amostras/architecture.svg" alt={"O vendedor preenche um formulário em etapas num SPA React hospedado no Amplify. O login é Microsoft via Cognito com PKCE. O SPA consulta uma Lambda exposta por Function URL dentro da VPC, que lê credenciais no Secrets Manager e devolve os lotes em estoque do Firebird do ERP com cache de 5 minutos. O pedido sai como e-mail padronizado para a expedição pelo Outlook ou mailto."} />
+
+**Formulário em etapas:** dados do cliente → materiais → preview → envio. Um pedido pode ter vários clientes, cada um com sua lista de materiais, acabamento (polido, levigado, escovado, jateado), quantidade, mercado interno ou externo e prazo "precisa para". O preview do e-mail é editável antes de enviar, e o histórico de pedidos fica no navegador.
+
+**Estoque de lotes do ERP.** A aba *Estoque* mostra os lotes de amostra com saldo, expansíveis por medida e pesquisáveis pelo código do produto. Uma Lambda na VPC consulta o Firebird com credencial no Secrets Manager e guarda o resultado em cache por 5 minutos. Um agendamento de warmup renova o cache antes de alguém precisar.
+
+<Callout type="warn">
+
+**Driver sem timeout.** O `attach()` do driver Firebird para Node não tem timeout: com a rede fria, ele pendura até a Lambda morrer. A conexão ganhou um limite próprio, e a conexão atrasada é liberada depois para não vazar socket.
+
+</Callout>
+
+**Acesso.** Começou aberto e passou a exigir login Microsoft (Cognito com Entra ID como IdP, code + PKCE) quando o endpoint de estoque entrou. O front é React 19 + Vite com deploy automático no Amplify Hosting a cada push.

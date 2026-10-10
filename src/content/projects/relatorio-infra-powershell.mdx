@@ -1,0 +1,25 @@
+---
+title: "Relatório diário de infra em PowerShell → Exchange Online"
+slug: relatorio-infra-powershell
+summary: "Script agendado que coleta alertas do monitoramento, frames das câmeras e o status do backup por API e envia um e-mail HTML pelo Microsoft Graph. Fim dos prints manuais."
+category: ferramentas
+tier: B
+date: 2026-05-26
+stack: ["PowerShell", "Microsoft 365", "SharePoint/Graph API", "Claude Code", "Codex", "Antigravity", "Maestri", "Obsidian"]
+metrics:
+  - { label: "trabalho manual", before: "5,5 h/mês", after: "0" }
+  - { label: "leitura do relatório", before: "prints soltos", after: "3 s (pills)" }
+cover: /projects/relatorio-infra-powershell/architecture.svg
+---
+
+Todo dia o analista de infra tirava print do painel de monitoramento, do visualizador de câmeras, conferia a pasta de backup e montava um e-mail. ~15 min por dia, 22 dias úteis: **5,5 h por mês** de trabalho repetitivo.
+
+<Figure src="/projects/relatorio-infra-powershell/architecture.svg" alt={"Num servidor Windows, o Task Scheduler dispara um script PowerShell que lê segredos do Credential Manager, consulta a API JSON-RPC do monitoramento, captura um frame de cada câmera por RTSP com ffmpeg, confere a pasta de backup e envia o relatório HTML pelo endpoint sendMail do Microsoft Graph com permissão app-only restrita a uma caixa."} />
+
+**Coleta por API, não por print.** Alertas pela API JSON-RPC do monitoramento, separados em **novos** (24 h, não reconhecidos) e **crônicos** (mais de 7 dias). Um frame de cada câmera via RTSP com ffmpeg, com fallback se a câmera estiver offline. Backup validado por existência e tamanho mínimo.
+
+**E-mail para ler em 3 segundos.** Pills de OK / Warn / Err no topo; o detalhe vem embaixo para quem precisar.
+
+**Segurança.** App Registration no Entra ID com client credentials, segredos no Windows Credential Manager (nunca em texto puro) e `ApplicationAccessPolicy` restringindo o app a **uma única caixa** no Exchange Online. Sem isso, a permissão `Mail.Send` app-only enviaria como qualquer usuário do tenant.
+
+**Operação.** Exit code diferente de zero em falha, para o Task Scheduler reportar, e logs estruturados. Próximos passos no roadmap: webhook no Teams em falha, certificado no lugar do client secret e port para um runbook serverless.

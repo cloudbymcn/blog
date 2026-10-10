@@ -1,0 +1,166 @@
+---
+title: "Portal corporativo serverless: o hub de todos os apps internos"
+slug: portal-corporativo-serverless
+summary: "Começou como galeria de fotos e virou a porta de entrada única dos apps criados ao longo do tempo: um login, um catálogo, permissões por grupo no token e ~20 Lambdas ligando ERP, CRM e Microsoft 365."
+category: cloud
+tier: A
+date: 2026-10-09
+stack: ["AWS Lambda", "API Gateway", "Cognito", "DynamoDB", "S3", "CloudFront", "SES", "SQS", "EventBridge", "SAM", "Systems Manager", "KMS", "ACM", "CloudWatch", "Bedrock", "Rekognition", "JavaScript", "Node.js", "Next.js", "PowerShell", "Firebird", "Salesforce", "SharePoint/Graph API", "Microsoft 365", "Claude Code", "Codex", "Antigravity", "Maestri", "Obsidian"]
+metrics:
+  - { label: "apps", before: "um endereço e um login por app", after: "1 portal, 1 login" }
+  - { label: "app novo no ar", before: "semanas", after: "horas" }
+cover: /projects/portal-corporativo-serverless/architecture.svg
+---
+
+## De galeria a hub
+
+Em março de 2026, numa indústria de rochas ornamentais no ES, o problema era um só: fotografar blocos de mármore e granito e guardar as fotos sem depender de um File Gateway numa EC2. Saiu uma galeria serverless em duas semanas: S3, Lambda, Cognito e upload direto por URL pré-assinada.
+
+Aí a TI percebeu que dava para subir uma página nova em horas, porque a infraestrutura já estava de pé. Vieram os pedidos: helpdesk para parar de receber chamado por WhatsApp, holerite sem fila no RH, inventário do pátio, catálogo do outlet, painel da produção. Cada app novo nascia útil e, ao mesmo tempo, piorava outro problema: **cada painel tinha seu endereço e seu jeito de entrar**. Senha compartilhada, ou nenhuma. Quem tinha o link, entrava.
+
+O portal virou a resposta para isso. Hoje ele é o **hub**: a porta de entrada única dos apps criados ao longo do tempo, com um login corporativo, um catálogo por setor e permissões que valem tanto na tela quanto no backend.
+
+<Figure src="/projects/portal-corporativo-serverless/architecture.svg" alt={"O colaborador faz login corporativo pelo Cognito, cuja Lambda de pre-token injeta grupo e permissões no token. As requisições passam por CloudFront e API Gateway até a Lambda do portal, que consulta o catálogo de setores, apps e auditoria no DynamoDB e só mostra o que o grupo libera. A partir dela saem os módulos internos, como RH, chamado e administração, cerca de vinte Lambdas especialistas ligadas ao ERP, ao CRM e ao Microsoft Graph, apps hospedados no S3 com versão por app e um gateway que coloca o login do portal na frente de painéis publicados em stacks próprias."} caption={"Uma porta de entrada, quatro tipos de app atrás dela."} />
+
+## Como o hub funciona
+
+### O catálogo
+
+Setores e apps vivem numa tabela do DynamoDB, editável pela tela de administração. A home monta os setores, os favoritos e os recentes de cada pessoa, e a busca do portal procura em apps, contatos e avisos ao mesmo tempo, sem diferenciar acento. Cada app do catálogo é de um de quatro tipos:
+
+| Tipo | O que é | Quem vê |
+| --- | --- | --- |
+| **Interno** | Módulo servido pela própria Lambda do portal (contracheque, chamado, inventário…) | quem tem a feature liberada no grupo |
+| **Externo** | Link para um sistema de fora | lista de grupos no item |
+| **Hospedado** | Site estático publicado no S3, com versão por app, servido com o cookie da sessão | lista de grupos no item |
+| **Atrás do gateway** | Painel que já tinha stack própria | o portal confere antes de repassar |
+
+Acima de tudo isso existe uma trava mais forte, `ownerOnly`: o app restrito a pessoas específicas não aparece nem para a TI.
+
+### O gateway de painéis
+
+Alguns painéis nasceram como sites independentes, cada um com o seu login improvisado. Em vez de reescrevê-los, o portal passou a ficar **na frente** deles: a requisição chega primeiro no portal, que confere quem é a pessoa e se ela pode ver aquele painel, e só então segue para a origem, assinada com SigV4. A resposta volta com `Cache-Control: private, no-store`, porque uma resposta guardada por engano mostraria dado de um usuário para o próximo. O painel não muda uma linha.
+
+<Callout type="warn">
+
+**O gateway não fecha a porta antiga sozinho.** Enquanto a stack do painel continuar publicada no endereço dela, quem souber esse endereço ainda entra direto. Fechar é um segundo passo, deliberado, depois que o caminho novo estiver validado. Está escrito assim no código, para ninguém achar que já está fechado.
+
+</Callout>
+
+## Permissões: grupo no token, conferido duas vezes
+
+O login é o corporativo (Entra ID federado no Cognito). Uma **Lambda de pre-token** acha o usuário nativo com o mesmo e-mail e injeta no token três claims: `custom:group`, `custom:role` e `custom:perms` (grants e denies individuais em JSON). A Lambda do portal autoriza em memória, sem consulta extra a cada rota.
+
+```javascript
+// Quem vê um app do catálogo (resumo da regra real)
+function canSeeApp(app, user, effectiveFeatures) {
+  if (!app || app.status !== "active") return false;
+  // trava mais forte: nem a TI passa
+  if (app.ownerOnly?.length && !app.ownerOnly.includes(user.email)) return false;
+  // módulo interno: feature liberada pelo grupo (+ grants, − denies)
+  if (app.type === "internal") return effectiveFeatures.has(app.featureId || app.slug);
+  // externo e hospedado: grupos no próprio item, "*" = todos
+  return app.groups?.includes("*") || app.groups?.includes(user.group);
+}
+```
+
+- **A tela filtra e o backend confere de novo.** Cada rota de módulo passa por `requireAuth` e `requireApp(featureId)`. Esconder o botão não é autorização.
+- **Grupos editáveis.** Onze grupos padrão (TI, Gerência, Comercial MI e ME, Marketing, Produção, Qualidade/PCP, Financeiro, Cobrança, Controladoria e RH) semeados de forma idempotente e editáveis na administração; o da TI é protegido e não pode ser apagado.
+- **"Por que fulano não vê isso?"** A administração responde com o motivo: restrito a pessoas específicas, feature fora do grupo, app inativo.
+- **Modo rápido de atribuição.** Distribuir grupo pessoa por pessoa em mais de duzentas contas levaria o dia, e metade não é gente de verdade (caixas compartilhadas, contas antigas). A lista mostra só quem tem licença com e-mail, já com o grupo sugerido pelos grupos do Entra, e grava o grupo em **todas** as contas da pessoa (a federada e a local).
+- **Assinatura do JWT verificada.** No começo, parte das rotas só decodificava o token. A revisão do módulo de biometria levantou isso, e hoje a assinatura é validada, com teste.
+
+## Catálogo de módulos
+
+Os apps foram nascendo de pedidos concretos. Agrupados por quem usa:
+
+<Card title="RH e pessoas">
+
+- **Contracheque.** Holerite consultado direto no ERP legado (Firebird) por uma Lambda dedicada. O RH consulta qualquer CPF; o resto, só o próprio.
+- **[Contracheque com reconhecimento facial](/projetos/contracheque-facial).** Para quem não tem login: prova de vida do Rekognition, busca na coleção de funcionários e um token de 5 minutos antes do ERP.
+- **Onboarding e offboarding.** Formulário no portal que vira uma fila no SQS. Um agente instalado como serviço Windows num servidor do domínio consome a fila e executa a entrada ou a saída no AD, com um usuário IAM que só lê e apaga mensagens daquela fila.
+- **Mural e aniversariantes**, com os aniversariantes do mês lidos do ERP.
+
+</Card>
+
+<Card title="Produção e pátio">
+
+- **Live das politrizes.** Um agente Node.js dentro da rede lê por SMB as pastas de fotos das cinco politrizes, gera miniaturas de 800 e 1.400 px das fotos novas, sobe para o S3 e regrava um índice. A Lambda só lê o índice, e a aba Live mostra a esteira pela CDN. Um ciclo completo leva ~75 s.
+- **Serraria: inspeção.** PWA para fotografar e registrar a inspeção na serraria, pensado para o celular no chão de fábrica.
+- **Inventário (StoneTrack).** O [PWA offline-first do pátio](/projetos/pwa-inventario-patio), com o backend no mesmo hub: snapshot diário dos blocos, consulta de cavaletes, congelamento do estoque na abertura de um inventário e sincronização ERP → DynamoDB a cada 5 minutos por delta de hash, com o caminho de volta por DynamoDB Stream.
+
+</Card>
+
+<Card title="Comercial">
+
+- **Galeria de pedras.** O app que começou tudo: upload direto ao S3 por URL pré-assinada, editor, modo cinema e um "espelho" compartilhável do bloco que não expõe o portal. Vídeos HEVC do iPhone passam por uma Lambda que transcodifica para H.264 e tira o áudio ([e o fast start em massa](/projetos/entrega-video-mediaconvert)).
+- **Amostras.** [Pedido de amostras](/projetos/pedidos-amostras) em etapas, com prévia do e-mail para a expedição.
+- **Loja / catálogo do outlet.** Next.js consumindo a API do portal, com um snapshot do estoque do Salesforce a cada 30 min em JSON comprimido com Brotli no S3. Um rastreador captura a venda do outlet em qualquer canal (inclusive a que fecha no WhatsApp), pelo status da chapa no CRM.
+- **Carteira e inteligência comercial.** Mudança de carteira entre vendedores, uma agregação diária das carteiras do CRM e um coletor de registros públicos de importação para prospecção no mercado externo. O site da fonte bloqueia acesso automatizado sem janela, então o coletor abre um Chrome real e visível, uma vez por semana.
+- **Matriz de cálculo** do mercado interno.
+
+</Card>
+
+<Card title="TI e administração">
+
+- **Abrir chamado.** Helpdesk com ticket rastreado no DynamoDB e aviso para a TI no Telegram.
+- **Administração.** Auditoria de toda ação (TTL de 90 dias), lixeira global, usuários, grupos e catálogo.
+- **Backups do banco.** Download dos backups do ERP. Uma Lambda mensal organiza os backups do Firebird por mês e marca para Glacier o que passa de 1 TB ([como o backup chega lá](/projetos/backup-firebird-s3-onedrive)).
+- **Relatórios.** Resumo diário às 18h por SES e um boletim de novidades da AWS e da Anthropic, resumidas e traduzidas pelo Bedrock.
+- **Monitoramento da conta AWS.** O [Sentinela](/projetos/finops-security-bedrock) roda em stack própria, publicada junto com o portal.
+
+</Card>
+
+<Card title="Integrações por trás dos módulos">
+
+- **Salesforce:** um broker JWT Bearer centraliza as chamadas à API REST; um guarda de cota roda a cada 5 min e, com 90% da cota diária de API usada, desliga a regra do [CDC](/projetos/salesforce-cdc-eventbridge) e avisa por e-mail (religa abaixo de 80%); um arquivador exporta registros para o S3 em JSONL.gz e só apaga pelo Bulk API 2.0 depois de um segundo aceite.
+- **SharePoint/OneDrive:** sincronização pela Graph API, com app-only auth e token em cache.
+- **Storage Gateway:** refresh agendado do cache do compartilhamento de arquivos.
+- **Segredos:** tudo no SSM Parameter Store como SecureString, com a política da Lambda limitada ao prefixo do portal.
+
+</Card>
+
+## Arquitetura: monolito no centro, especialistas em volta
+
+<Steps>
+<Step n={1}>
+
+**Uma Lambda principal** serve o frontend (HTML, CSS e JS vanilla, inline, sem build) e cerca de 80 rotas REST. Um app novo é uma view e algumas rotas, sem stack, pipeline, CloudFront ou Cognito novos.
+
+</Step>
+<Step n={2}>
+
+**~20 Lambdas especialistas** para o que tem permissão, timeout ou rede diferentes: holerite e inventário falando com o Firebird, broker do Salesforce, transcodificação de vídeo, snapshots agendados, relatórios. Least privilege por função.
+
+</Step>
+<Step n={3}>
+
+**Apps satélite** em stacks próprias quando faz sentido (a loja em Next.js, o monitoramento, a inteligência comercial, o organizador de backups), sempre entrando pelo hub.
+
+</Step>
+<Step n={4}>
+
+**Tudo em SAM.** YAML puro sobre CloudFormation, sem state remoto. Para um portal mantido por uma pessoa, é o equilíbrio entre verbosidade e simplicidade.
+
+</Step>
+</Steps>
+
+<Callout type="info">
+
+**Por que monolito no centro?** O roteamento da Lambda principal é feito com `if` encadeados, sem framework: zero dependência para quebrar numa versão nova, zero tempo de import no cold start e um stack trace que aponta direto para o código. Para ~80 rotas isso ainda é legível. Acima de 200, eu migraria para um roteador mínimo, não para microsserviços.
+
+</Callout>
+
+## O que aprendi queimando tempo
+
+- **`setTimeout` dentro de handler é armadilha.** Usei para deixar a auditoria "assíncrona" e a Lambda terminava antes de o timer disparar: a auditoria nunca era escrita. Em Lambda, ou `await`, ou `InvocationType: "Event"` em outra função.
+- **Template de e-mail do Cognito com `<` quebra em silêncio.** O e-mail de "esqueci minha senha" saía vazio, sem nenhum erro no CloudWatch.
+- **Graph API sem admin consent devolve 403 sem dizer por quê.** A permissão `Files.Read.All` precisa ser do tipo Application e ter consentimento do administrador global.
+- **GSI com `KEYS_ONLY` sai mais caro.** Cada resultado virava um `GetItem` extra. Com `Projection: ALL` o armazenamento dobra, mas as leituras caem dez vezes.
+- **Esconder o botão não é permissão.** O hub só ficou confiável quando a mesma regra passou a valer na tela e em cada rota.
+
+<Card title="O que eu faria diferente">
+
+Teria criado o catálogo e o gateway antes do terceiro app, não depois do décimo. Boa parte do trabalho do hub foi trazer de volta para um login só painéis que nasceram soltos, e fechar portas antigas é sempre mais lento do que não abri-las.
+
+</Card>

@@ -1,0 +1,585 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* Paper Mono (paper.design/mono, SIL OFL 1.1 — licença em /fonts/paper-mono/OFL.txt), variável wght 100–800 */
+@font-face {
+  font-family: 'Paper Mono';
+  src: url('/fonts/paper-mono/PaperMono-wght.woff2') format('woff2');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+@plugin '@tailwindcss/typography';
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-link: var(--link);
+  --color-line: var(--line);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+html {
+  /* barra de rolagem oculta: 100vw = largura do conteúdo (carrossel de ponta a ponta sem sobra) */
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  scroll-padding-top: var(--nav-h);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* blocos de ponta a ponta (carrossel) usam 100vw; clip evita o scroll horizontal da barra */
+  overflow-x: clip;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+  /* alternativas da Inter (a SF ignora): l com cauda e dígitos/letras mais abertos */
+  font-feature-settings:
+    'cv11' 1,
+    'ss01' 1;
+}
+
+/* tudo em minúsculo (Matheus): títulos, nav, botões, chips, labels, contadores, rodapé.
+   Corpo de texto e código ficam como estão; o resto usa a classe .lc */
+h1,
+h2,
+h3,
+h4,
+button,
+label,
+summary,
+header nav,
+footer,
+.lc {
+  text-transform: lowercase;
+}
+
+html::-webkit-scrollbar {
+  display: none;
+}
+
+::selection {
+  background: var(--ring);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes lanyard-sway {
+  0%,
+  100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}
+
+.lanyard-sway {
+  transform-origin: 50% 0;
+  animation: lanyard-sway 4.5s ease-in-out infinite;
+}
+
+/* reveal e máscara (camada imersiva, SPEC §0-bis): curva de saída longa estilo Apple */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes mask-up {
+  from {
+    transform: translateY(105%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up {
+  opacity: 0;
+  animation: fade-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.mask-up {
+  transform: translateY(105%);
+  animation: mask-up 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* card com tilt 3D (useTilt escreve --rx/--ry/--mx/--my): sombra e cover seguem o mouse */
+.tilt {
+  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition:
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.tilt:hover {
+  box-shadow: calc(var(--mx, 0) * -24px) calc(20px + var(--my, 0) * -16px) 50px rgba(0, 0, 0, 0.12);
+}
+
+.tilt.is-tilting {
+  transition-duration: 0.15s;
+}
+
+.tilt-media {
+  transform: scale(1) translate(0, 0);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tilt:hover .tilt-media {
+  transform: scale(1.04) translate(calc(var(--mx, 0) * -8px), calc(var(--my, 0) * -8px));
+}
+
+/* Cipher Reveal (nome do hero): a letra real fica no fluxo e some enquanto embaralha; a máscara mostra
+   a cifra centrada e esticada (--sx) na largura da letra final, então a linha não pula */
+.cipher-g {
+  position: relative;
+  display: inline-block;
+}
+.cipher-pending .cipher-face {
+  opacity: 0;
+}
+.cipher-face,
+.cipher-mask {
+  transition: opacity 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.cipher-mask {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  white-space: pre;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) scaleX(var(--sx, 1));
+}
+
+/* concave carousel: posição animada em JS (rAF: deslize, inércia, mola); reflexo esmaecendo pra baixo */
+.concave-card {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.concave-reflection {
+  opacity: 0.12;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent 40%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent 40%);
+}
+
+/* livro da trajetória (TrajectoryBook): papel, lombada e folha girando */
+.book-root {
+  /* papel claro; texto das páginas na fonte do site, Paper Mono só na marginália (.book-mono) */
+  font-family: var(--font-sans);
+  --book-bg: #f7f6f2;
+  --book-fg: #1d1d1f;
+  --book-muted: #6b6a66;
+  --book-accent: #1d1d1f;
+  --book-edge: rgba(0, 0, 0, 0.07);
+}
+
+.book-mono {
+  font-family: var(--font-mono);
+}
+
+/* spread ~720x380 no desktop, 640 abaixo de 1280; mobile = uma página de ~300px */
+.book-stage {
+  max-width: 720px;
+}
+
+@media (max-width: 1279px) {
+  .book-stage {
+    max-width: 640px;
+  }
+}
+
+.book {
+  position: relative;
+  perspective: 2200px;
+}
+
+.book-spread {
+  aspect-ratio: 720 / 380;
+}
+
+.book-single {
+  aspect-ratio: 3 / 4;
+  max-width: 300px;
+  margin-inline: auto;
+}
+
+.book-half {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.book-half-left {
+  left: 0;
+}
+
+.book-half-right {
+  left: 50%;
+}
+
+.book-single .book-half-right {
+  left: 0;
+  width: 100%;
+}
+
+.book-page {
+  color: var(--book-fg);
+  background-color: var(--book-bg);
+  /* grão fino do papel */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  box-shadow:
+    0 24px 50px rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--book-edge);
+  overflow: hidden;
+}
+
+/* curvatura: sombra na lombada e luz na borda externa */
+.book-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.book-page-right {
+  border-radius: 4px 14px 14px 4px;
+}
+
+.book-page-right::before {
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.14),
+    rgba(0, 0, 0, 0.03) 7%,
+    transparent 16%,
+    transparent 92%,
+    rgba(255, 255, 255, 0.18)
+  );
+}
+
+.book-page-left {
+  border-radius: 14px 4px 4px 14px;
+}
+
+.book-page-left::before {
+  background: linear-gradient(
+    to left,
+    rgba(0, 0, 0, 0.14),
+    rgba(0, 0, 0, 0.03) 7%,
+    transparent 16%,
+    transparent 92%,
+    rgba(255, 255, 255, 0.18)
+  );
+}
+
+.book-single .book-page-right {
+  border-radius: 14px;
+}
+
+.book-muted {
+  color: var(--book-muted);
+}
+
+.book-accent {
+  color: var(--book-accent);
+}
+
+.book-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0 22px 6px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+}
+
+.book-leaf {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 50%;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.book-leaf-next {
+  animation: leaf-next var(--flip-ms) cubic-bezier(0.45, 0.05, 0.25, 1) forwards;
+}
+
+.book-leaf-prev {
+  left: 0;
+  transform-origin: right center;
+  animation: leaf-prev var(--flip-ms) cubic-bezier(0.45, 0.05, 0.25, 1) forwards;
+}
+
+.book-leaf-single {
+  left: 0;
+  width: 100%;
+  transform-origin: left center;
+}
+
+.book-leaf-single.book-leaf-prev {
+  animation-name: leaf-in;
+}
+
+.book-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.book-face-back {
+  transform: rotateY(180deg);
+}
+
+/* sombra dinâmica: escurece a folha no meio do giro */
+.book-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.28), transparent 70%);
+  opacity: 0;
+  animation: leaf-shade var(--flip-ms) ease-in-out forwards;
+}
+
+@keyframes leaf-next {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(-180deg);
+  }
+}
+
+@keyframes leaf-prev {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(180deg);
+  }
+}
+
+@keyframes leaf-in {
+  from {
+    transform: rotateY(-180deg);
+  }
+  to {
+    transform: rotateY(0deg);
+  }
+}
+
+@keyframes leaf-shade {
+  50% {
+    opacity: 1;
+  }
+}
+
+/* glass (SPEC §0-bis): cards, nav e chips */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* painel de ajustes do crachá: slider fino e color picker redondo */
+.lanyard-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--accent) var(--pct, 50%), rgba(0, 0, 0, 0.1) var(--pct, 50%));
+  cursor: pointer;
+}
+
+.lanyard-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.lanyard-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.12),
+    0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.lanyard-color {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  background: none;
+}
+
+.lanyard-color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.lanyard-color::-webkit-color-swatch {
+  border: 0;
+  border-radius: 999px;
+}
+
+.lanyard-color::-moz-color-swatch {
+  border: 0;
+  border-radius: 999px;
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee {
+  animation: marquee var(--marquee-duration, 40s) linear infinite;
+}
+
+.marquee-reverse {
+  animation-direction: reverse;
+}
+
+.marquee-pause:hover .marquee {
+  animation-play-state: paused;
+}
+
+@keyframes scroll-hint {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(8px);
+    opacity: 1;
+  }
+}
+
+.scroll-hint {
+  animation: scroll-hint 2s ease-in-out infinite;
+}
+
+/* conteúdo markdown dentro dos componentes MDX (que são not-prose) */
+.mdx-inner > * + * {
+  margin-top: 0.75em;
+}
+
+.mdx-inner a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.mdx-inner code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  color: var(--ink);
+}
+
+.mdx-inner ul {
+  list-style: disc;
+  padding-left: 1.25em;
+}
+
+.mdx-inner ol {
+  list-style: decimal;
+  padding-left: 1.25em;
+}
+
+/* nomes de evento/ARN longos em código inline não estouram o mobile */
+.prose :not(pre) > code {
+  overflow-wrap: anywhere;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+  font-weight: 500;
+}
+
+.prose details {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.prose summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
