@@ -41,7 +41,7 @@ export function Hero() {
       <ImmersiveSlot load={loadBackdrop} delayMs={400} className="absolute inset-0 z-0" />
       <ImmersiveSlot
         load={loadKnot}
-        delayMs={900}
+        delayMs={400}
         media="(min-width: 768px)"
         allowReducedMotion
         className="absolute inset-0 z-0"

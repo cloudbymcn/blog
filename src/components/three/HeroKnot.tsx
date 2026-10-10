@@ -167,9 +167,9 @@ const fragmentShader = /* glsl */ `
     vec3 h = normalize(uLight + vView);
     float sheen = pow(max(dot(n, h), 0.0), 28.0); // reflexo sedoso (o ponteiro move a luz)
     float depth = mix(1.0 - uDepthFade, 1.0, vDepth * 0.5 + 0.5); // lado de trás esmaece
-    float alpha = 0.06 + fold * 0.28 + edge * 0.5 + sheen * 0.22;
+    float alpha = 0.13 + fold * 0.4 + edge * 0.75 + sheen * 0.3; // tintas presentes, ainda translúcidas
     vec3 col = mix(ink, uInkA, sheen * 0.5);
-    gl_FragColor = vec4(col, clamp(alpha * depth, 0.0, 0.8));
+    gl_FragColor = vec4(col, clamp(alpha * depth, 0.0, 0.9));
   }
 `
 
@@ -240,17 +240,19 @@ export default function HeroKnot() {
         const cr = canvas.getBoundingClientRect()
         const ar = actions.getBoundingClientRect()
         const col = (actions.parentElement ?? actions).getBoundingClientRect()
-        const top = ar.bottom - cr.top + 24
-        const bottom = cr.height - 16
-        const area = Math.min(K.maxHeight, bottom - top, col.width)
-        fits = area >= 180
+        // o vão real costuma ser curto (~110–200px em notebook): o nó ocupa ele inteiro
+        const top = ar.bottom - cr.top + 12
+        const bottom = cr.height - 4
+        const area = Math.min(K.maxHeight, bottom - top, col.width * 0.6)
+        fits = area >= 90
         const cx = col.left - cr.left + col.width / 2
         const cy = top + (bottom - top) / 2
         const h = Math.tan((FOV * Math.PI) / 360) * CAMERA_Z
         const pxToWorld = (2 * h) / cr.height
         tiltGroup.position.set((cx - cr.width / 2) * pxToWorld, -(cy - cr.height / 2) * pxToWorld, 0)
-        // raio do nó ≈ size × metade da área (com folga da largura da fita)
-        tiltGroup.scale.setScalar(((K.size * area) / 2 / (1 + K.ribbonWidth / 2)) * pxToWorld)
+        // inclinado 32°, a altura na tela fica ~0,85 do diâmetro: com 1,05 o nó preenche o vão sem tocar
+        const fill = area < K.maxHeight ? 1.05 : K.size
+        tiltGroup.scale.setScalar(((fill * area) / 2 / (1 + K.ribbonWidth / 2)) * pxToWorld)
         tiltGroup.visible = fits
       }
       const ro = new ResizeObserver(layout)
