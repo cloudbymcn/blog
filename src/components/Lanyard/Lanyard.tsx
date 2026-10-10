@@ -41,6 +41,8 @@ export interface LanyardProps {
   intro?: boolean;
   /** [forja] canvas não bloqueia a página: só o cartão captura ponteiro (hit test via raycast). */
   passThrough?: boolean;
+  /** [forja] chamado uma vez, quando o primeiro frame com as texturas foi desenhado (crossfade do placeholder). */
+  onFirstFrame?: () => void;
   className?: string;
   style?: CSSProperties;
 }
@@ -892,10 +894,12 @@ const Lanyard = ({
   interactive = true,
   intro = true,
   passThrough = false,
+  onFirstFrame,
   className = '',
   style
 }: LanyardProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const firstFrameRef = useRef<(() => void) | undefined>(undefined);
   const settingsRef = useRef<Settings | null>(null);
   const applyRef = useRef<(() => void) | null>(null);
 
@@ -924,6 +928,7 @@ const Lanyard = ({
       intro,
       passThrough
     };
+    firstFrameRef.current = onFirstFrame;
   });
 
   useEffect(() => {
@@ -1051,6 +1056,13 @@ const Lanyard = ({
     let visible = true;
     let alive = true;
     let placed = false;
+    // [forja] nasce em repouso: espera as texturas, assenta a física fora da tela e só então desenha
+    let texturesReady = false;
+    let settled = false;
+    let announced = false;
+    let breezeFrom = 0;
+    let restCenterY = 0; // y do centro do cartão no enquadramento (mesmo ponto do placeholder)
+    let sag = 0; // quanto a fita estica sob o peso; descontado do comprimento pra o repouso cair no lugar
     let hovering = false;
     let press: Press | null = null;
     let imageToken = 0;
@@ -1105,7 +1117,8 @@ const Lanyard = ({
       const cardTop = viewHeight / 2 - viewHeight * mix(0.12, 0.42, clamp(s.strapLength, 0, 1));
       const hangTop = cardTop + (layout.hangY - layout.height / 2);
       sim.anchor.set(anchorX, anchorY, 0);
-      configureSimulation(sim, layout, anchorY - hangTop);
+      restCenterY = cardTop - layout.height / 2;
+      configureSimulation(sim, layout, anchorY - hangTop - sag);
       sim.nodes[0].copy(sim.anchor);
       sim.previous[0].copy(sim.anchor);
     };
@@ -1153,6 +1166,8 @@ const Lanyard = ({
           images.strap = strap;
           paintFaces();
           repaintStrap();
+          texturesReady = true;
+          start();
         });
       }
       const faceKey = `${layoutKey}|${s.cardColor}|${s.imageFit}`;
@@ -1302,13 +1317,49 @@ const Lanyard = ({
       };
     };
 
+    /**
+     * [forja] Assenta o crachá em repouso antes do primeiro frame (sem brisa): a fita estica sob o peso,
+     * então mede quanto o cartão desceu, encurta a fita nessa medida e assenta de novo. Assim o 3D nasce
+     * parado exatamente onde o placeholder estava, sem queda nem solavanco.
+     */
+    const settle = () => {
+      const calm = { ...physics(), breeze: 0 };
+      for (let pass = 0; pass < 4; pass++) {
+        placeHanging(sim, layout, false);
+        for (let k = 0; k < 180; k++) stepSimulation(sim, 1 / 60, calm, 0);
+        const error = restCenterY - sim.body.position.y; // > 0: desceu demais
+        if (Math.abs(error) < 1e-3 || pass === 3) break;
+        sag += error;
+        frameView();
+      }
+      const body = sim.body;
+      body.velocity.set(0, 0, 0);
+      body.angular.set(0, 0, 0);
+      body.previous.copy(body.position);
+      body.previousQuaternion.copy(body.quaternion);
+      for (let i = 0; i <= JOINTS; i++) {
+        sim.velocities[i].set(0, 0, 0);
+        sim.previous[i].copy(sim.nodes[i]);
+      }
+    };
+
     const tick = (now: number) => {
       raf = 0;
       if (!alive) return;
+      // [forja] sem texturas o cartão sairia em branco: espera (o placeholder segura a tela)
+      if (!texturesReady) return;
       const dt = Math.min(1 / 30, Math.max(1 / 240, (now - last) / 1000));
       last = now;
+      if (!settled) {
+        settled = true;
+        if (!(settingsRef.current!.intro && !reducedMotion)) settle();
+        breezeFrom = time;
+      }
       time += dt;
       const current = physics();
+      // [forja] a brisa entra em 1s a partir do repouso (smoothstep), sem tranco
+      const ramp = Math.min(1, (time - breezeFrom) / 1);
+      current.breeze *= ramp * ramp * (3 - 2 * ramp);
       stepSimulation(sim, dt, current, time);
       const body = sim.body;
       if (!Number.isFinite(body.position.x + body.position.y + body.position.z + body.quaternion.w)) {
@@ -1316,6 +1367,27 @@ const Lanyard = ({
         placeHanging(sim, layout, false);
       }
       render();
+      if (!announced) {
+        announced = true;
+        if (import.meta.env.DEV) {
+          // calibração placeholder × 3D: retângulo do cartão na tela no primeiro frame
+          const rect = canvas.getBoundingClientRect();
+          const xs: number[] = [];
+          const ys: number[] = [];
+          cardGroup.updateMatrixWorld();
+          for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+            const p = new THREE.Vector3((x * layout.width) / 2, (y * layout.height) / 2, 0)
+              .applyMatrix4(cardGroup.matrixWorld)
+              .project(camera);
+            xs.push(rect.left + ((p.x + 1) / 2) * rect.width);
+            ys.push(rect.top + ((1 - p.y) / 2) * rect.height);
+          }
+          (window as unknown as { __lanyardFirstFrame?: number[] }).__lanyardFirstFrame = [
+            Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)
+          ];
+        }
+        firstFrameRef.current?.();
+      }
       const resting = sim.calm > 1.2 && !sim.grab && current.breeze === 0;
       if (visible && !resting) raf = requestAnimationFrame(tick);
     };

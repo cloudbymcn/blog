@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
-import { whenEngaged } from '../../lib/immersive'
+import { whenIdle } from '../../lib/immersive'
 import { LANYARD_DEFAULTS, type LanyardSettings } from './settings'
 
 const Lanyard = lazy(() => import('./Lanyard'))
@@ -47,10 +47,13 @@ export function LanyardPlaceholder({
   anchor = 'center',
   size = LANYARD_DEFAULTS.size,
   strapLength = LANYARD_DEFAULTS.strapLength,
+  still = false,
 }: {
   anchor?: Anchor
   size?: number
   strapLength?: number
+  /** parado na pose de repouso (o 3D vai assumir daqui): sem o balanço CSS, pra a troca não pular */
+  still?: boolean
 }) {
   const [failed, setFailed] = useState(false)
   const cardTop = 0.12 + (0.42 - 0.12) * strapLength
@@ -60,10 +63,10 @@ export function LanyardPlaceholder({
       style={{ left: ANCHOR_X[anchor] }}
       aria-hidden="true"
     >
-      <div className="lanyard-sway flex h-full flex-col items-center">
+      <div className={`${still ? '' : 'lanyard-sway '}flex h-full flex-col items-center`}>
         <div
           className="w-3 shrink-0 rounded-sm bg-[#111]"
-          style={{ height: `calc(${cardTop * 100}% - 1.25rem)` }}
+          style={{ height: `calc(${cardTop * 100}% - 1rem)` }}
         />
         <div className="-mt-1 h-4 w-8 rounded-sm bg-gradient-to-b from-[#e5e5ea] to-[#a1a1a6]" />
         {failed ? (
@@ -92,17 +95,18 @@ export function LanyardPlaceholder({
   )
 }
 
+const desktopPointer = () => window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
 /**
  * Quando montar o crachá 3D (three.js ~560 KB): nunca antes do LCP.
- * Desktop com mouse: depois do load + idle. Toque: só na primeira interação (o placeholder
- * estático segura o hero; carregar three num celular no boot derruba TBT/LCP).
+ * Desktop com mouse: logo depois do load + idle curto (o placeholder fica até o 3D desenhar o primeiro
+ * frame, então não há pulo). Toque: só na primeira interação (carregar three num celular no boot
+ * derruba TBT/LCP).
  */
 function useDeferredStart() {
   const [ready, setReady] = useState(false)
   useEffect(() => {
-    // desktop: na primeira interação (ou 6s), não logo depois do load (o init do three dava ~550ms de long task)
-    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches)
-      return whenEngaged(() => setReady(true))
+    if (desktopPointer()) return whenIdle(() => setReady(true))
     const events = ['pointerdown', 'touchstart', 'scroll', 'keydown'] as const
     const go = () => {
       events.forEach((e) => window.removeEventListener(e, go))
@@ -131,31 +135,76 @@ export function LanyardStage({
   const reduced = useSyncExternalStore(subscribeReducedMotion, prefersReducedMotion, () => true)
   const [lowEnd] = useState(isLowEnd)
   const ready = useDeferredStart()
+  const [desktop] = useState(desktopPointer)
+  // 'wait': placeholder por cima, canvas invisível; 'fade': crossfade 250ms; 'done': só o 3D; 'gave-up': só o placeholder
+  const [phase, setPhase] = useState<'wait' | 'fade' | 'done' | 'gave-up'>('wait')
   const { plainBand, ...look } = settings
+  const with3d = !reduced && !lowEnd && ready && phase !== 'gave-up'
+
+  // 3D que não desenha em 3s (rede lenta, GPU ruim): fica o placeholder, como antes. Conta só tempo com
+  // frames de verdade (rAF), pra uma aba aberta em segundo plano não desistir do 3D antes de ser vista.
+  useEffect(() => {
+    if (!with3d || phase !== 'wait') return
+    let raf = 0
+    let last = 0
+    let shown = 0
+    const tick = (now: number) => {
+      if (last) shown += Math.min(100, now - last)
+      last = now
+      if (shown > 3000) setPhase('gave-up')
+      else raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [with3d, phase])
+
+  useEffect(() => {
+    if (phase !== 'fade') return
+    const t = window.setTimeout(() => setPhase('done'), 300)
+    return () => window.clearTimeout(t)
+  }, [phase])
+
+  const placeholder = (
+    <LanyardPlaceholder
+      anchor={anchor}
+      size={settings.size}
+      strapLength={settings.strapLength}
+      still={desktop && !reduced && !lowEnd && phase !== 'gave-up'}
+    />
+  )
 
   return (
     <div className="relative h-full w-full">
       {/* absolute: o canvas do Lanyard se redimensiona pelo container; com altura auto ele cresce em loop */}
       <div className={`absolute inset-0 ${passThrough ? 'pointer-events-none' : ''}`}>
-        {reduced || lowEnd || !ready ? (
-          <LanyardPlaceholder anchor={anchor} size={settings.size} strapLength={settings.strapLength} />
-        ) : (
-          <Suspense
-            fallback={
-              <LanyardPlaceholder anchor={anchor} size={settings.size} strapLength={settings.strapLength} />
-            }
+        {with3d && (
+          <div
+            className="absolute inset-0 transition-opacity duration-[250ms] ease-out"
+            style={{ opacity: phase === 'wait' ? 0 : 1 }}
           >
-            <Lanyard
-              {...look}
-              frontImage={FRONT}
-              backImage="/lanyard/card-back.png"
-              strapImage={plainBand ? undefined : '/lanyard/strap.png'}
-              imageFit="cover"
-              orientation="portrait"
-              anchor={anchor}
-              passThrough={passThrough}
-            />
-          </Suspense>
+            <Suspense fallback={null}>
+              <Lanyard
+                {...look}
+                frontImage={FRONT}
+                backImage="/lanyard/card-back.png"
+                strapImage={plainBand ? undefined : '/lanyard/strap.png'}
+                imageFit="cover"
+                orientation="portrait"
+                anchor={anchor}
+                passThrough={passThrough}
+                onFirstFrame={() => setPhase((p) => (p === 'wait' ? 'fade' : p))}
+              />
+            </Suspense>
+          </div>
+        )}
+        {/* o placeholder (imagem LCP) segura a tela até o 3D desenhar o primeiro frame, depois some em 250ms */}
+        {phase !== 'done' && (
+          <div
+            className="absolute inset-0 transition-opacity duration-[250ms] ease-out"
+            style={{ opacity: phase === 'fade' ? 0 : 1 }}
+          >
+            {placeholder}
+          </div>
         )}
       </div>
     </div>

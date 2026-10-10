@@ -37,5 +37,6 @@ export const LANYARD_DEFAULTS: LanyardSettings = {
   elasticity: 0.5,
   breeze: 0.5,
   interactive: true,
-  intro: true,
+  // nasce em repouso, na pose do placeholder (sem queda no load); o painel de ajustes religa a intro
+  intro: false,
 }
