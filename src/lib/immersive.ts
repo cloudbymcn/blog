@@ -1,11 +1,13 @@
 /**
  * Gate da camada imersiva (SPEC §0-bis): three.js decorativo e Lenis só em desktop com mouse,
  * sem reduced-motion e com GPU razoável. Mobile fica com a versão estática (perf/LCP).
- * `allowReducedMotion`: o componente aceita reduced-motion e se vira (ex.: um frame parado).
  */
-export function canRunImmersive({ allowReducedMotion = false } = {}): boolean {
-  const motion = allowReducedMotion ? '' : ' and (prefers-reduced-motion: no-preference)'
-  if (!window.matchMedia(`(hover: hover) and (pointer: fine)${motion}`).matches) return false
+export function canRunImmersive(): boolean {
+  if (
+    !window.matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)')
+      .matches
+  )
+    return false
   if ((navigator.hardwareConcurrency ?? 8) < 4) return false
   try {
     const c = document.createElement('canvas')

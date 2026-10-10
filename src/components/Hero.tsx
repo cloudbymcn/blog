@@ -12,8 +12,6 @@ const desktopQuery = '(min-width: 768px)'
 
 // fundo three.js decorativo: chunk separado, só desktop e depois do load (ImmersiveSlot)
 const loadBackdrop = () => import('./three/HeroBackdrop')
-// nó de fita de luz no vazio abaixo dos botões; com reduced-motion fica parado
-const loadKnot = () => import('./three/HeroKnot')
 
 // mobile: canvas de 70svh no topo; escala o size pro cartão dar ~45% da tela (0.45 / 0.70 ≈ 0.64)
 const MOBILE_SIZE_SCALE = 0.64 / 0.42
@@ -39,13 +37,6 @@ export function Hero() {
       className="relative isolate flex min-h-svh flex-col overflow-hidden bg-bg pt-[var(--nav-h)]"
     >
       <ImmersiveSlot load={loadBackdrop} delayMs={400} className="absolute inset-0 z-0" />
-      <ImmersiveSlot
-        load={loadKnot}
-        delayMs={400}
-        media="(min-width: 768px)"
-        allowReducedMotion
-        className="absolute inset-0 z-0"
-      />
 
       {/* SPEC §0-bis: o canvas cobre a dobra inteira por cima do texto; só o cartão pega ponteiro */}
       <div className="pointer-events-none absolute inset-x-0 top-[var(--nav-h)] z-10 h-[70svh] md:inset-0 md:h-auto">
@@ -80,11 +71,7 @@ export function Hero() {
             Arquiteturas AWS reais, decisões técnicas e implementações completas. Pós-graduando em Arquitetura
             Cloud, com foco em IA, escalabilidade e sistemas distribuídos.
           </p>
-          <div
-            data-hero-actions
-            className="fade-up mt-8 flex flex-wrap items-center gap-3"
-            style={{ animationDelay: '460ms' }}
-          >
+          <div className="fade-up mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: '460ms' }}>
             <Magnet>
               <Link
                 to="/projetos"

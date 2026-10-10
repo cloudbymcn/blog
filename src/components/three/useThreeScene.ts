@@ -13,11 +13,10 @@ export interface SceneContext {
  * Cena three.js decorativa com o ciclo de vida resolvido: renderer transparente, resize pelo container,
  * loop pausado fora da viewport e com a aba oculta, DPR limitado e dispose de tudo no unmount.
  * `setup` monta a cena e devolve o update por frame (+ cleanup opcional).
- * `animate: false` (reduced-motion): sem loop, um frame parado a cada resize.
  */
 export function useThreeScene(
   setup: (ctx: SceneContext) => { update: (t: number, dt: number) => void; dispose?: () => void },
-  { fov = 35, maxDpr = 1.5, animate = true } = {},
+  { fov = 35, maxDpr = 1.5 } = {},
 ) {
   const ref = useRef<HTMLDivElement>(null)
   const setupRef = useRef(setup)
@@ -55,7 +54,7 @@ export function useThreeScene(
       raf = requestAnimationFrame(loop)
     }
     const play = () => {
-      if (!animate || raf || !visible || document.hidden) return
+      if (raf || !visible || document.hidden) return
       last = performance.now()
       raf = requestAnimationFrame(loop)
     }
@@ -70,7 +69,6 @@ export function useThreeScene(
       renderer.setSize(w, h, false)
       camera.aspect = w / h
       camera.updateProjectionMatrix()
-      if (!animate) update(0, 0)
       renderer.render(scene, camera)
     }
     const ro = new ResizeObserver(resize)
@@ -107,7 +105,7 @@ export function useThreeScene(
       renderer.dispose()
       renderer.domElement.remove()
     }
-  }, [fov, maxDpr, animate])
+  }, [fov, maxDpr])
 
   return ref
 }
