@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { scrollToTarget, startSmoothScroll, stopSmoothScroll } from '../lib/smoothScroll'
 import { Footer } from './Footer'
-import { Nav } from './Nav'
+import { Dock, Nav } from './Nav'
 
 /** Rola pro topo a cada rota, ou pra âncora quando a URL tem hash. */
 function useScrollRestore() {
@@ -28,10 +28,13 @@ export function Layout() {
         Pular para o conteúdo
       </a>
       <Nav />
+      <Dock />
       <main id="conteudo">
         <Outlet />
       </main>
       <Footer />
+      {/* abaixo de 1270px o dock vira barra inferior: folga pra ele não cobrir o rodapé */}
+      <div aria-hidden="true" className="h-24 bg-bg-2 min-[1270px]:hidden" />
     </>
   )
 }
