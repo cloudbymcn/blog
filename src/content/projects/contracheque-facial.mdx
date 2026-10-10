@@ -1,0 +1,163 @@
+---
+title: "Contracheque com reconhecimento facial: biometria em produção para o RH"
+slug: contracheque-facial
+summary: "Funcionário sem login consulta o próprio holerite pelo celular com prova de vida e busca facial no Rekognition. Spec antes do código, 76 testes unitários e LGPD desenhada junto."
+category: ia
+tier: A
+date: 2026-10-09
+stack: ["Rekognition", "AWS Lambda", "API Gateway", "Cognito", "DynamoDB", "S3", "Systems Manager", "IAM", "SAM", "Amplify", "Node.js", "React", "Firebird"]
+metrics:
+  - { label: "quem via o holerite", before: "quem soubesse CPF + data", after: "só o próprio rosto" }
+  - { label: "acesso liberado por", before: "sem prazo", after: "5 min, um CPF" }
+cover: /projects/contracheque-facial/architecture.svg
+---
+
+O contracheque é um dos módulos do [portal corporativo](/projetos/portal-corporativo-serverless) de uma indústria de rochas ornamentais no ES. A primeira versão era simples: CPF, data de nascimento e matrícula, e o holerite aparecia, lido do ERP legado (Firebird).
+
+O problema também era simples: **qualquer pessoa que soubesse esses três dados via o salário de qualquer outra**. E esses dados não são segredo: estão em ficha de cadastro, crachá, conversa de corredor. Exigir login também não resolvia, porque boa parte do chão de fábrica não tem conta no portal nem e-mail corporativo.
+
+A pergunta virou: como provar que é a própria pessoa, pelo celular dela, sem senha?
+
+<Figure src="/projects/contracheque-facial/architecture.svg" alt={"Na consulta, o funcionário abre a página no celular, sem login, e passa pela prova de vida do Amazon Rekognition Face Liveness com confiança mínima de 90. A selfie validada vai para o SearchFacesByImage na coleção de funcionários, com similaridade mínima de 95%. Com o match, o portal emite um token HMAC de 5 minutos preso a um CPF, que a Lambda de holerite troca pela consulta no ERP Firebird. No primeiro acesso, o auto-cadastro valida a prova de vida e o CPF com a data de nascimento no ERP, grava o cadastro como pendente no DynamoDB e a selfie num bucket S3 privado. O RH aprova, e só então o rosto é indexado na coleção."} caption={"Dois caminhos: consulta (linha de cima) e cadastro (linha de baixo). O rosto só entra na coleção depois do RH."} />
+
+## O fluxo
+
+<Steps>
+<Step n={1}>
+
+**O funcionário abre a página no portal pelo celular.** Informa CPF e data de nascimento, confere nome e matrícula mascarada e escolhe a competência. Nenhum login.
+
+</Step>
+<Step n={2}>
+
+**Prova de vida com o Amazon Rekognition Face Liveness.** O widget pede para centralizar o rosto, aproximar e ficar parado enquanto a tela pisca cores. A sessão só vale se o resultado for `SUCCEEDED` com **confiança mínima de 90**. Foto impressa, tela de outro celular ou vídeo não passam.
+
+</Step>
+<Step n={3}>
+
+**Busca na coleção de funcionários.** A imagem de referência da própria sessão de liveness vai para o `SearchFacesByImage`, com **limiar de similaridade de 95%** e no máximo um resultado. Cada rosto da coleção carrega o CPF como `ExternalImageId`.
+
+</Step>
+<Step n={4}>
+
+**Token de 5 minutos, preso a um CPF.** Com o match (e o nome do rosto coerente com o nome da primeira tela), o backend assina um token HMAC com escopo `face-paystub` e validade de 300 s. A comparação da assinatura é em tempo constante.
+
+</Step>
+<Step n={5}>
+
+**O holerite sai do ERP.** A Lambda de holerite, a mesma que já consultava o Firebird, recebe o CPF **do token**, nunca do navegador, e devolve a tela e o PDF.
+
+</Step>
+</Steps>
+
+### E o cadastro?
+
+A primeira versão do cadastro (v1) era pela webcam do RH: o funcionário precisava ir até a sala. Três dias depois veio a v2, com **auto-cadastro pelo celular e aprovação do RH**:
+
+1. O funcionário digita CPF e nascimento. O backend procura no ERP e mostra "Você é Fulano, matrícula 1\*\*\*4?". Se não achar, a mensagem é genérica.
+2. Ele aceita o termo de uso de biometria (obrigatório) e faz a selfie com a mesma prova de vida da consulta.
+3. O backend **revalida tudo do lado do servidor**: liveness `ok` e CPF + nascimento contra o ERP. Nada do que aparece na caixa de confirmação vem do cliente.
+4. A selfie vai para um bucket S3 privado e o cadastro fica `pending` no DynamoDB, com o aceite digital, a hora e o IP. **Pendente não está no Rekognition**, então não consulta nada.
+5. O RH vê a fila com a selfie (URL pré-assinada curta) e compara com a pessoa que conhece. Para aprovar, precisa marcar que o termo físico foi assinado. Antes de indexar, o backend roda um `SearchFacesByImage` com a foto: se aquele rosto já estiver ativo em **outro** CPF, a aprovação é bloqueada. Só então vem o `IndexFaces` e o status vira `active`.
+
+Um colega que soubesse o CPF e a data de outra pessoa e cadastrasse o próprio rosto seria barrado ali, pelo RH: a foto não é a pessoa.
+
+## Decisões
+
+### Por que liveness + coleção, e não só comparar duas fotos
+
+Comparar a selfie com uma foto de cadastro (`CompareFaces`) resolve "é parecido", mas não "é uma pessoa viva na frente da câmera agora". O **Face Liveness** cobre a fraude de apresentação (foto, tela, máscara simples), e a **coleção** resolve o "quem é" sem o navegador dizer quem diz ser: a busca é 1:N e o CPF sai do rosto encontrado, não do formulário.
+
+### Por que esses limiares
+
+- **Liveness ≥ 90**: o resultado é uma confiança de 0 a 100. Abaixo de 90, a pessoa refaz, o que custa segundos; aceitar uma tentativa de fraude custaria o salário de alguém.
+- **Similaridade ≥ 95%** com um único resultado: numa coleção de algumas centenas de rostos, o limiar alto troca alguns "tente de novo com mais luz" por nenhum falso positivo entre colegas parecidos.
+- **Token de 5 min**: o suficiente para escolher a competência e baixar o PDF. Depois disso, nova prova de vida.
+
+### Privacidade e LGPD: o que fica e o que não fica
+
+<Callout type="info">
+
+**Fica guardado:** o vetor do rosto na coleção do Rekognition (não é uma imagem), a selfie do cadastro no S3 privado (o RH precisa dela para comparar), o registro com aceite digital, termo físico, quem aprovou e quando, e o log de consultas (quem, quando, resultado).
+
+**Não fica:** a selfie de cada consulta (usada na busca e descartada), qualquer valor do holerite em log, e o rosto de quem foi rejeitado.
+
+</Callout>
+
+- **Dois consentimentos, os dois obrigatórios:** o aceite digital no cadastro e o termo físico marcado pelo RH na aprovação.
+- **Exclusão de verdade:** rejeição ou desligamento apaga a foto do S3, o rosto da coleção (`DeleteFaces`) e o cadastro. Fica só a trilha de auditoria.
+- **Retenção:** o log de auditoria expira em 1 ano. Se a prova de consentimento precisa sobreviver à exclusão do cadastro é uma pergunta jurídica, e foi levada ao jurídico em vez de decidida no código, junto com o texto final do termo.
+- **Quem gerencia:** a fila de aprovação e a lista de ativos ficam com uma lista curta de pessoas do RH e a TI, não com o grupo do RH inteiro.
+- **Rotas públicas protegidas:** rate limit e auditoria em todas, inclusive no lookup, que de outro jeito serviria para enumerar CPF e data de nascimento.
+
+## Spec antes do código
+
+Esse foi o primeiro módulo do portal escrito de ponta a ponta no fluxo **SDD (spec-driven development)**, com agentes de código fazendo a implementação e eu fazendo o papel de quem decide:
+
+<Steps>
+<Step n={1}>
+
+**Spec de design** com motivação, decisões fechadas (serviço, limiares, LGPD), fluxos, rotas, tabela e o que fica fora de escopo. A v2 reescreveu só o delta.
+
+</Step>
+<Step n={2}>
+
+**Plano em tasks** (10 na v1, 5 na v2), cada uma com briefing, arquivos sob responsabilidade e o contrato que produz e consome. Antes de começar, uma varredura conferiu se o que uma task produz bate com o que a outra consome.
+
+</Step>
+<Step n={3}>
+
+**Uma task, uma revisão.** Cada entrega gerou um pacote de diff revisado à parte, com rodadas de correção limitadas e um registro de decisões ("ruling") para cada desvio: por que, e quanto custa se estiver errado.
+
+</Step>
+<Step n={4}>
+
+**Revisão final do conjunto**, que achou o que a revisão por task não acha. Na v2: o IP vinha do cabeçalho `X-Forwarded-For`, que dava para forjar, e ele aparecia sem escape na tela do RH, um XSS armazenado. Correção: IP só da origem autoritativa da requisição e escape em toda saída da tela.
+
+</Step>
+</Steps>
+
+### Testes unitários
+
+O handler recebe as dependências injetadas (Rekognition, DynamoDB, S3, ERP, auditoria), então os testes rodam com fakes, sem AWS e sem câmera:
+
+| Arquivo | O que cobre | Casos |
+| --- | --- | --- |
+| `token.test.js` | assinatura, expiração, escopo, token adulterado | 8 |
+| `rekognition.test.js` | limiares de liveness e similaridade, rosto não detectado | 8 |
+| `store.test.js` | cadastro pendente, ativo, listagem, exclusão | 5 |
+| `index.test.js` | rotas: rate limit, pendente não consulta, conflito de rosto, aprovação sem termo, rejeição apaga foto, auditoria | 55 |
+
+**76 casos** no total, rodando no `node --test` antes de cada entrega.
+
+## Custos
+
+O Rekognition cobra por uso, e o volume é pequeno: algumas centenas de funcionários consultando uma ou duas vezes por mês. Pela tabela pública, cada consulta é uma verificação de liveness (~US$ 0,015) e uma busca (~US$ 0,001). Armazenar o vetor de um rosto custa uma fração de centavo por mês.
+
+<Metrics>
+<Metric value="~US$ 0,016" label="por consulta (liveness + busca)" />
+<Metric value="~US$ 3" label="por mês, com ~200 consultas" />
+<Metric value="US$ 0" label="Lambda, DynamoDB e S3 nesse volume" />
+</Metrics>
+
+O resto (Lambda, DynamoDB on-demand, S3, um Identity Pool para o widget de liveness) fica no free tier ou em centavos.
+
+## O que daria diferente
+
+<Card title="Autenticação do portal antes da biometria">
+
+A revisão final registrou um problema que não era desta branch: o portal decodificava o JWT sem validar a assinatura em parte das rotas administrativas. Foi levado à decisão antes da produção, mas a ordem certa seria fechar isso primeiro e construir a biometria em cima de uma base já verificada.
+
+</Card>
+
+<Card title="Rate limit fora da memória">
+
+O limitador de tentativas ficou em memória, por container da Lambda, como limitação conhecida e registrada. Com tráfego distribuído entre containers ele vale menos. Uma tabela no DynamoDB com TTL, ou o throttling do próprio API Gateway por rota, resolveria sem mudar o fluxo.
+
+</Card>
+
+<Card title="Aviso ao funcionário">
+
+Hoje o funcionário não é avisado quando o RH aprova o cadastro: não existe canal para quem não tem e-mail corporativo. Um SMS ou WhatsApp na aprovação fecharia o ciclo.
+
+</Card>
