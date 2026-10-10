@@ -1,13 +1,50 @@
+import { useEffect, useSyncExternalStore } from 'react'
+import type { PathIcon } from '../assets/stackIcons'
 import { stackIcon } from '../lib/icons'
 import { stackGroup } from '../lib/stack'
 
-/** SVG inline do simple-icons; sem ícone de marca, usa um genérico da categoria. */
+/*
+ * Ícones fora do simple-icons (serviços AWS, Codex, Antigravity, Nova, VS Code…) ficam num chunk
+ * separado (~13 KB gzip), carregado quando o primeiro StackIcon monta: não pesa no bundle inicial.
+ */
+let paths: Record<string, PathIcon> | undefined
+let loading: Promise<void> | undefined
+const listeners = new Set<() => void>()
+
+function loadPaths() {
+  loading ??= import('../assets/stackIcons').then((m) => {
+    paths = m.STACK_ICON_PATHS
+    listeners.forEach((l) => l())
+  })
+}
+
+function subscribe(l: () => void) {
+  listeners.add(l)
+  return () => listeners.delete(l)
+}
+
+/** SVG inline monocromático (currentColor); sem ícone de marca, usa um genérico da categoria. */
 export function StackIcon({ name, className = 'size-5' }: { name: string; className?: string }) {
   const icon = stackIcon(name)
+  const loaded = useSyncExternalStore(subscribe, () => paths)
+  useEffect(() => {
+    if (!icon) loadPaths()
+  }, [icon])
+
   if (icon) {
     return (
       <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
         <path d={icon.path} />
+      </svg>
+    )
+  }
+  // enquanto o chunk não chega, reserva o espaço em vez de piscar o genérico
+  if (!loaded) return <svg viewBox="0 0 24 24" className={className} aria-hidden="true" />
+  const own = loaded[name]
+  if (own) {
+    return (
+      <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+        <path d={own.d} fillRule={own.evenodd ? 'evenodd' : undefined} />
       </svg>
     )
   }
