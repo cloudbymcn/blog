@@ -19,6 +19,20 @@ export const STACK = {
     'CloudWatch',
     'SAM',
     'CDK',
+    'IAM',
+    'VPC',
+    'KMS',
+    'SNS',
+    'Systems Manager',
+    'ACM',
+    'X-Ray',
+    'Amplify',
+    'Textract',
+    'Location Service',
+    'Cost Explorer',
+    'GuardDuty',
+    'CloudTrail',
+    'Compute Optimizer',
   ],
   'IaC/DevOps': ['Terraform', 'SST', 'GitHub Actions', 'Docker', 'PowerShell', 'Bash', 'Nginx'],
   Linguagens: ['Python', 'TypeScript', 'JavaScript', 'Node.js', 'SQL'],
@@ -31,7 +45,21 @@ export const STACK = {
     'Microsoft 365',
     'OpenAPI',
   ],
-  IA: ['Bedrock (Claude)', 'Bedrock (Nova Canvas)', 'Strands Agents', 'Gemini', 'OCR'],
+  IA: [
+    'Claude Code',
+    'Codex',
+    'Antigravity',
+    'Maestri',
+    'Strands Agents',
+    'Bedrock (Claude)',
+    'Bedrock (Nova)',
+    'Bedrock (Nova Canvas)',
+    'Bedrock (Titan)',
+    'Gemini',
+    'OCR',
+  ],
+  // ferramentas do dia a dia do Matheus (editor, notas, Python, versionamento)
+  Ferramentas: ['VS Code', 'Obsidian', 'uv', 'Git', 'GitHub'],
 } as const
 
 export type StackGroup = keyof typeof STACK
@@ -49,7 +77,12 @@ export function stackGroup(item: string): StackGroup | undefined {
   return groupOf.get(item)
 }
 
-/** Serviços AWS distintos (pro contador do hero). */
+/** Serviços AWS distintos (stats.awsServices); os modelos do Bedrock contam como serviço AWS. */
 export function isAwsService(item: string): boolean {
   return groupOf.get(item) === 'AWS' || item.startsWith('Bedrock')
+}
+
+/** Nome do serviço pro contador: Bedrock (Claude/Nova/Titan…) é um serviço só. */
+export function awsServiceName(item: string): string {
+  return item.startsWith('Bedrock') ? 'Bedrock' : item
 }

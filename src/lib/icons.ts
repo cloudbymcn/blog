@@ -1,5 +1,10 @@
 import {
   siAnthropic,
+  siClaudecode,
+  siGit,
+  siGithub,
+  siObsidian,
+  siUv,
   siDocker,
   siDuckdb,
   siGithubactions,
@@ -44,6 +49,11 @@ const ICONS: Record<string, SimpleIcon> = {
   OpenAPI: siOpenapiinitiative,
   Gemini: siGooglegemini,
   'Bedrock (Claude)': siAnthropic,
+  'Claude Code': siClaudecode,
+  Obsidian: siObsidian,
+  uv: siUv,
+  Git: siGit,
+  GitHub: siGithub,
 }
 
 export function stackIcon(name: string): SimpleIcon | undefined {
