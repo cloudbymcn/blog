@@ -51,6 +51,7 @@ export const STACK = {
     'Codex',
     'Antigravity',
     'Maestri',
+    'JEV',
     'Strands Agents',
     'Bedrock (Claude)',
     'Bedrock (Nova)',

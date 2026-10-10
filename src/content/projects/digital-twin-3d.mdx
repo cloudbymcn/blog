@@ -1,90 +1,259 @@
 ---
 title: "Digital Twin 3D de uma planta industrial, no navegador"
 slug: digital-twin-3d
-summary: "Planta DWG, ortofoto e fotos de drone viraram um mapa 3D navegável de 7 galpões, com busca em português, estoque real e 60 fps no notebook."
+summary: "Planta DWG, ortofoto e drone viraram um twin operacional de 7 galpões em three.js: estoque do ERP, Wi-Fi, alertas, CFTV, politrizes ao vivo e um assistente de voz com teto de custo."
 category: produtos
 tier: A
-date: 2026-10-08
-stack: ["AWS Lambda", "API Gateway", "DynamoDB", "CloudFront", "S3", "SAM", "Bedrock", "Bedrock (Nova)", "TypeScript", "three.js", "React", "Vite", "Claude Code", "Codex", "Antigravity", "Maestri", "Obsidian"]
+date: 2026-10-09
+stack: ["three.js", "React", "TypeScript", "Vite", "Node.js", "Python", "AWS Lambda", "API Gateway", "DynamoDB", "S3", "CloudFront", "VPC", "Secrets Manager", "CloudWatch", "Cost Explorer", "IAM", "SAM", "Bedrock", "Bedrock (Nova)", "Firebird", "Salesforce", "JEV"]
 metrics:
   - { label: "GPU de perto", before: "~30 ms", after: "~13 ms" }
-  - { label: "miniatura", before: "860 KB", after: "8,5 KB" }
+  - { label: "politriz no mapa", before: "SSD de 2025", after: "a cada 5 s" }
 cover: /projects/digital-twin-3d/architecture.svg
 ---
 
-Em uma indústria de rochas ornamentais no ES, a pergunta mais comum do dia é "onde está?". Onde está a estiva B1-P33, onde está o bloco que o cliente reservou, onde fica o rack de rede do galpão 2. A resposta morava na cabeça de quem anda pelo pátio, em planilhas e num ERP legado que sabe o nome do local, mas não sabe onde ele fica.
+Em uma indústria de rochas ornamentais no ES, a pergunta mais comum do dia é "onde está?". Onde está a estiva B1-P33, onde está o bloco que o cliente reservou, onde fica o rack de rede do galpão 2, qual câmera vê a doca 3, por que a politriz parou. Cada resposta morava num lugar: na cabeça de quem anda pelo pátio, numa planilha, no ERP legado (que sabe o nome do local, mas não onde ele fica), no painel do Wi-Fi, no Zabbix, no DVR.
 
-O Digital Twin começou como um mapa 3D da planta e virou a base espacial para logística, produção e TI: sete galpões, docas, pátio de blocos e equipamentos, navegáveis no navegador do notebook, do iPad e do celular.
+O Digital Twin junta tudo isso num mapa 3D da planta, no navegador do notebook, do iPad e do celular. Começou como mapa e virou a base espacial da operação: **logística** (estoque, estivas, cargas do dia), **produção** (politrizes ao vivo), **TI** (Wi-Fi, racks, rede, alertas) e **segurança** (câmeras). Tudo somente leitura, e honesto sobre a precisão de cada dado.
 
-<Figure src="/projects/digital-twin-3d/architecture.svg" alt={"A planta DWG e as fotos de drone são reconstruídas em arquivos JSON validados com zod e montam o PlantModel, contrato único consumido pela cena React Three Fiber e pelo Orbe Assistente. O build estático vai para CloudFront e S3; a API passa por API Gateway com JWT do Entra ID até uma Lambda arm64 na VPC, que lê ativos e uma cópia do estoque no DynamoDB e, opcionalmente, chama o Bedrock para texto e voz."} caption={"Os dados entram por um contrato só; trocar JSON por API muda uma peça."} />
+<Figure src="/projects/digital-twin-3d/architecture.svg" alt={"Visão geral: a planta DWG, a ortofoto e o drone viram arquivos JSON validados com zod que montam o PlantModel, contrato único lido pela cena React Three Fiber. O estoque vem de uma cópia do ERP Firebird e a rede da fábrica entra pelo conector somente leitura; os dois chegam à API do Twin, local ou numa Lambda dentro da VPC, que alimenta o orbe e os cards. O Bedrock só é chamado quando o parser local não entende a frase."} caption={"Planta, estoque e rede num contrato só. A cena não sabe de onde o dado veio."} />
+
+<Metrics>
+<Metric value="7 galpões" label="G1–G7, docas, pátio e portaria" />
+<Metric value="2.780" label="estivas reais em 172 fileiras" />
+<Metric value="~500" label="commits, 800+ testes, 33 cenários e2e" />
+<Metric value="60 fps" label="notebook · ~50 no iPad deitado" />
+</Metrics>
 
 ## Da planta DWG ao PlantModel
 
-A geometria saiu de três fontes: a planta DWG oficial, a ortofoto e fotos de drone. Galpões, pilares, docas e áreas externas viraram JSON em `public/data/`, validados com zod na carga. Cada elemento carrega a **confiança da fonte**. Limite inferido é desenhado tracejado, e um modo "colorir por confiança" pinta tudo de verde, âmbar ou vermelho.
-
-Tudo isso monta o `PlantModel`, o único contrato que a interface conhece. Quando o JSON estático der lugar a uma API, só o `DataSource` muda.
-
-<Callout type="info">
-
-**Honestidade dos dados como requisito.** As estivas têm nome, código e etiqueta reais do ERP, mas posição ilustrativa até a organização em campo. Chapas desenhadas levam selo DEMO. Pessoas e veículos animados são decorativos, não rastreamento. A interface diz isso em cada card.
-
-</Callout>
-
-## Câmera que conta onde você está
-
-O `CameraDirector` transforma toda mudança de contexto em voo com easing: planta → galpão → área → ativo. Ao escolher um galpão, o telhado some, as paredes voltadas para a câmera baixam (cutaway, como no The Sims) e o resto da planta perde saturação. Isométrica é o padrão; dá para alternar para perspectiva ou planta e girar 90°.
-
-Rótulos têm três níveis de detalhe (LOD 0/1/2) pela largura visível: de longe, só galpões; de perto, IDs das estivas e nomes das máquinas. Rótulo nunca sobrepõe outro, e o que está atrás de parede some (oclusão com `three-mesh-bvh`).
-
-No galpão piloto existe ainda o **Walk Mode**: um avatar genérico com EPI em terceira pessoa, WASD ou joystick no tablet, colisão com estivas e máquinas numa grade caminhável de 0,25 m gerada a partir dos mesmos dados.
-
-## Busca em português, sem LLM no caminho crítico
-
-O Orbe Assistente (tecla `/`) entende "onde está o G5", "me leva no galpão cinco", "onde tem Alga Green no G1" ou um código de estiva. Um **parser local** resolve a frase em intenção e alvo. Se há mais de um resultado, vira escolha ("6 docas — qual delas?"). Se não existe, vira explicação com o próximo passo.
-
-A IA (Bedrock: Nova Micro para texto, Nova Sonic para voz) é opcional e desligada por padrão. Ela só entra quando o parser não entende a frase, devolve uma intenção que é validada e convertida num comando seguro, e tem travas de custo no backend: US$ 5/dia e US$ 50/mês em dev.
-
-## Estoque real, somente leitura
-
-O card de um local mostra cavaletes, chapas, material, m² e galeria de fotos, lidos de cópias em DynamoDB que outro sistema já mantinha a partir do ERP. Nenhuma escrita no ERP. Busca por código de barras da chapa resolve mesmo com só 2 ou 3 dígitos, conferindo no estoque.
-
-Medido: busca ~340 ms, card do local p50 195 ms (0–2 ms em cache). As miniaturas WebP geradas pelo Twin têm 8,5 KB, contra 860 KB da foto original.
-
-## Performance como feature
-
-A cena roda com `frameloop="demand"`: parada, não renderiza. O resto foi medição em 6 tamanhos de tela com Playwright e ajuste:
+A geometria saiu de três fontes, cruzadas galpão por galpão:
 
 <Steps>
 <Step n={1}>
 
-Presets Médio e Baixo **sem composer** de pós-processamento, com contorno na própria cena. IBL só nos metais, pedra em textura, instâncias desenhadas da frente para trás.
+**Planta DWG oficial** para medidas: vãos, pilares, docas, salas. Um script em Python extrai cotas e até os microdetalhes de combate a incêndio do G1 do DXF local, que nunca entra no repositório.
 
 </Step>
 <Step n={2}>
 
-**Bolha de detalhe**: chapa a chapa só perto do centro da vista, reordenando instâncias e ajustando `count`.
+**Ortofoto** para o posicionamento no terreno. Ela também calibrou o sistema de coordenadas: a origem fica num canto do galpão principal, o eixo X corre ao longo do G1 e a conversão para latitude e longitude tem ±3 m de erro.
 
 </Step>
 <Step n={3}>
 
-Resolução dinâmica quando o FPS cai. O `backdrop-filter` da UI foi descartado: custava ~9 fps no galpão mais pesado em 1920 px.
+**Fotos de drone** para o que a planta não diz: fachadas listradas, telhados com claraboias e painéis, tesouras, caminhos de rolamento e pontes rolantes. Cada galpão tem uma análise própria separada em três colunas: **observado**, **inferido** e **desconhecido**.
 
 </Step>
 </Steps>
 
+Tudo vira JSON em `public/data/`, validado com zod na carga, e monta o `PlantModel`, o único contrato que a interface conhece. Trocar uma medida não exige rebuild. Quando o JSON estático der lugar a uma API, só o `DataSource` muda.
+
+Todo elemento declara `source` (dwg, ortho, photo, measured, inferred, erp…) e `confidence` (alta, média, baixa). Limite inferido é desenhado tracejado, e o modo "colorir por confiança" pinta a planta de verde, âmbar ou vermelho. **Inferência nunca vira fato.**
+
+### Direção de arte: o G1 como piloto
+
+O G1 é o piloto visual: um jogo de gerenciamento isométrico com acabamento corporativo. Chapa a chapa nas estivas, máquinas com a pegada real no piso, pontes rolantes em movimento ocasional, rolos girando, sinaleiros piscando, caminhões na rua e no pátio. Pessoas circulam com rotinas por função (o gerente observa, a supervisão inspeciona, o operador anda mais), mas são ilustração, não rastreamento: a interface diz isso no hover.
+
+Os outros galpões ganharam a estrutura detalhada a partir do drone e das plantas, com as estivas em volume simples. A regra de separação ajudou a crescer sem bagunça: **os dados dizem onde está cada coisa; `src/render` decide como ela aparece**. Um cavalete bonito continua posicionado pelo `position` dos dados.
+
+<Callout type="info">
+
+**Honestidade dos dados como requisito.** As estivas têm nome, código e etiqueta reais do ERP, mas posição ilustrativa até a organização em campo (que hoje se faz pelo tablet, arrastando fileiras inteiras no galpão). Chapa desenhada leva selo DEMO. Quando a API do estoque responde, cheia ou vazia segue o ERP, e o estoque real aparece no card.
+
+</Callout>
+
+## Stack
+
+| Camada | Escolha |
+| --- | --- |
+| Base | React 19, TypeScript estrito, Vite |
+| 3D | three.js, React Three Fiber, drei; `postprocessing` só no preset Alto; `three-mesh-bvh` para raycast e oclusão de rótulos |
+| Estado e dados | Zustand na interface; zod no contrato dos dados e em toda resposta de API |
+| Qualidade | Vitest (800+ testes), oxlint, Prettier, Playwright para fumaça e medição de desempenho |
+| Conector | Node.js na rede da fábrica; Python no coletor das máquinas antigas |
+| AWS | SAM: HTTP API com autorizador JWT do Entra ID, Lambda arm64 na VPC, DynamoDB com PITR, S3 privado com CloudFront e OAC |
+
+O domínio (`src/domain`) e a fonte de dados (`src/services`) não conhecem three.js. É isso que deixa 800 testes rodarem em segundos: parser de endereço de estiva, layout das fileiras, câmera, rótulos, alarmes da politriz, tudo puro.
+
+## UX: a câmera conta onde você está
+
+O `CameraDirector` transforma toda mudança de contexto em voo com easing: planta → galpão → área → ativo. Escolher um galpão faz o telhado sumir, as paredes voltadas para a câmera baixarem (cutaway, como no The Sims) e o resto da planta perder saturação. Cada tipo de alvo tem o próprio enquadramento de chegada: máquina de três-quartos, doca vista de fora, rack de frente com a porta translúcida.
+
+- **Busca animada de estiva.** Digitar "B1-P33" ou o número da etiqueta voa até a estiva, acende um anel nela e abre o card com estoque e fotos. A busca global entende galpão, máquina, doca, AP, rack, bloco, chapa e frases ("onde tem Alga Green no G1").
+- **Rótulos por nível (LOD 0/1/2)** pela largura visível. Nunca se sobrepõem, e o que está atrás de parede some.
+- **Walk Mode** no G1: avatar genérico com EPI em terceira pessoa, WASD ou joystick no tablet, colisão numa grade caminhável de 0,25 m gerada dos mesmos dados.
+- **Responsivo de verdade.** Gaveta à direita no desktop e no tablet deitado; folha inferior arrastável no celular e no tablet em pé. A câmera enquadra o objeto na parte do mapa que o painel não cobre. Toque: um dedo move, dois giram e dão zoom, alvos de 44 px, safe areas.
+
+## Performance como feature
+
+A cena roda com `frameloop="demand"`: parada, não renderiza. O resto foi medição em 6 tamanhos de tela com Playwright e ajuste.
+
+<Steps>
+<Step n={1}>
+
+**Presets de GPU.** Alto para placa dedicada (com pós-processamento); Médio e Baixo **sem composer**, com o contorno desenhado na própria cena. Referência do Médio: GPU integrada de notebook.
+
+</Step>
+<Step n={2}>
+
+**Materiais baratos onde ninguém olha.** IBL só nos metais, pedra em textura, instâncias desenhadas da frente para trás, paredes mescladas, InstancedMesh para tudo que repete.
+
+</Step>
+<Step n={3}>
+
+**Bolha de detalhe.** Chapa a chapa só perto do centro da vista, reordenando instâncias e ajustando `count`.
+
+</Step>
+<Step n={4}>
+
+**Resolução dinâmica e sombras sob demanda.** A resolução cai quando o FPS cai; a sombra é recalculada só quando algo muda. Shaders pré-compilados de forma dirigida, para o primeiro voo não engasgar.
+
+</Step>
+</Steps>
+
+O `backdrop-filter` da interface foi descartado na medição: custava ~9 fps no galpão mais pesado em 1920 px. Resultado no G1 de perto, em 1920×1080: **~30 → ~13 ms de GPU**.
+
+## Integrações: o twin como painel da operação
+
+Aqui o mapa deixa de ser maquete. Todas as integrações seguem a mesma regra: **o navegador nunca fala com o equipamento e nunca vê credencial**. Quem fala é o conector, um serviço Node.js dentro da rede da fábrica, só leitura, com cache, prazo total e erro saneado (`unifi_timeout`, nunca a mensagem bruta). Em produção, a mesma API roda numa Lambda dentro da VPC, que já alcança a rede local por uma VPN site-to-site.
+
+<Figure src="/projects/digital-twin-3d/integracoes.svg" alt={"UniFi, Zabbix, CFTV Intelbras e MikroTik entram no conector do Twin, que roda dentro da rede, só lê e devolve erros saneados. Um PC Windows XP de uma politriz é lido por um coletor Python que fala SMB1 a cada 5 segundos e espelha só o que cresceu. O conector serve a API do Twin, local ou numa Lambda na VPC, que alimenta o navegador, e publica a cada 30 segundos o retrato das politrizes num bucket S3 privado, que outra aplicação lê com permissão IAM só de leitura."} caption={"O equipamento é a verdade do equipamento; o twin é a verdade da posição."} />
+
+### Estoque do ERP
+
+O card de um local mostra cavaletes, chapas, material, m² e galeria de fotos, lidos de cópias em DynamoDB que outro sistema já mantinha a partir do ERP legado (Firebird). Nenhuma escrita no ERP. A busca por código de barras resolve mesmo com só 2 ou 3 dígitos, conferindo no estoque. O "mapa de materiais" responde "onde tem Alga Green" com feixes nas estivas e a câmera voando até o galpão.
+
+Medido: busca ~340 ms, card do local p50 195 ms (0–2 ms em cache). As miniaturas WebP têm 8,5 KB contra 860 KB da foto original. As movimentações de cavalete chegam quase em tempo real por um stream do DynamoDB, e a ponte rolante leva o cavalete de um galpão a outro em 4 s de animação.
+
+### UniFi: Wi-Fi no lugar certo
+
+O conector lê os 40 access points pela API de integração do controlador, com a chave só no `.env` (em produção, no Secrets Manager). O certificado do controlador é autoassinado de fábrica, então o TLS não foi desligado: o conector baixa o certificado, confere a impressão digital SHA-256 fixada e só então confia nele. Se o certificado mudar, a conexão falha com `unifi_tls`.
+
+No twin, o modo **Infraestrutura** lista os APs (fora do ar primeiro), e cada um é posicionado no mapa pelo mouse, toque ou caneta: o assistente sugere a superfície pelo tipo físico (antena externa na parede, redondo no teto). Clientes Wi-Fi só aparecem sob demanda e não são guardados. A **cobertura estimada** pinta o piso com o melhor sinal e hachura possíveis sombras, sempre com o aviso "não substitui site survey".
+
+### Zabbix: o que caiu, onde fica, quem depende
+
+Dois caminhos convivem. O principal é a leitura pela API com um token só leitura, preso a uma allow-list de cinco métodos `*.get`, no máximo a cada 30 s e só quando alguém pede. O alternativo é um webhook com chave no cabeçalho, comparação em tempo constante e corpo saneado (HTML e caracteres de controle fora, mensagem cortada em 300).
+
+O host vira ativo por um vínculo explícito; host sem vínculo aparece como **host sem mapa**, nunca casado no chute. O impacto sai de um arquivo de dependências com procedência, que nasceu vazio de propósito: **nada de topologia inventada**. Severidade 3+ pinta o mapa com um halo e entra na busca ("o que caiu?").
+
+### CFTV Intelbras e MikroTik
+
+As câmeras ficam no mapa com o cone de visão. A imagem é um quadro sob demanda, só com o card aberto, exige um papel próprio, é auditada (inclusive quando negada) e sai com `Cache-Control: no-store`: nada vai para disco, banco ou teste, e nada passa por IA ou reconhecimento facial. Cada DVR é reconhecido pelo número de série que ele mesmo informa e ganha um nome humano, porque "por IP ninguém sabe de nada".
+
+Os MikroTik entram com GET em três caminhos da REST API e cache de 3 min. A topologia real vem do MAC do aparelho de cima que o UniFi informa: o AP passa a "ligar" no switch certo, com a fonte dita.
+
+### Politrizes ao vivo
+
+O capítulo que mais me divertiu. A politriz mais antiga roda num **PC com Windows XP** que guarda tudo em texto: uma linha por chapa (medidas, espessura, entrada e saída da linha), eventos de entrada e saída e alarmes do dia em português. Ela compartilha a pasta na rede, mas o XP só fala **SMB1**, que o Windows 11 não tem mais. Ligar SMB1 na máquina do conector não era opção.
+
+<Steps>
+<Step n={1}>
+
+**Coletor em Python** com `pysmb`, que fala SMB1 sozinho. A cada 5 s ele confere o tamanho de três arquivos e copia **só o que cresceu**, mais os alarmes de hoje e de ontem. O conector sobe o coletor e o refaz se cair.
+
+</Step>
+<Step n={2}>
+
+**O que ele nunca faz:** ler as colunas do log de chapas a partir da 15ª (login do operador), abrir o arquivo de configuração (senha da tela em texto claro) ou os registros de turno (nome de quem toca o turno), e escrever qualquer coisa na máquina. Há teste conferindo isso.
+
+</Step>
+<Step n={3}>
+
+**Retrato em tempo real.** Entrou e não saiu = está na linha agora. O tempo na linha é a mediana da entrada à saída (~21 min) e o ritmo, a mediana entre saídas (~5 min). Parada = nada por mais de 3 ritmos. O alarme que acendeu até um ritmo depois do último registro ganha "pode ser o motivo da parada".
+
+</Step>
+<Step n={4}>
+
+**No mapa**, a linha inteira (carregador, rolos, politriz de 21 cabeças, secador, enceradeira, descarregador) anima com as chapas reais: os painéis descem, a trave vai e volta, os discos giram com chapa debaixo, a chapa sai clara e polida. Parada, a linha congela no último registro.
+
+</Step>
+</Steps>
+
+A outra politriz roda Windows 10 e foi lida com um usuário local sem administrador, pastas compartilhadas só com leitura e a porta 445 liberada só para o PC do twin. Ela só registra a saída da chapa, então a entrada é estimada pelo ritmo, e o card diz isso. Em histórico, o importador já tinha resumido 12 meses da primeira: 12.922 chapas e ~85,5 mil m² brutos.
+
+O retrato também sai do mapa. A pedido de outra aplicação interna, o conector publica a cada 30 s, **só o que mudou**, um `manifest.json`, o retrato ao vivo e os arquivos da máquina sem dado pessoal num bucket S3 privado (`latest/` sobrescrito, `daily/` apagado em 90 dias). Quem lê usa o próprio usuário IAM, com negação explícita de gravar e apagar que vale até para administrador, conferida no simulador do IAM. Custo: centavos por mês.
+
+<Callout type="warn">
+
+**Regra fixa: o twin nunca escreve na máquina.** Nada de parâmetro, receita ou comando, nem pelo OPC. O próximo passo para o ao vivo de verdade (velocidade, pressões) é ler o OPC por um gateway, sempre só leitura e com o aval do fabricante.
+
+</Callout>
+
+### O resto da planta
+
+- **Inversores solares** pela API local, só leitura e sem senha: potência, energia do dia e o inversor que não injeta há 24 h.
+- **Clima ao vivo** de uma API pública: chuva animada com o vento real, neblina, tempestade. É ambientação, nunca base de decisão.
+- **Cargas do dia** a partir do CRM (Salesforce): container, cliente, navio e os galpões onde está a carga, só com uma lista fechada de campos. O aviso "doca não registrada" fica em destaque, porque nenhum sistema diz por qual doca cada container sai.
+- **GPS do aparelho**: uma bolinha "Você · ±X m" que segue quem anda. A posição fica só na memória da página e nunca vai para a API.
+
+## Assistente por voz e texto
+
+O orbe no topo (tecla `/`) entende português: "onde está o G5", "me leva no galpão cinco", "mostra APs sem posição", "quais pendências do G7?", "abrir fotos do bloco 40528". Alvo com mais de um resultado vira escolha ("6 docas, qual delas?"); o que não existe vira explicação com o próximo passo ("nenhum rack cadastrado no G2 ainda").
+
+O desenho veio do [JEV](/projetos/extensao-navegador-voz), a extensão de voz que eu uso no navegador: **parser local primeiro, IA só no que ele não entende**. O JEV fez parte do fluxo de trabalho, comandando o navegador por voz enquanto eu testava o twin, e o assistente do twin herdou a ideia e o nome: ele atende por "Ei Jev", em português e inglês.
+
+<Figure src="/projects/digital-twin-3d/assistente.svg" alt={"A frase ou a voz em português vai primeiro ao parser local, que resolve em menos de 1 ms sem custo e gera um comando seguro executado pelo CameraDirector. Se o parser não entende, uma Lambda com teto de gasto e kill switch chama o Bedrock: Nova Micro para texto e Nova 2 Sonic para voz. A IA devolve uma intenção, validada com zod; intenção segura vira comando, intenção com certeza baixa vira pedido de confirmação. A Lambda registra uso e custo sem guardar frase, áudio ou nome."} caption={"A IA não executa nada: devolve uma intenção, que passa pelo mesmo funil dos comandos locais."} />
+
+<Steps>
+<Step n={1}>
+
+**Parser local resolve primeiro.** Determinístico, no navegador, em menos de 1 ms e sem custo. A maior parte das frases morre aqui.
+
+</Step>
+<Step n={2}>
+
+**A IA só entra quando ele não entende.** A frase ganha "Perguntar à IA"; o microfone grava até 15 s. Amazon Bedrock: **Nova Micro** no texto, **Nova 2 Sonic** na voz em pt-BR, que também responde falando.
+
+</Step>
+<Step n={3}>
+
+**A IA devolve uma intenção, não uma ação.** O backend valida a intenção com zod contra o contrato dos comandos.
+
+</Step>
+<Step n={4}>
+
+**Só comando seguro executa.** Voar, abrir card, ligar camada. Nada que grave.
+
+</Step>
+<Step n={5}>
+
+**Certeza baixa vira pergunta.** A intenção chega como sugestão para confirmar, nunca como execução.
+
+</Step>
+</Steps>
+
+## Controle de custo
+
+A ordem foi: **estimativa antes de qualquer chamada**, depois a chamada real só pelo backend, atrás de feature flag, kill switch e limites. A estimativa usou a Price List API da AWS e foi conferida com chamadas reais mínimas (US$ 0,017 no total dos testes): áudio de entrada e de saída a 25 tokens por segundo, ~1.000 tokens de texto por comando.
+
 <Metrics>
-<Metric value="~30 → ~13 ms" label="GPU, galpão piloto de perto, 1920×1080" />
-<Metric value="60 fps" label="notebook" />
-<Metric value="~50 fps" label="iPad deitado" />
-<Metric value="2.780" label="estivas em 172 fileiras" />
+<Metric value="US$ 0,00008" label="comando de texto (Nova Micro)" />
+<Metric value="US$ 0,005" label="comando de voz de 15 s (Nova 2 Sonic)" />
+<Metric value="US$ 5/dia" label="teto em dev · US$ 50/mês" />
+<Metric value="US$ 0" label="comando que o parser entende" />
 </Metrics>
 
-## Deploy
+- **Travas no backend:** US$ 5/dia e US$ 50/mês em dev, o que dá ~1.000 comandos de voz por dia. Produção nasce desligada até validação.
+- **Kill switch** acionado só por quem tem o papel de administrador no Entra ID.
+- **Aba Custos AWS** do projeto inteiro: mês, hoje, previsão, orçamento (US$ 25/mês para o twin), custo por serviço e por feature, via Cost Explorer com cache. A seção IA e voz mostra custo por sessão e **por comando**: hora, tipo, modelo, duração, custo e uma chave pseudônima.
+- **Privacidade nos logs:** nunca a frase, o áudio ou o nome de quem falou.
 
-O backend é um template SAM: HTTP API com autorizador JWT do Entra ID, Lambda arm64 dentro da VPC, DynamoDB com PITR, S3 privado com CloudFront e OAC, `/api/*` no mesmo domínio e CSP. Escrita só com papel de edição no Entra, com auditoria no CloudWatch. Segredo de integração entra sem valor no template. Os custos do projeto aparecem numa aba própria, com orçamento AWS de US$ 25/mês.
+Cada número na aba diz de onde vem: exemplo, estimativa local ou consolidado da AWS.
+
+## Deploy e segurança
+
+O backend é um template SAM: HTTP API com autorizador JWT do Entra ID, Lambda arm64 na VPC, DynamoDB com PITR, S3 privado com CloudFront e OAC, `/api/*` no mesmo domínio e CSP. Gravar posição de ativo exige papel de edição, com auditoria no CloudWatch. Segredo entra no template sem valor. Toda variável `VITE_*` vai para o bundle público, então nenhum segredo começa com `VITE_`. Fotos de drone, plantas e ortofoto nunca são versionadas: o repositório guarda só as medidas derivadas, cada uma com a referência.
 
 <Card title="O que fez diferença">
 
-Um contrato de dados único e honesto sobre a própria precisão. Isso permitiu crescer em camadas (Wi-Fi, racks, estoque, voz) sem reescrever a cena, e evitou que um mapa bonito fosse lido como verdade operacional antes da hora.
+Um contrato de dados único e honesto sobre a própria precisão, e um conector que só lê. Isso permitiu crescer em camadas (estoque, Wi-Fi, racks, alertas, câmeras, politrizes, voz) sem reescrever a cena, e evitou que um mapa bonito fosse lido como verdade operacional antes da hora.
+
+</Card>
+
+<Card title="O que eu faria diferente">
+
+Começaria o conector pela produção e não pelo Wi-Fi. A politriz ao vivo foi o que mais mudou a conversa com a fábrica, e a pasta compartilhada de um Windows XP estava lá desde sempre. Também teria criado o arquivo de dependências da rede junto com o primeiro AP posicionado, em vez de depois do Zabbix.
 
 </Card>
