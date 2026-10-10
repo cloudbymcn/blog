@@ -60,10 +60,10 @@ export function Nav() {
   )
 }
 
-// ícones lineares (lucide: briefcase, mail), 24px, traço 1.75
+// ícones lineares (lucide: briefcase, mail), 18px, traço 1.75
 const iconProps = {
-  width: 22,
-  height: 22,
+  width: 18,
+  height: 18,
   viewBox: '0 0 24 24',
   fill: 'none',
   stroke: 'currentColor',
@@ -93,9 +93,9 @@ const ITEMS: DockItem[] = [
       <img
         src="/img/logo-icon.svg"
         alt=""
-        width={30}
-        height={30}
-        className={`size-[30px] transition-[filter] duration-300 ${active ? 'invert' : ''}`}
+        width={24}
+        height={24}
+        className={`size-6 transition-[filter] duration-300 ${active ? 'invert' : ''}`}
       />
     ),
   },
@@ -125,15 +125,15 @@ const ITEMS: DockItem[] = [
   },
 ]
 
-const SIZE = 52
-const GAP = 12
+const SIZE = 40
+const GAP = 8
 const PITCH = SIZE + GAP
 
-/** Escala estilo dock do macOS pela distância do ponteiro ao centro: 1.25 embaixo, 1.1 no vizinho. */
+/** Escala estilo dock do macOS pela distância do ponteiro ao centro: 1.2 embaixo, 1.08 no vizinho. */
 function magnify(distance: number) {
   const d = Math.abs(distance)
-  if (d < PITCH) return 1.25 - 0.15 * (d / PITCH)
-  if (d < PITCH * 2) return 1.1 - 0.1 * ((d - PITCH) / PITCH)
+  if (d < PITCH) return 1.2 - 0.12 * (d / PITCH)
+  if (d < PITCH * 2) return 1.08 - 0.08 * ((d - PITCH) / PITCH)
   return 1
 }
 
@@ -178,7 +178,7 @@ export function Dock() {
           setPointerY(e.clientY - (list.current?.getBoundingClientRect().top ?? 0))
         }}
         onPointerLeave={() => setPointerY(null)}
-        className={`flex ${side ? 'flex-col gap-3' : 'glass flex-row gap-2 rounded-[22px] p-2'}`}
+        className={`flex ${side ? 'flex-col gap-2' : 'glass flex-row gap-1.5 rounded-[18px] p-1.5'}`}
       >
         {ITEMS.map((item, i) => {
           const active = isActive(item)
@@ -191,8 +191,8 @@ export function Dock() {
                 to={href}
                 aria-label={item.label}
                 aria-current={active ? 'page' : undefined}
-                className={`flex items-center justify-center rounded-2xl outline-none transition-[transform,background-color,color] duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 ${
-                  side ? 'size-[52px] origin-left' : 'size-12'
+                className={`flex items-center justify-center rounded-xl outline-none transition-[transform,background-color,color] duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 ${
+                  side ? 'size-10 origin-left' : 'size-9'
                 } ${active ? 'bg-ink text-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]' : `${side ? 'glass' : 'bg-white/70'} text-ink hover:bg-white`}`}
                 style={{ transform: `scale(${scale})` }}
               >
@@ -202,7 +202,7 @@ export function Dock() {
                 // rótulo à direita, aparece no hover/foco
                 <span
                   aria-hidden="true"
-                  className="glass pointer-events-none absolute left-full top-1/2 ml-5 -translate-x-1 -translate-y-1/2 whitespace-nowrap rounded-full px-3 py-1 text-[13px] text-ink opacity-0 transition duration-200 group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:translate-x-0 group-hover:opacity-100"
+                  className="glass pointer-events-none absolute left-full top-1/2 ml-4 -translate-x-1 -translate-y-1/2 whitespace-nowrap rounded-full px-3 py-1 text-[13px] text-ink opacity-0 transition duration-200 group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:translate-x-0 group-hover:opacity-100"
                 >
                   {item.label}
                 </span>
