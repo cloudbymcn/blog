@@ -33,6 +33,7 @@ export const STACK = {
     'GuardDuty',
     'CloudTrail',
     'Compute Optimizer',
+    'Rekognition',
   ],
   'IaC/DevOps': ['Terraform', 'SST', 'GitHub Actions', 'Docker', 'PowerShell', 'Bash', 'Nginx'],
   Linguagens: ['Python', 'TypeScript', 'JavaScript', 'Node.js', 'SQL'],
