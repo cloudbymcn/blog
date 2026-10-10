@@ -60,8 +60,8 @@ export const STACK = {
     'Gemini',
     'OCR',
   ],
-  // ferramentas do dia a dia do Matheus (editor, notas, Python, versionamento)
-  Ferramentas: ['VS Code', 'Obsidian', 'uv', 'Git', 'GitHub'],
+  // ferramentas do dia a dia do Matheus (editor, notas, Python, versionamento, JEV = extensão de voz dele)
+  Ferramentas: ['VS Code', 'Obsidian', 'uv', 'Git', 'GitHub', 'JEV'],
 } as const
 
 export type StackGroup = keyof typeof STACK

@@ -12,6 +12,24 @@ export function StackIcon({ name, className = 'size-5' }: { name: string; classN
     )
   }
   const group = stackGroup(name)
+  // JEV (extensão de voz): microfone
+  if (name === 'JEV') {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        className={className}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <rect x="9" y="2" width="6" height="12" rx="3" />
+        <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8" />
+      </svg>
+    )
+  }
   // nuvem pra AWS, cilindro pra dados, faísca pra IA, chaves pro resto
   const d =
     group === 'AWS'
