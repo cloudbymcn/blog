@@ -44,7 +44,11 @@ export function StackIcon({ name, className = 'size-5' }: { name: string; classN
   if (own) {
     return (
       <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
-        <path d={own.d} fillRule={own.evenodd ? 'evenodd' : undefined} />
+        <path
+          d={own.d}
+          fillRule={own.evenodd ? 'evenodd' : undefined}
+          {...(own.line && { stroke: 'currentColor', strokeWidth: 0.45, strokeLinejoin: 'round' })}
+        />
       </svg>
     )
   }
