@@ -1,6 +1,6 @@
 # PROJECT_STATUS — cloudbymcn v2 (Lanyard)
 
-Atualizado: 2026-10-09 (Orquestrador: retomada, notas consolidadas em 'Status- cloudbymcn'; Lente capturando covers reais) · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](SPEC-FRONTEND-V2.md)
+Atualizado: 2026-10-10 (Orquestrador: ícones reais na stack + covers reais de twin-studio, classificador e simulador) · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](SPEC-FRONTEND-V2.md)
 
 ## Estado atual
 
@@ -49,12 +49,11 @@ Atualizado: 2026-10-09 (Orquestrador: retomada, notas consolidadas em 'Status- c
 |---|---|---|
 | App | Forja | **encerrada**: app completo, SEO/redirects, perf desktop 98–99, PR #1 aberto |
 | Conteúdo (20 MDX) | Cartógrafo | 20 no índice; twin, portal reescritos, twin-studio e contracheque-facial novos (09/10 noite) |
-| Assets | Lente | **ativa (09/10 noite)**: covers reais por captura local — twin-studio primeiro, depois classificador, simulador, dungeonai, jev-listener-web, contracheque-facial (se rodarem sem credencial/dado real) |
+| Assets | Lente | covers reais por captura local (cover.webp + cover.mp4, só dados demo, marca escondida): twin-studio (c414008, API local só com texturas e luz assada), classificador-chapas-ia (58d5809, IA fake + regras), simulador-pedra-ambientes (603d990, ambientes prontos sem Gemini). Pulados: dungeonai (Bedrock a cada turno), jev-listener-web (extensão, painel depende de chrome.*), contracheque-facial (Rekognition + ERP real) |
 | QA + scrub-check | Vigia | QA final feito (f0a1d83); pendente: recapturar screenshots depois das animações |
 
 ## Próximo passo
 
-- **Bloqueio (09/10 23h):** portais do Maestri não renderizam (screenshot timeout, janela minimizada/oculta). Lente parada com vite :5191 + mock só de `/api/studio` (:8799) prontos pra gravar o twin-studio (esconder header com nome da empresa; nomes comerciais das pedras aparecem na bandeja: confirmar com Matheus). Forja: falta só o print `tmp/stack-icones.png`. classificador-chapas-ia não sobe sem `CLASSIF_DECISION` = `jev`|`regras`.
 
 - **Matheus (decisão):** branch de publicação e merge. O PR #1 aponta pra `main`, que é a branch que dispara o `deploy.yml`; a branch padrão do repo no GitHub ainda é `master` (mais antiga, fev/2026, 2 commits fora da v2). Decidir se `main` vira a padrão, configurar Settings → Pages → Source = GitHub Actions, domínio `cloudbymcn.com` (+ DNS, hoje NXDOMAIN) e fazer o merge.
 - Vigia: recapturar as screenshots (rolar cada seção até a viewport e esperar ~1,5 s) e commitar; a Forja ou quem estiver ativo troca as imagens no corpo do PR #1.
