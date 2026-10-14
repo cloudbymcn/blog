@@ -14,10 +14,10 @@ export function Home() {
       <Hero />
       <FeaturedProjects />
       <StackLoop />
-      <Certs />
-      <Contact />
       {/* card do Instagram: some do bundle quando reels.json está vazio */}
       {__HAS_REELS__ && <Reels />}
+      <Certs />
+      <Contact />
     </>
   )
 }

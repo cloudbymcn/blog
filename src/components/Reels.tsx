@@ -4,7 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 const ReelsCard = /* @__PURE__ */ lazy(() => import('./ReelsCard'))
 
 /**
- * Casca do card de reels no fim da home: só um sentinela no bundle principal. O chunk do card (dados,
+ * Casca do card de reels na home (entre a stack e a trajetória): só um sentinela no bundle principal. O chunk do card (dados,
  * posters, vídeo) baixa quando o sentinela chega a ~800px da viewport. Com `src/content/reels.json`
  * vazio, `__HAS_REELS__` é false no build e a Home nem importa este arquivo.
  */
