@@ -24,7 +24,7 @@ jobs:
     env:
       # só os booleanos ficam no job; os valores dos secrets entram apenas nos passos que usam
       HAS_IG_TOKEN: ${{ secrets.IG_TOKEN != '' }}
-      HAS_GH_PAT: ${{ secrets.GH_PAT_SECRETS != '' }}
+      HAS_GH_PAT: ${{ secrets.GH_SECRETS_PAT != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -51,7 +51,7 @@ jobs:
         if: env.HAS_IG_TOKEN == 'true' && env.HAS_GH_PAT == 'true'
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT_SECRETS }}
+          GH_TOKEN: ${{ secrets.GH_SECRETS_PAT }}
         run: |
           if [ -s "$RUNNER_TEMP/ig-token" ]; then gh secret set IG_TOKEN --repo "$GITHUB_REPOSITORY" < "$RUNNER_TEMP/ig-token"; fi
           rm -f "$RUNNER_TEMP/ig-token"

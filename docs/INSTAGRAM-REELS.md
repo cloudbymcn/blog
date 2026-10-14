@@ -99,7 +99,7 @@ Se o refresh devolver um valor novo, o workflow só consegue gravar de volta no 
 
 - Crie um **fine-grained personal access token** em GitHub → Settings → Developer settings, só para o
   repo `cloudbymcn/blog`, com a permissão **Secrets: Read and write**.
-- Salve como secret `GH_PAT_SECRETS`.
+- Salve como secret `GH_SECRETS_PAT`.
 
 Sem esse PAT, se o log do passo "Reels do Instagram" mostrar `token renovado ... (valor novo)` ou um
 erro `code 190` (token vencido), gere outro token no painel da Meta (passo 2.5) e troque o secret.
