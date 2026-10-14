@@ -1,0 +1,78 @@
+name: Deploy (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # semanal: rebusca os reels do Instagram (só faz algo com o secret IG_TOKEN; cron roda na branch padrão)
+  schedule:
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# um deploy por vez; não cancela o que já está publicando
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # só os booleanos ficam no job; os valores dos secrets entram apenas nos passos que usam
+      HAS_IG_TOKEN: ${{ secrets.IG_TOKEN != '' }}
+      HAS_GH_PAT: ${{ secrets.GH_SECRETS_PAT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # reels do @cloudbymcn (docs/INSTAGRAM-REELS.md). Sem o secret, o passo pula e o site usa
+      # public/reels/ + src/content/reels.json commitados. Falha da API não derruba o deploy.
+      - name: Reels do Instagram
+        if: env.HAS_IG_TOKEN == 'true'
+        continue-on-error: true
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+        run: |
+          command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg; }
+          IG_TOKEN_OUT="$RUNNER_TEMP/ig-token" npm run reels:fetch
+
+      # o refresh devolve um token de mais 60 dias; com um PAT (Secrets: write) ele volta pro secret
+      - name: Guarda o token renovado
+        if: env.HAS_IG_TOKEN == 'true' && env.HAS_GH_PAT == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_SECRETS_PAT }}
+        run: |
+          if [ -s "$RUNNER_TEMP/ig-token" ]; then gh secret set IG_TOKEN --repo "$GITHUB_REPOSITORY" < "$RUNNER_TEMP/ig-token"; fi
+          rm -f "$RUNNER_TEMP/ig-token"
+
+      - run: npm run check
+      - run: npm run build
+
+      # rotas com meta própria, 404.html (noindex, fallback da SPA) e redirects dos posts antigos
+      # saem do build (scripts/vite/static-pages.ts)
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

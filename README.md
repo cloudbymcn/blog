@@ -70,7 +70,9 @@ python -m http.server 8000
 
 1. No `style.css`, adicione a cor:
    ```css
-   .pj[data-cat="aiml"]{--pj-c:#ec4899}
+   .pj[data-cat='aiml'] {
+     --pj-c: #ec4899;
+   }
    ```
 2. No `index.html`, adicione o botao de filtro:
    ```html
@@ -80,6 +82,7 @@ python -m http.server 8000
 ## Deploy
 
 Opcoes recomendadas:
+
 - **S3 + CloudFront** (vira case study)
 - **Netlify** (drag & drop ou conecta ao GitHub)
 - **Vercel** (conecta ao repo)

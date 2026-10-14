@@ -1,0 +1,14 @@
+dist
+node_modules
+legacy
+posts
+assets
+public
+package-lock.json
+*.mdx
+docs
+src/components/Lanyard/Lanyard.tsx
+
+# rascunhos locais dos agentes (não versionados)
+tmp
+.maestri

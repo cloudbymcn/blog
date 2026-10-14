@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540" font-family="Inter, system-ui, sans-serif" role="img" aria-label="Vitrine serverless de chapas">
+<title>Vitrine serverless de chapas</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#71717a"/></marker>
+<radialGradient id="glow" cx="80%" cy="0%" r="70%"><stop offset="0" stop-color="#38bdf8" stop-opacity=".10"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/></radialGradient></defs>
+<rect width="960" height="540" fill="#0e0e10"/><rect width="960" height="540" fill="url(#glow)"/>
+<text x="40" y="52" font-size="22" font-weight="700" fill="#f4f4f5" font-family="Space Grotesk, Inter, sans-serif">Vitrine serverless de chapas</text>
+<text x="40" y="76" font-size="13" fill="#a1a1aa">Parceiro cadastra, admin valida o preço, cliente reserva. Preço só no servidor.</text>
+<g><rect x="250" y="110" width="680" height="360" rx="16" fill="none" stroke="#3f3f46" stroke-dasharray="6 6"/><text x="264" y="132" font-size="11" fill="#71717a" font-family="JetBrains Mono, ui-monospace, monospace" letter-spacing="1">AWS (SAM)</text></g>
+<path d="M195,207 L290,241.2" fill="none" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M205,329.4 L290,298.8" fill="none" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M205,380.4 L290,400.8" fill="none" stroke="#52525b" stroke-width="1.5" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<path d="M450,270 L520,270" fill="none" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M680,270 L740,270" fill="none" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M820,302 L820,388" fill="none" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M431.3333333333333,238 L538.6666666666666,182" fill="none" stroke="#52525b" stroke-width="1.5" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<g><rect x="45" y="148" width="150" height="64" rx="12" fill="#18181b" stroke="#f4f4f5" stroke-width="1.5"/><text x="120" y="176" text-anchor="middle" font-size="14" font-weight="600" fill="#f4f4f5">Cliente</text><text x="120" y="195" text-anchor="middle" font-size="11" fill="#a1a1aa" font-family="JetBrains Mono, ui-monospace, monospace">vitrine · lead</text></g>
+<g><rect x="35" y="328" width="170" height="64" rx="12" fill="#18181b" stroke="#f4f4f5" stroke-width="1.5"/><text x="120" y="356" text-anchor="middle" font-size="14" font-weight="600" fill="#f4f4f5">Parceiro / admin</text><text x="120" y="375" text-anchor="middle" font-size="11" fill="#a1a1aa" font-family="JetBrains Mono, ui-monospace, monospace">painel</text></g>
+<g><rect x="290" y="238" width="160" height="64" rx="12" fill="#1c1608" stroke="#f59e0b" stroke-width="1.5"/><text x="370" y="266" text-anchor="middle" font-size="14" font-weight="600" fill="#f4f4f5">CloudFront</text><text x="370" y="285" text-anchor="middle" font-size="11" fill="#a1a1aa" font-family="JetBrains Mono, ui-monospace, monospace">site + fotos</text></g>
+<g><rect x="290" y="388" width="160" height="64" rx="12" fill="#1c1608" stroke="#f59e0b" stroke-width="1.5"/><text x="370" y="416" text-anchor="middle" font-size="14" font-weight="600" fill="#f4f4f5">Cognito</text><text x="370" y="435" text-anchor="middle" font-size="11" fill="#a1a1aa" font-family="JetBrains Mono, ui-monospace, monospace">parceiro · admin</text></g>
+<g><rect x="520" y="238" width="160" height="64" rx="12" fill="#1c1608" stroke="#f59e0b" stroke-width="1.5"/><text x="600" y="266" text-anchor="middle" font-size="14" font-weight="600" fill="#f4f4f5">API Gateway</text><text x="600" y="285" text-anchor="middle" font-size="11" fill="#a1a1aa" font-family="JetBrains Mono, ui-monospace, monospace">HTTP</text></g>
+<g><rect x="740" y="238" width="160" height="64" rx="12" fill="#1c1608" stroke="#f59e0b" stroke-width="1.5"/><text x="820" y="266" text-anchor="middle" font-size="14" font-weight="600" fill="#f4f4f5">AWS Lambda</text><text x="820" y="285" text-anchor="middle" font-size="11" fill="#a1a1aa" font-family="JetBrains Mono, ui-monospace, monospace">router único</text></g>
+<g><rect x="740" y="388" width="160" height="64" rx="12" fill="#0a1a14" stroke="#34d399" stroke-width="1.5"/><text x="820" y="416" text-anchor="middle" font-size="14" font-weight="600" fill="#f4f4f5">DynamoDB</text><text x="820" y="435" text-anchor="middle" font-size="11" fill="#a1a1aa" font-family="JetBrains Mono, ui-monospace, monospace">PITR · VALID#</text></g>
+<g><rect x="520" y="118" width="160" height="64" rx="12" fill="#1c1608" stroke="#f59e0b" stroke-width="1.5"/><text x="600" y="146" text-anchor="middle" font-size="14" font-weight="600" fill="#f4f4f5">S3</text><text x="600" y="165" text-anchor="middle" font-size="11" fill="#a1a1aa" font-family="JetBrains Mono, ui-monospace, monospace">fotos · presigned</text></g>
+<text x="40" y="516" font-size="11" fill="#71717a" font-family="JetBrains Mono, ui-monospace, monospace">Vitrine nunca expõe custo nem margem. Auditoria imutável: sem endpoint de exclusão.</text>
+<text x="920" y="516" text-anchor="end" font-size="11" fill="#52525b" font-family="JetBrains Mono, ui-monospace, monospace">cloudbymcn.com</text>
+</svg>

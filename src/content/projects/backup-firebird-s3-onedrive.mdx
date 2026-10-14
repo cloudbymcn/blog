@@ -1,0 +1,135 @@
+---
+title: "Backup de banco Firebird: 5 saltos viraram 1"
+slug: backup-firebird-s3-onedrive
+summary: "Backup diário de ~80 GB que passava por 2 servidores e 3 softwares virou um script só, no servidor do banco, enviando para S3 e OneDrive em paralelo."
+category: cloud
+tier: A
+date: 2026-05-14
+stack: ["EC2", "S3", "AWS Lambda", "IAM", "Firebird", "Bash", "Microsoft 365", "SharePoint/Graph API", "Claude Code", "Codex", "Antigravity", "Maestri", "Obsidian"]
+metrics:
+  - { label: "saltos", before: "5", after: "1" }
+  - { label: "arquivo", before: "80 GB", after: "8,9 GB" }
+cover: /projects/backup-firebird-s3-onedrive/architecture.svg
+---
+
+O banco do ERP legado (Firebird, ~80 GB) roda numa EC2 Linux. O backup diário precisava chegar em dois lugares: no S3, como armazenamento durável, e no OneDrive, onde a equipe consegue baixar e restaurar sem pedir acesso à AWS.
+
+O caminho que existia funcionava, na maior parte dos dias.
+
+## O problema: 5 saltos, 2 servidores, 3 softwares
+
+```bash
+# Arquitetura anterior
+#
+# EC2 Linux (banco)
+#   └─ zip + aws s3 mv ──▶ S3
+#                          │
+#                          ▼
+#                  Servidor Windows de backup
+#                    └─ rclone mount (drive T:)
+#                        └─ Cobian Reflector (cópia agendada)
+#                            └─ pasta local do OneDrive
+#                                └─ cliente OneDrive Desktop
+#                                    └─ nuvem Microsoft
+```
+
+Cada seta era um ponto de falha: o drive montado, o serviço do rclone, o agendamento do Cobian, a sessão do cliente OneDrive, o cache local, as permissões do Windows. Dois agendamentos separados precisavam estar alinhados. A virada de mês da pasta de destino era manual.
+
+<Callout type="danger">
+
+**O pior tipo de falha era a silenciosa.** O cliente OneDrive Desktop às vezes simplesmente não subia um arquivo de 9 GB, sem erro visível. E o script antigo tinha uma chave AWS estática no corpo.
+
+</Callout>
+
+## A solução: rodar onde o banco mora
+
+O banco e o zip já estavam na EC2 Linux. Faz sentido mandar dali direto para os dois destinos, em vez de baixar de novo no servidor Windows.
+
+<Figure src="/projects/backup-firebird-s3-onedrive/architecture.svg" alt={"Na EC2 Linux do banco, o cron dispara às 02:00 um script bash com lockfile. O script compacta o Firebird de cerca de 80 GB para cerca de 9 GB e envia o zip em paralelo: para o S3 com aws s3 cp usando IAM Role, e para o OneDrive com rclone copy pela Graph API. Um trap EXIT grava um arquivo de status no OneDrive em caso de sucesso ou falha. No S3, uma Lambda mensal organiza os backups por mês e acima de 1 TB os mais antigos vão para o Glacier."} caption={"Um script, um agendamento, dois destinos isolados."} />
+
+<Steps>
+<Step n={1}>
+
+**cron às 02:00** dispara `backup_s3_onedrive.sh`. Um lockfile em `/var/run/` impede duas execuções simultâneas (cron + alguém rodando à mão, já que o processo leva 30+ minutos).
+
+</Step>
+<Step n={2}>
+
+**zip:** 80 GB → 8,9 GB.
+
+</Step>
+<Step n={3}>
+
+**`aws s3 cp`** com a **IAM Role** da instância. Nenhuma credencial no script.
+
+</Step>
+<Step n={4}>
+
+**`rclone copy`** direto para o OneDrive pela Microsoft Graph API, com uma conta de serviço (não de funcionário). Pasta `AAAA/MM/` pela data do arquivo: a virada de mês é automática.
+
+</Step>
+<Step n={5}>
+
+**Limpeza local só se os dois uploads deram certo.** Se algum falhou, o zip fica para retry.
+
+</Step>
+<Step n={6}>
+
+**Status diário** num arquivo na raiz do OneDrive, escrito por um `trap EXIT`, seja sucesso ou falha.
+
+</Step>
+</Steps>
+
+```text
+Status:      SUCESSO
+Etapas:
+  [OK ]  Compressao zip
+  [OK ]  Upload S3
+  [OK ]  Upload OneDrive
+  [OK ]  Limpeza local
+```
+
+## Decisões técnicas
+
+<Card title="set -uo pipefail, sem -e">
+
+Com `-e`, o script morre no primeiro erro e o status nunca é escrito. Sem ele, cada etapa checa o próprio código de saída e marca o resultado no status. O `trap EXIT` garante que o status sobe mesmo se algo inesperado acontecer.
+
+</Card>
+
+<Card title="S3 + OneDrive, não só OneDrive">
+
+Regra 3-2-1: cópias em provedores diferentes. Uma queda longa da Microsoft não afeta o S3, e uma conta AWS comprometida não alcança o OneDrive.
+
+</Card>
+
+<Card title="Cada destino com o seu papel">
+
+O **S3 é o arquivo profundo**: guarda tudo. Uma Lambda roda no dia 1 de cada mês e move o mês anterior para uma pasta própria; acima de 1 TB, os mais antigos ganham uma tag e a lifecycle os leva para o Glacier. O **OneDrive é o atalho da equipe**: o script mantém lá só os 10 backups mais recentes, copiando os que faltam e apagando excedentes. Se a listagem do S3 vier vazia, ele não apaga nada.
+
+</Card>
+
+<Card title="rclone direto em vez do cliente Desktop">
+
+O rclone valida o upload de ponta a ponta e devolve erro de verdade. O cliente Desktop, com arquivo de 9 GB, às vezes falhava em silêncio.
+
+</Card>
+
+## Operação
+
+O tempo total esperado é de 25 a 45 minutos: zip 18–22 min, S3 3–5 min, OneDrive 15–20 min. Para saber se o backup de hoje rodou, basta abrir o arquivo de status no OneDrive web. Nada de entrar em servidor.
+
+Os cenários de falha conhecidos estão num runbook: OneDrive cheio (`quotaLimitReached`), token OAuth expirado (401/403), disco cheio no zip, cron que não rodou. Cada um com o comando de diagnóstico e a resposta.
+
+O rollback é trocar uma linha do crontab: o script antigo ficou intacto, com backup datado.
+
+<Metrics>
+<Metric value="5 → 1" label="saltos até o OneDrive" />
+<Metric value="2 → 1" label="servidores no caminho crítico" />
+<Metric value="3 → 0" label="softwares intermediários" />
+<Metric value="0" label="credenciais AWS no script" />
+</Metrics>
+
+## O que ficou de lição
+
+A arquitetura antiga não era errada, era acumulada: cada peça resolveu um problema de um momento. Olhando de onde o dado nasce, o caminho mais curto era óbvio. E um backup só vale se alguém consegue saber, sem esforço, que ele rodou ontem.
