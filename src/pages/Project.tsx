@@ -69,7 +69,7 @@ export function Project() {
     <article className="pb-24 pt-[var(--nav-h)]">
       <header className="border-b border-line bg-bg-2">
         <div className="mx-auto max-w-6xl px-5 pb-12 pt-12 md:px-8">
-          <Link to="/projetos" className="lc text-sm text-link hover:underline">
+          <Link to="/projetos" className="lc -my-3.5 inline-block py-3.5 text-sm text-link hover:underline">
             ‹ Todos os projetos
           </Link>
           <p className="lc mt-8 text-sm font-medium text-ink-2">
@@ -170,7 +170,7 @@ export function Project() {
                 <li key={s}>
                   <Link
                     to={`/projetos?stack=${encodeURIComponent(s)}`}
-                    className="glass flex items-center gap-1.5 rounded-full px-3 py-1 text-sm text-ink-2 hover:text-link"
+                    className="glass flex min-h-9 items-center gap-1.5 rounded-full px-3 py-1 text-sm text-ink-2 hover:text-link md:min-h-0"
                   >
                     <StackIcon name={s} className="size-3.5" />
                     {s}

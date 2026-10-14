@@ -111,7 +111,7 @@ export function Contact() {
                     'radial-gradient(60% 80% at 15% 20%, rgba(0,113,227,0.08), transparent 70%), radial-gradient(50% 70% at 85% 90%, rgba(159,179,204,0.18), transparent 70%)',
                 }}
               />
-              <div className="relative grid gap-8 p-6 sm:p-8 md:grid-cols-[1.2fr_1fr] md:items-stretch md:gap-6">
+              <div className="relative grid gap-8 p-5 sm:p-8 md:grid-cols-[1.2fr_1fr] md:items-stretch md:gap-6">
                 <div className="flex flex-col gap-5">
                   <h2 className="font-display text-4xl font-semibold leading-[1.05] tracking-[-0.02em] sm:text-5xl lg:text-6xl">
                     Let&rsquo;s connect.

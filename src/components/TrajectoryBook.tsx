@@ -294,7 +294,7 @@ export function TrajectoryBook() {
           onClick={() => turn('prev')}
           disabled={!canPrev}
           aria-label="Página anterior"
-          className="glass flex size-10 items-center justify-center rounded-full text-ink transition-opacity hover:bg-white disabled:opacity-40"
+          className="glass flex size-11 items-center justify-center rounded-full text-ink transition-opacity hover:bg-white disabled:opacity-40 md:size-10"
         >
           <span aria-hidden="true" className="text-xl leading-none">
             ‹
@@ -308,7 +308,7 @@ export function TrajectoryBook() {
           onClick={() => turn('next')}
           disabled={!canNext}
           aria-label="Próxima página"
-          className="glass flex size-10 items-center justify-center rounded-full text-ink transition-opacity hover:bg-white disabled:opacity-40"
+          className="glass flex size-11 items-center justify-center rounded-full text-ink transition-opacity hover:bg-white disabled:opacity-40 md:size-10"
         >
           <span aria-hidden="true" className="text-xl leading-none">
             ›

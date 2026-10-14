@@ -459,6 +459,15 @@ html::-webkit-scrollbar {
   box-shadow: var(--glass-shadow);
 }
 
+/* barra inferior do mobile: vidro mais sólido que o .glass, pra não misturar com o texto que passa atrás */
+.dock-bar {
+  background: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.12);
+}
+
 /* painel de ajustes do crachá: slider fino e color picker redondo */
 .lanyard-range {
   -webkit-appearance: none;

@@ -209,7 +209,7 @@ export function LanyardControls({
         aria-label={open ? 'Fechar ajustes do crachá' : 'Ajustar crachá'}
         title="Ajustar crachá"
         onClick={() => setOpen((o) => !o)}
-        className="glass absolute right-6 top-[calc(var(--nav-h)+16px)] z-30 flex size-10 items-center justify-center rounded-full text-ink-2 transition-colors hover:text-ink md:right-8"
+        className="glass absolute right-6 top-[calc(var(--nav-h)+16px)] z-30 flex size-11 items-center justify-center rounded-full text-ink-2 transition-colors hover:text-ink md:right-8"
       >
         <SlidersIcon />
       </button>

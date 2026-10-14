@@ -461,7 +461,8 @@ export function ConcaveCarousel({ items, label }: { items: CarouselItem[]; label
       </div>
 
       <div className="mx-auto mt-2 max-w-xl text-center" aria-live={userPaused || paused ? 'polite' : 'off'}>
-        <p className="lc truncate font-display text-xl font-semibold tracking-[-0.02em] text-ink">
+        {/* mobile: título em até 2 linhas com altura fixa (troca de slide não empurra o resto) */}
+        <p className="lc line-clamp-2 min-h-[2.5em] font-display text-xl font-semibold leading-[1.25] tracking-[-0.02em] text-ink md:line-clamp-1 md:min-h-0 md:leading-normal">
           {current?.title}
         </p>
         <p className="mt-1 line-clamp-1 text-[15px] text-ink-2">{current?.subtitle}</p>
@@ -472,7 +473,7 @@ export function ConcaveCarousel({ items, label }: { items: CarouselItem[]; label
           type="button"
           onClick={() => go(-1)}
           aria-label="Projeto anterior"
-          className="glass flex size-10 items-center justify-center rounded-full text-ink transition-colors hover:bg-white"
+          className="glass flex size-11 items-center justify-center rounded-full text-ink transition-colors hover:bg-white md:size-10"
         >
           <span aria-hidden="true" className="text-xl leading-none">
             ‹
@@ -485,7 +486,7 @@ export function ConcaveCarousel({ items, label }: { items: CarouselItem[]; label
           type="button"
           onClick={() => go(1)}
           aria-label="Próximo projeto"
-          className="glass flex size-10 items-center justify-center rounded-full text-ink transition-colors hover:bg-white"
+          className="glass flex size-11 items-center justify-center rounded-full text-ink transition-colors hover:bg-white md:size-10"
         >
           <span aria-hidden="true" className="text-xl leading-none">
             ›
@@ -497,7 +498,7 @@ export function ConcaveCarousel({ items, label }: { items: CarouselItem[]; label
             onClick={() => setUserPaused((v) => !v)}
             aria-label={userPaused ? 'Retomar rotação automática' : 'Pausar rotação automática'}
             aria-pressed={userPaused}
-            className="ml-1 flex size-8 items-center justify-center rounded-full text-ink-2 hover:text-ink"
+            className="ml-1 flex size-11 items-center justify-center rounded-full text-ink-2 hover:text-ink md:size-8"
           >
             <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden="true">
               {userPaused ? <path d="M8 5v14l11-7z" /> : <path d="M7 5h4v14H7zM13 5h4v14h-4z" />}

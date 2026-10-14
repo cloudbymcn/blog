@@ -38,6 +38,33 @@ function useScrolled(threshold = 8) {
   return scrolled
 }
 
+/**
+ * Barra inferior (mobile): some ao rolar pra baixo (não cobre o texto que a pessoa está lendo) e volta
+ * ao rolar pra cima e no fim da página. No topo aparece, exceto com hideAtTop (hero da home, onde os
+ * botões do próprio hero já levam a projetos e contato e a barra cobriria o parágrafo).
+ */
+function useHiddenOnScrollDown(enabled: boolean, hideAtTop: boolean) {
+  const [hidden, setHidden] = useState(hideAtTop)
+  useEffect(() => {
+    if (!enabled) return
+    let last = window.scrollY
+    // direto no evento (sem rAF): conta barata, e setState com o mesmo valor não re-renderiza
+    const update = () => {
+      const y = window.scrollY
+      const atEnd = y + window.innerHeight >= document.documentElement.scrollHeight - 8
+      if (atEnd) setHidden(false)
+      else if (y < 80) setHidden(hideAtTop)
+      else if (Math.abs(y - last) > 6) setHidden(y > last)
+      else return
+      last = y
+    }
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
+  }, [enabled, hideAtTop])
+  return enabled && hidden
+}
+
 /** Barra superior fina: só o wordmark (os links moram no dock). */
 export function Nav() {
   const scrolled = useScrolled()
@@ -141,7 +168,8 @@ function magnify(distance: number) {
  * Dock lateral (SPEC §0-bis, adaptado do "Navigation 4" do React Bits Pro): coluna fixa à esquerda,
  * centrada na vertical, com o ícone da logo (início), projetos e contato. Hover amplia o botão sob o
  * ponteiro e os vizinhos como o dock do macOS (mola via CSS) e mostra o rótulo à direita. Item ativo:
- * fundo #1d1d1f e ícone branco. Abaixo de 1270px (onde o dock encostaria no texto) vira barra inferior.
+ * fundo #1d1d1f e ícone branco. Abaixo de 1270px (onde o dock encostaria no texto) vira barra inferior,
+ * com vidro mais sólido, alvos de 44px e que se esconde ao rolar pra baixo.
  */
 export function Dock() {
   const { pathname } = useLocation()
@@ -158,6 +186,8 @@ export function Dock() {
     return () => mq.removeEventListener('change', on)
   }, [])
 
+  const hidden = useHiddenOnScrollDown(!side, isHome)
+
   const isActive = (item: DockItem) =>
     isHome ? (section ?? 'inicio') === item.section : item.to !== '/' && pathname.startsWith(item.to)
 
@@ -168,7 +198,9 @@ export function Dock() {
       className={
         side
           ? 'fixed left-6 top-1/2 z-40 -translate-y-1/2'
-          : 'fixed inset-x-0 bottom-4 z-40 flex justify-center px-4'
+          : `pointer-events-none fixed inset-x-0 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 transition-[transform,opacity] duration-300 ease-out focus-within:translate-y-0 focus-within:opacity-100 ${
+              hidden ? 'translate-y-[calc(100%+2rem)] opacity-0' : ''
+            }`
       }
     >
       <ul
@@ -178,7 +210,7 @@ export function Dock() {
           setPointerY(e.clientY - (list.current?.getBoundingClientRect().top ?? 0))
         }}
         onPointerLeave={() => setPointerY(null)}
-        className={`flex ${side ? 'flex-col gap-2' : 'glass flex-row gap-1.5 rounded-[18px] p-1.5'}`}
+        className={`flex ${side ? 'flex-col gap-2' : 'dock-bar pointer-events-auto flex-row gap-1.5 rounded-[20px] p-1.5'}`}
       >
         {ITEMS.map((item, i) => {
           const active = isActive(item)
@@ -192,7 +224,7 @@ export function Dock() {
                 aria-label={item.label}
                 aria-current={active ? 'page' : undefined}
                 className={`flex items-center justify-center rounded-xl outline-none transition-[transform,background-color,color] duration-300 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 ${
-                  side ? 'size-10 origin-left' : 'size-9'
+                  side ? 'size-10 origin-left' : 'size-11'
                 } ${active ? 'bg-ink text-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]' : `${side ? 'glass' : 'bg-white/70'} text-ink hover:bg-white`}`}
                 style={{ transform: `scale(${scale})` }}
               >
