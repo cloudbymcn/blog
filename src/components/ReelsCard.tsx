@@ -16,6 +16,15 @@ export interface Reel {
 }
 
 const reels = data as Reel[]
+
+/** Legenda pro site: sem hashtags (no card elas só fazem ruído), linhas juntas, espaços simples. */
+function cleanCaption(text: string) {
+  return text
+    .replace(/#[\p{L}\p{N}_]+/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 const PROFILE = 'https://instagram.com/cloudbymcn'
 
 const CARD_W = 252 // reel central no desktop; 9:16 dá 448px de altura
@@ -123,7 +132,7 @@ function OpenHint() {
 const tileCls = 'reels-tile'
 
 function label(reel: Reel, i: number, n: number) {
-  const text = reel.caption.split('\n')[0].slice(0, 90)
+  const text = cleanCaption(reel.caption.split('\n')[0]).slice(0, 90)
   return `Reel ${i + 1} de ${n}${text ? `: ${text}` : ''} (abre no Instagram)`
 }
 
@@ -407,7 +416,7 @@ function Strip({ play, onCenter }: { play: boolean; onCenter: (i: number) => voi
         }}
         className="reels-stage"
         style={{
-          height: CARD_H + 48,
+          height: CARD_H + 72, // folga embaixo pra sombra do central não cortar
           touchAction: 'pan-y',
           cursor: n > 1 ? (dragging ? 'grabbing' : 'grab') : undefined,
         }}
@@ -562,7 +571,7 @@ export default function ReelsCard() {
 
   if (reels.length === 0) return null
   const play = motionOk && inView
-  const caption = reels[current]?.caption.trim() ?? ''
+  const caption = cleanCaption(reels[current]?.caption ?? '')
 
   return (
     <section aria-labelledby="reels-title" className="reels-section">

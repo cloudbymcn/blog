@@ -15,6 +15,8 @@
 }
 .reels-inner {
   @apply relative overflow-hidden rounded-[1.6rem] bg-white/60;
+  /* cqw no mobile = largura do card (o % do filho do scroller desconta o padding) */
+  container-type: inline-size;
 }
 
 /* cabeçalho: ícone + @cloudbymcn à esquerda, "seguir" à direita */
@@ -74,7 +76,7 @@
   @apply absolute left-1/2 top-6 will-change-transform;
 }
 .reels-controls {
-  @apply mt-4 flex items-center justify-center gap-4;
+  @apply flex items-center justify-center gap-4;
 }
 .reels-arrow {
   @apply flex size-10 items-center justify-center rounded-full text-ink transition-colors hover:bg-white;
@@ -91,14 +93,18 @@
 
 /* mobile: um reel por tela, scroll-snap nativo */
 .reels-swipe {
-  @apply flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-[12%] py-6;
+  --reel-w: min(76cqw, 340px);
+  @apply flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain py-6;
+  /* sobra igual dos dois lados: o primeiro e o último também param no centro */
+  padding-inline: calc((100cqw - var(--reel-w)) / 2);
   scrollbar-width: none;
 }
 .reels-swipe::-webkit-scrollbar {
   display: none;
 }
 .reels-swipe .reels-tile {
-  @apply w-[76%] max-w-[340px] shrink-0 snap-center transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)];
+  width: var(--reel-w);
+  @apply shrink-0 snap-center transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)];
 }
 .reels-swipe .reels-tile.is-dim {
   @apply scale-[0.92] opacity-50;
