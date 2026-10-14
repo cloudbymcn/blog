@@ -504,24 +504,6 @@ html::-webkit-scrollbar {
   border-radius: 999px;
 }
 
-@keyframes marquee {
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-.marquee {
-  animation: marquee var(--marquee-duration, 40s) linear infinite;
-}
-
-.marquee-reverse {
-  animation-direction: reverse;
-}
-
-.marquee-pause:hover .marquee {
-  animation-play-state: paused;
-}
-
 @keyframes scroll-hint {
   0%,
   100% {
