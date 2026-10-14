@@ -48,11 +48,6 @@ const MILESTONES: Milestone[] = [
     text: 'foco em ia, escalabilidade e sistemas distribuídos. em andamento.',
     logo: { src: '/trajetoria/hackone.svg', alt: 'hackone' },
   },
-  {
-    year: 'hoje',
-    title: 'analista de infraestrutura cloud',
-    text: 'desenhando e colocando em produção arquiteturas aws: integrações, pipelines orientados a eventos, automação e ia aplicada.',
-  },
 ]
 
 /** Página 0 = abertura; depois um marco por página. */
@@ -86,7 +81,7 @@ function PageContent({ index }: { index: number }) {
     <div className="flex h-full flex-col pt-1">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="book-accent text-[32px] font-semibold leading-none tracking-[-0.02em] md:text-[34px] xl:text-[40px]">
+          <p className="book-accent text-[22px] font-semibold leading-none tracking-[-0.02em] md:text-[24px] xl:text-[28px]">
             {m.year}
           </p>
           {cert && <p className="book-mono book-muted mt-2 text-[11px]">{cert.code.toLowerCase()}</p>}
@@ -99,7 +94,7 @@ function PageContent({ index }: { index: number }) {
             loading="lazy"
             decoding="async"
             onError={(e) => (e.currentTarget.style.display = 'none')}
-            className="h-8 w-auto max-w-[130px] shrink-0 object-contain md:h-9 xl:h-10 xl:max-w-[150px]"
+            className="h-7 w-auto max-w-[120px] shrink-0 object-contain xl:h-8 xl:max-w-[140px]"
           />
         )}
       </div>
