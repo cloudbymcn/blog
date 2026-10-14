@@ -191,6 +191,8 @@ for (const dirName of DIRS_TO_SCAN) {
     let content = ''
     try {
       content = fs.readFileSync(fullPath, 'utf8')
+      // SVG: coordenadas de path (d="...") parecem IPv4 (ex.: 1.16.55.88); texto e atributos seguem checados
+      if (ext === '.svg') content = content.replace(/\sd="[^"]*"/g, ' d=""')
     } catch (err) {
       console.warn(`[WARN] Não foi possível ler arquivo ${relPath}: ${err.message}`)
       continue

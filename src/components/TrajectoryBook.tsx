@@ -8,9 +8,16 @@ interface Milestone {
   title: string
   text: string
   cert?: string // código da certificação (badge na página)
+  logo?: { src: string; alt: string } // logo da instituição (public/trajetoria/)
 }
 
 const MILESTONES: Milestone[] = [
+  {
+    year: '2020',
+    title: 'engenharia da computação',
+    text: 'a base: graduação na multivix. hardware, redes, algoritmos e o hábito de entender como as coisas funcionam por dentro.',
+    logo: { src: '/trajetoria/multivix.svg', alt: 'multivix' },
+  },
   {
     year: '2024',
     title: 'aws certified cloud practitioner',
@@ -37,13 +44,9 @@ const MILESTONES: Milestone[] = [
   },
   {
     year: '2026',
-    title: 'lançamento do cloud by mcn',
-    text: 'o caderno aberto: cada problema resolvido em produção vira case, com decisões, custos e o que eu faria diferente.',
-  },
-  {
-    year: '2026',
-    title: 'pós-graduação em arquitetura cloud',
+    title: 'pós-graduação em cloud computing',
     text: 'foco em ia, escalabilidade e sistemas distribuídos. em andamento.',
+    logo: { src: '/trajetoria/hackone.svg', alt: 'hackone' },
   },
   {
     year: 'hoje',
@@ -89,6 +92,16 @@ function PageContent({ index }: { index: number }) {
           {cert && <p className="book-mono book-muted mt-2 text-[11px]">{cert.code.toLowerCase()}</p>}
         </div>
         {cert && <CertBadge {...cert} className="w-[104px] shrink-0 md:w-[116px] xl:w-[150px]" />}
+        {m.logo && (
+          <img
+            src={m.logo.src}
+            alt={m.logo.alt}
+            loading="lazy"
+            decoding="async"
+            onError={(e) => (e.currentTarget.style.display = 'none')}
+            className="h-8 w-auto max-w-[130px] shrink-0 object-contain md:h-9 xl:h-10 xl:max-w-[150px]"
+          />
+        )}
       </div>
       <p className="mt-3 text-base font-semibold leading-snug tracking-[-0.02em] xl:text-[18px]">{m.title}</p>
       <p className="mt-2 max-w-[40ch] text-[13px] font-normal leading-normal text-ink-2 xl:text-sm">
