@@ -68,8 +68,8 @@ export function Hero() {
             className="fade-up mt-6 max-w-md text-[17px] leading-relaxed text-ink-2"
             style={{ animationDelay: '380ms' }}
           >
-            Arquiteturas AWS reais, decisões técnicas e implementações completas. Pós-graduando em Arquitetura
-            Cloud, com foco em IA, escalabilidade e sistemas distribuídos.
+            Arquiteturas AWS reais, decisões técnicas e implementações completas. Pós-graduando em Cloud
+            Computing, com foco em IA, escalabilidade e sistemas distribuídos.
           </p>
           <div className="fade-up mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: '460ms' }}>
             <Magnet>
