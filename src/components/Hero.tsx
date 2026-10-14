@@ -56,6 +56,7 @@ export function Hero() {
           {/* nome decodifica de caracteres embaralhados (Cipher Reveal); o h1 continua semântico */}
           <CipherName
             lines={['Matheus', 'Nascimento']}
+            end="."
             className="mt-3 block font-display text-5xl font-semibold leading-[1.05] tracking-[-0.02em] md:text-7xl"
           />
           <MaskText

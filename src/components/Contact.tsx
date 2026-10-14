@@ -132,7 +132,7 @@ export function Contact() {
                         ver projetos
                         <svg
                           viewBox="0 0 24 24"
-                          className="size-4 transition-transform duration-300 group-hover:translate-x-0.5"
+                          className="size-4 transition-[transform,color] duration-300 group-hover:translate-x-0.5 group-hover:text-link"
                           fill="none"
                           stroke="currentColor"
                           strokeWidth="2"
@@ -160,7 +160,7 @@ export function Contact() {
                             >
                               <Icon
                                 path={c.path}
-                                className="size-5 text-ink-2 transition-colors group-hover:text-ink"
+                                className="size-5 text-ink-2 transition-colors group-hover:text-link"
                               />
                               {c.label}
                             </a>

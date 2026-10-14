@@ -426,9 +426,9 @@ export function ConcaveCarousel({ items, label }: { items: CarouselItem[]; label
                       goTo(i)
                     }
                   }}
-                  className="block"
+                  className="group block"
                 >
-                  <div className="aspect-[16/10] overflow-hidden rounded-2xl border border-line bg-white shadow-[0_12px_40px_rgba(0,0,0,0.10)]">
+                  <div className="aspect-[16/10] overflow-hidden rounded-2xl border border-line bg-white shadow-[0_12px_40px_rgba(0,0,0,0.10)] transition-[border-color,box-shadow] duration-300 group-hover:border-accent/60 group-hover:shadow-[0_12px_40px_rgba(0,113,227,0.16)] group-focus-visible:border-accent">
                     <CoverMedia
                       poster={item.image}
                       video={item.video}
@@ -479,7 +479,7 @@ export function ConcaveCarousel({ items, label }: { items: CarouselItem[]; label
           </span>
         </button>
         <p className="lc min-w-[5.5rem] text-center font-mono text-sm tabular-nums text-ink-2">
-          <span className="text-ink">{pad(center + 1)}</span> / {pad(n)}
+          <span className="text-link">{pad(center + 1)}</span> / {pad(n)}
         </p>
         <button
           type="button"

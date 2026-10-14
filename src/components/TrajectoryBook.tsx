@@ -287,7 +287,7 @@ export function TrajectoryBook() {
           </span>
         </button>
         <p className="min-w-[5.5rem] text-center font-mono text-sm tabular-nums text-ink-2">
-          <span className="text-ink">{pad(pos + 1)}</span> / {pad(PAGE_COUNT)}
+          <span className="text-link">{pad(pos + 1)}</span> / {pad(PAGE_COUNT)}
         </p>
         <button
           type="button"

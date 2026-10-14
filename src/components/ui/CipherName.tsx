@@ -32,7 +32,16 @@ interface Glyph {
  * passa e elas decodificam de novo atrás dele. Scheduler em rAF só enquanto há letra mexendo.
  * Reduced-motion: texto final direto.
  */
-export function CipherName({ lines, className = '' }: { lines: string[]; className?: string }) {
+export function CipherName({
+  lines,
+  end,
+  className = '',
+}: {
+  lines: string[]
+  /** sufixo fora da cifra (o ponto final em azul): entra quando o nome termina de decodificar */
+  end?: string
+  className?: string
+}) {
   const ref = useRef<HTMLHeadingElement>(null)
   const [reduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
 
@@ -181,6 +190,7 @@ export function CipherName({ lines, className = '' }: { lines: string[]; classNa
               <span className="cipher-mask" />
             </span>
           ))}
+          {end && li === lines.length - 1 && <span className="cipher-end">{end}</span>}
         </span>
       ))}
     </h1>

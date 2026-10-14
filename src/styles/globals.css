@@ -204,6 +204,15 @@ html::-webkit-scrollbar {
   transform: translateX(-50%) scaleX(var(--sx, 1));
 }
 
+/* ponto final do nome em azul (único acento do hero): aparece no fim do decode (~1,4s) */
+.cipher-end {
+  color: var(--accent);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1.3s;
+}
+.cipher-pending .cipher-end {
+  opacity: 0;
+}
+
 /* concave carousel: posição animada em JS (rAF: deslize, inércia, mola); reflexo esmaecendo pra baixo */
 .concave-card {
   transform-style: preserve-3d;
@@ -223,7 +232,7 @@ html::-webkit-scrollbar {
   --book-bg: #f7f6f2;
   --book-fg: #1d1d1f;
   --book-muted: #6b6a66;
-  --book-accent: #1d1d1f;
+  --book-accent: var(--accent); /* anos: texto grande, 4.3:1 sobre o papel passa no AA de texto grande */
   --book-edge: rgba(0, 0, 0, 0.07);
 }
 
