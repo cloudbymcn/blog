@@ -1,9 +1,10 @@
 # PROJECT_STATUS — cloudbymcn v2 (Lanyard)
 
-Atualizado: 2026-10-14 (Orquestrador: cargo analista, OG, stack em grade, reels claros com ícone colorido) · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](SPEC-FRONTEND-V2.md)
+Atualizado: 2026-10-14 (Orquestrador: DEPLOY em https://cloudbymcn.github.io) · Branch: `v2-lanyard` · Espec: [SPEC-FRONTEND-V2.md](SPEC-FRONTEND-V2.md)
 
 ## Estado atual
 
+- **No ar desde 14/10 (deploy autorizado pelo Matheus): https://cloudbymcn.github.io** — repo `cloudbymcn/cloudbymcn.github.io` (criado pra isso; site de usuário serve na raiz, base `/` sem mudar código), Pages via GitHub Actions (`deploy.yml`), secrets `IG_TOKEN` e `GH_SECRETS_PAT`. Remote local `site`; **publicar = `git push site v2-lanyard:main`** (deploy + cron semanal dos reels rodam lá). `SITE`, og:url, canonical, robots e sitemap (regerado com as 23 rotas reais) apontam pro github.io; `public/CNAME` removido (1ecebf6). Run 38626706429 verde, reels buscados no CI; validado no portal: home, /projetos, post, /contato, redirect `/posts/*.html`, 0 imagens quebradas. Livro da trajetória fecha com 'próximo capítulo' (1191e87); anos menores e pretos, sem 'hoje' (11afba2).
 - Commit 1 (Forja): scaffold Vite 6 + React 19 + TS + Tailwind v4 + MDX, estrutura de pastas do §10 (b5edd45).
 - Lanyard integrado com `React.lazy` + placeholder, reduced-motion/GPU fraca cai no placeholder (48a484c).
 - Home com os 6 blocos, nav fixa, `/sobre` e `/contato` (a1b3133).
@@ -62,7 +63,7 @@ Atualizado: 2026-10-14 (Orquestrador: cargo analista, OG, stack em grade, reels 
 - **Matheus (reels do Instagram):** escolher um modo em `docs/INSTAGRAM-REELS.md`. Rápido: jogar os mp4 numa pasta e `npm run reels:import -- <pasta>`. Automático: conta profissional + app Meta (Instagram API with Instagram Login) → token → secret `IG_TOKEN` no repo (opcional `GH_SECRETS_PAT`). Depois, validar o card no portal (desktop e 390px).
 
 
-- **Matheus (decisão):** branch de publicação e merge. O PR #1 aponta pra `main`, que é a branch que dispara o `deploy.yml`; a branch padrão do repo no GitHub ainda é `master` (mais antiga, fev/2026, 2 commits fora da v2). Decidir se `main` vira a padrão, configurar Settings → Pages → Source = GitHub Actions, domínio `cloudbymcn.com` (+ DNS, hoje NXDOMAIN) e fazer o merge.
+- **Matheus:** (a) incluir `cloudbymcn/cloudbymcn.github.io` no PAT `ig-token-refresh` (senão o token renovado não é salvo; o atual vale até ~13/12); (b) o site v1 continua em cloudbymcn.github.io/blog (Pages legacy do repo `blog`): desligar ou redirecionar; (c) PR #1 no repo `blog` pode ser fechado ou mergeado só pra histórico; (d) domínio cloudbymcn.com quando quiser (DNS + CNAME + voltar `SITE`). Antigo: branch de publicação e merge. O PR #1 aponta pra `main`, que é a branch que dispara o `deploy.yml`; a branch padrão do repo no GitHub ainda é `master` (mais antiga, fev/2026, 2 commits fora da v2). Decidir se `main` vira a padrão, configurar Settings → Pages → Source = GitHub Actions, domínio `cloudbymcn.com` (+ DNS, hoje NXDOMAIN) e fazer o merge.
 - Vigia: recapturar as screenshots (rolar cada seção até a viewport e esperar ~1,5 s) e commitar; a Forja ou quem estiver ativo troca as imagens no corpo do PR #1.
 - Depois do deploy validado: apagar `legacy/`, `posts/`, `assets/` antigos e `public/img/logo-mcn.png`; conferir em produção um redirect de `/posts/*.html` e o OG de uma página de projeto.
 - Se o `card-front.png` mudar: regerar `card-front.webp` (1024) e `card-front-480.webp` (480).
