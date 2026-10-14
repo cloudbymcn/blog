@@ -2,7 +2,7 @@
  * Textos de SEO/OG por rota. Sem dependência de browser: usado pelo hook useSeo (runtime) e pelo
  * plugin scripts/vite/static-pages.ts (gera dist/<rota>/index.html com as metas pros crawlers).
  */
-export const SITE = 'https://cloudbymcn.com'
+export const SITE = 'https://cloudbymcn.github.io'
 export const DEFAULT_IMAGE = '/og.png'
 const BRAND = 'Cloud by MCN'
 

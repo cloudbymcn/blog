@@ -1,63 +1,95 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://cloudbymcn.com/</loc>
-    <lastmod>2026-05-26</lastmod>
-    <priority>1.0</priority>
+    <loc>https://cloudbymcn.github.io/</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/sentinela-finops-bedrock.html</loc>
-    <lastmod>2026-05-26</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/stonetrack-pwa-inventario.html</loc>
-    <lastmod>2026-05-26</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/contato</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/serravans-frota-sst.html</loc>
-    <lastmod>2026-05-26</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos/api-segura-banco-privado</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/mailbox-cleaner-mrm.html</loc>
-    <lastmod>2026-05-26</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos/backup-firebird-s3-onedrive</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/dungeonai-rpg-bedrock.html</loc>
-    <lastmod>2026-03-31</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos/classificador-chapas-ia</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/ptax-lambda-migration.html</loc>
-    <lastmod>2026-03-31</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos/contracheque-facial</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/sharepoint-lambda-firebird.html</loc>
-    <lastmod>2026-03-31</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos/digital-twin-3d</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/salesforce-cdc-eventbridge-firebird.html</loc>
-    <lastmod>2026-03-30</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos/dungeonai</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/gestao-midia-aws-serverless.html</loc>
-    <lastmod>2026-05-26</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos/entrega-video-mediaconvert</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/integracao-api-aws.html</loc>
-    <lastmod>2026-02-12</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos/extensao-navegador-voz</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
   <url>
-    <loc>https://cloudbymcn.com/posts/otimizacao-mp4.html</loc>
-    <lastmod>2026-02-04</lastmod>
-    <priority>0.8</priority>
+    <loc>https://cloudbymcn.github.io/projetos/finops-security-bedrock</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/gestao-frota-ocr</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/pedidos-amostras</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/portal-corporativo-serverless</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/ptax-lambda-terraform</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/pwa-inventario-patio</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/relatorio-infra-powershell</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/salesforce-cdc-eventbridge</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/sharepoint-lambda-pipeline</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/simulador-pedra-ambientes</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/twin-studio</loc>
+    <lastmod>2026-10-14</lastmod>
+  </url>
+  <url>
+    <loc>https://cloudbymcn.github.io/projetos/vitrine-serverless-chapas</loc>
+    <lastmod>2026-10-14</lastmod>
   </url>
 </urlset>

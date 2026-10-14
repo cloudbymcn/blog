@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://cloudbymcn.com/sitemap.xml
+Sitemap: https://cloudbymcn.github.io/sitemap.xml
