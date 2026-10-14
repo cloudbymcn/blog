@@ -11,17 +11,7 @@ import { Section } from './ui/Section'
 const ROWS: { label: string; items: readonly string[]; big?: boolean }[] = [
   {
     label: 'agentes & ia',
-    items: [
-      'Claude Code',
-      'Codex',
-      'Antigravity',
-      'Maestri',
-      'Strands Agents',
-      'Bedrock (Claude)',
-      'Bedrock (Nova)',
-      'Gemini',
-      'Bedrock (Nova Canvas)',
-    ],
+    items: ['Claude Code', 'Codex', 'Antigravity', 'Maestri', 'Strands Agents', 'Bedrock', 'Gemini'],
     big: true,
   },
   {
@@ -40,8 +30,8 @@ const ROWS: { label: string; items: readonly string[]; big?: boolean }[] = [
       'Bash',
     ],
   },
-  // todos os serviços AWS do vocabulário (os que aparecem nos 18 projetos + os que o Matheus cita)
-  { label: 'aws', items: STACK.AWS },
+  // todos os serviços AWS do vocabulário, menos o Bedrock (fica uma vez só, em agentes & ia)
+  { label: 'aws', items: STACK.AWS.filter((s) => s !== 'Bedrock') },
   {
     label: 'linguagens & web',
     items: [
