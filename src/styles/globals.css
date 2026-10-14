@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 @import './tokens.css';
+/* o card de reels traz o próprio CSS no chunk lazy (ReelsCard.css): fora do scan, CSS inicial não cresce */
+@source not '../components/ReelsCard.tsx';
 
 /* Paper Mono (paper.design/mono, SIL OFL 1.1 — licença em /fonts/paper-mono/OFL.txt), variável wght 100–800 */
 @font-face {

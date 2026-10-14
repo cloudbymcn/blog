@@ -1,0 +1,109 @@
+/*
+ * Estilos do card de reels. Ficam neste arquivo (importado pelo chunk lazy) em vez de utilitários no
+ * JSX pra não engordar o CSS inicial: globals.css tira o ReelsCard.tsx do scan do Tailwind (@source not).
+ */
+@reference '../styles/globals.css';
+
+.reels-section {
+  @apply overflow-x-clip bg-bg-2;
+}
+.reels-wrap {
+  @apply mx-auto max-w-6xl px-6 pb-28 md:px-8 md:pb-40;
+}
+.reels-shell {
+  @apply rounded-[2rem] p-1.5;
+}
+.reels-inner {
+  @apply relative overflow-hidden rounded-[1.6rem] bg-white/60;
+}
+
+/* cabeçalho: ícone + @cloudbymcn à esquerda, "seguir" à direita */
+.reels-head {
+  @apply flex items-center justify-between gap-4 px-5 pt-5 sm:px-7 sm:pt-6;
+}
+.reels-profile {
+  @apply flex min-w-0 items-center gap-3;
+}
+.reels-avatar {
+  @apply flex size-10 shrink-0 items-center justify-center rounded-xl border border-line bg-white text-ink-2 transition-colors;
+}
+.reels-avatar svg {
+  @apply size-5;
+}
+.reels-profile > span + span {
+  @apply min-w-0;
+}
+.reels-profile:hover .reels-avatar {
+  @apply text-ink;
+}
+.reels-handle {
+  @apply block truncate text-[15px] font-semibold text-ink;
+}
+.reels-sub {
+  @apply block text-[13px] text-ink-2;
+}
+.reels-follow {
+  @apply inline-flex h-9 items-center rounded-full bg-ink px-4 text-[14px] font-medium text-white transition-colors hover:bg-black;
+}
+
+/* reel 9:16 */
+.reels-tile {
+  @apply relative block aspect-[9/16] overflow-hidden rounded-[1.25rem] border border-line bg-bg-2 shadow-[0_12px_40px_rgba(0,0,0,0.12)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)];
+}
+.reels-media {
+  @apply absolute inset-0 h-full w-full object-cover;
+}
+.reels-hint {
+  @apply pointer-events-none absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 text-[12px] font-medium text-white opacity-0 backdrop-blur-md transition-opacity duration-300;
+}
+.reels-hint svg {
+  @apply size-3;
+}
+.reels-tile:hover .reels-hint,
+.reels-tile:focus-visible .reels-hint {
+  @apply opacity-100;
+}
+
+/* desktop: faixa com o central em destaque (posições vêm do rAF em ReelsCard.tsx) */
+.reels-stage {
+  @apply relative overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)];
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+}
+.reels-slot {
+  @apply absolute left-1/2 top-6 will-change-transform;
+}
+.reels-controls {
+  @apply mt-4 flex items-center justify-center gap-4;
+}
+.reels-arrow {
+  @apply flex size-10 items-center justify-center rounded-full text-ink transition-colors hover:bg-white;
+}
+.reels-arrow span {
+  @apply text-xl leading-none;
+}
+.reels-count {
+  @apply min-w-[5.5rem] text-center font-mono text-sm tabular-nums text-ink-2;
+}
+.reels-count span {
+  @apply text-ink;
+}
+
+/* mobile: um reel por tela, scroll-snap nativo */
+.reels-swipe {
+  @apply flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-[12%] py-6;
+  scrollbar-width: none;
+}
+.reels-swipe::-webkit-scrollbar {
+  display: none;
+}
+.reels-swipe .reels-tile {
+  @apply w-[76%] max-w-[340px] shrink-0 snap-center transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)];
+}
+.reels-swipe .reels-tile.is-dim {
+  @apply scale-[0.92] opacity-50;
+}
+
+.reels-caption {
+  @apply mx-auto line-clamp-2 min-h-[2.75em] max-w-md px-6 pb-6 text-center text-[15px] leading-snug text-ink-2 md:pb-7 md:pt-2;
+}

@@ -1,15 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CoverVideo } from '../lib/content'
-
-type Connection = { saveData?: boolean; effectiveType?: string }
-
-/** Vídeo só com movimento liberado e rede boa: reduced-motion, economia de dados e 2g ficam no poster. */
-function motionAllowed() {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
-  const c = (navigator as Navigator & { connection?: Connection }).connection
-  if (c?.saveData) return false
-  return !/2g$/.test(c?.effectiveType ?? '')
-}
+import { motionAllowed } from '../lib/motion'
 
 /** Fontes que o navegador diz tocar, na ordem webm → mp4 (Safari antigo pula o webm). */
 function playableSources(video?: CoverVideo) {
