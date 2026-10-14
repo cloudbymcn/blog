@@ -50,8 +50,8 @@ const MILESTONES: Milestone[] = [
   },
 ]
 
-/** Página 0 = abertura; depois um marco por página. */
-const PAGE_COUNT = MILESTONES.length + 1
+/** Página 0 = abertura; depois um marco por página; a última fecha o livro. */
+const PAGE_COUNT = MILESTONES.length + 2
 
 const FLIP_MS = 700
 const reducedQuery = '(prefers-reduced-motion: reduce)'
@@ -71,6 +71,25 @@ function PageContent({ index }: { index: number }) {
         <p className="mt-3 max-w-[30ch] text-[13px] leading-normal text-ink-2 xl:text-sm">
           certificações, estudos e o que mudou no caminho. vire a página ›
         </p>
+      </div>
+    )
+  }
+  if (index === PAGE_COUNT - 1) {
+    return (
+      <div className="flex h-full flex-col justify-center">
+        <p className="book-mono book-muted text-xs">continua</p>
+        <p className="mt-3 text-[28px] font-semibold leading-[1.05] tracking-[-0.02em] md:text-[30px] xl:text-[36px]">
+          próximo
+          <br />
+          capítulo.
+        </p>
+        <p className="mt-3 max-w-[30ch] text-[13px] leading-normal text-ink-2 xl:text-sm">
+          o caderno segue aberto: cada certificação, estudo e projeto novo vira página aqui.
+        </p>
+        <div className="mt-6 flex items-center gap-2.5">
+          <img src="/img/logo-icon.svg" alt="" loading="lazy" decoding="async" className="size-7 xl:size-8" />
+          <span className="book-mono book-muted text-[11px]">beyond the cloud</span>
+        </div>
       </div>
     )
   }
