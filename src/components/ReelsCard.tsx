@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { siInstagram } from 'simple-icons'
 import data from '../content/reels.json'
 import { motionAllowed } from '../lib/motion'
@@ -68,10 +68,21 @@ interface Motion {
   focus: boolean
 }
 
+/** Glifo do Instagram com o gradiente oficial da marca (radial a partir do canto inferior esquerdo). */
 function InstagramIcon() {
+  const id = `ig-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}` // ids do useId trazem ":" ou "«»"
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d={siInstagram.path} />
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <radialGradient id={id} cx="0.3" cy="1.07" r="1.3" gradientUnits="objectBoundingBox">
+          <stop offset="0" stopColor="#feda75" />
+          <stop offset="0.25" stopColor="#fa7e1e" />
+          <stop offset="0.5" stopColor="#d62976" />
+          <stop offset="0.75" stopColor="#962fbf" />
+          <stop offset="1" stopColor="#4f5bd5" />
+        </radialGradient>
+      </defs>
+      <path d={siInstagram.path} fill={`url(#${id})`} />
     </svg>
   )
 }
