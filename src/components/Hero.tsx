@@ -61,7 +61,7 @@ export function Hero() {
           />
           <MaskText
             as="p"
-            lines={['Engenheiro de Infraestrutura Cloud']}
+            lines={['Analista de Infraestrutura Cloud']}
             delay={260}
             className="lc mt-3 block font-display text-xl font-medium tracking-[-0.01em] text-ink-2 md:text-2xl"
           />

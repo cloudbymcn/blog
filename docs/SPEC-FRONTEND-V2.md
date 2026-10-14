@@ -117,7 +117,7 @@ Performance obrigatória: Lanyard carregado com `React.lazy` + `Suspense` (place
 
 Tirada do site atual, só pra os executores não inventarem:
 
-- Nome: **Matheus Nascimento** · "Engenheiro de Infraestrutura Cloud"
+- Nome: **Matheus Nascimento** · "Analista de Infraestrutura Cloud"
 - Sub: "Arquiteturas AWS reais, decisões técnicas e implementações completas. Pós-graduando em Arquitetura Cloud, com foco em IA, escalabilidade e sistemas distribuídos."
 - Por que documento: "Cada vez que resolvo um problema em produção, documento. Cada vez que erro, documento melhor ainda."
 - Timeline: 2024 CLF-C02 · 2024 AIF-C01 · 2025 SAA-C03 · 2026 lançamento do Cloud by MCN · 2026 pós-graduação em Arquitetura Cloud.

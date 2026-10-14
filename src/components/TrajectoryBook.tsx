@@ -50,7 +50,7 @@ const MILESTONES: Milestone[] = [
   },
   {
     year: 'hoje',
-    title: 'engenheiro de infraestrutura cloud',
+    title: 'analista de infraestrutura cloud',
     text: 'desenhando e colocando em produção arquiteturas aws: integrações, pipelines orientados a eventos, automação e ia aplicada.',
   },
 ]
